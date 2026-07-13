@@ -1,1 +1,77 @@
-package com.flowledger.product.service; import com.flowledger.common.service.OrganizationScopedService; import com.flowledger.product.dto.ProductDtos.*; import com.flowledger.product.entity.*; import com.flowledger.product.mapper.ProductMapper; import com.flowledger.product.repository.*; import org.springframework.data.domain.*; import org.springframework.data.jpa.domain.Specification; import org.springframework.http.*; import org.springframework.stereotype.*; import org.springframework.transaction.annotation.*; import org.springframework.web.server.*; import java.util.*; @Service @Transactional public class ProductService extends OrganizationScopedService {private final ProductRepository r;private final ProductMapper m;private final CategoryRepository categories;private final UnitRepository units;private final TaxRateRepository taxes;public ProductService(ProductRepository r,ProductMapper m,CategoryRepository c,UnitRepository u,TaxRateRepository t){this.r=r;this.m=m;categories=c;units=u;taxes=t;}public Response create(Create d){if(r.existsByOrganizationIdAndSku(orgId(),d.sku()))throw new ResponseStatusException(HttpStatus.CONFLICT,"SKU already exists");validate(d.categoryId(),d.unitId(),d.taxRateId());Product e=m.toEntity(d);e.setOrganizationId(orgId());return m.toResponse(r.save(e));}@Transactional(readOnly=true)public Response get(UUID id){return m.toResponse(load(id));}public Response update(UUID id,Update d){validate(d.categoryId(),d.unitId(),d.taxRateId());Product e=load(id);m.update(d,e);return m.toResponse(r.save(e));}public void delete(UUID id){r.delete(load(id));}@Transactional(readOnly=true)public Page<Response> search(Filter f,Pageable p){Specification<Product>s=(x,q,b)->b.equal(x.get("organizationId"),orgId());if(f.type()!=null)s=s.and((x,q,b)->b.equal(x.get("itemType"),f.type()));if(f.categoryId()!=null)s=s.and((x,q,b)->b.equal(x.get("categoryId"),f.categoryId()));if(f.active()!=null)s=s.and((x,q,b)->b.equal(x.get("active"),f.active()));if(f.barcode()!=null&&!f.barcode().isBlank())s=s.and((x,q,b)->b.equal(x.get("barcode"),f.barcode()));if(f.search()!=null&&!f.search().isBlank()){String v="%"+f.search().toLowerCase()+"%";s=s.and((x,q,b)->b.or(b.like(b.lower(x.get("name")),v),b.like(b.lower(x.get("sku")),v)));}return r.findAll(s,p).map(m::toResponse);}private void validate(UUID category,UUID unit,UUID tax){UUID org=orgId();if(category!=null)required(categories.findByIdAndOrganizationId(category,org),"Category");Unit u=units.findById(unit).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Unit not found"));if(!u.isSystemUnit()&&!org.equals(u.getOrganizationId()))throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Unit not found");if(tax!=null)required(taxes.findByIdAndOrganizationId(tax,org),"Tax rate");}private Product load(UUID id){return required(r.findByIdAndOrganizationId(id,orgId()),"Product");}}
+package com.flowledger.product.service;
+
+import com.flowledger.common.service.OrganizationScopedService;
+import com.flowledger.product.dto.ProductDtos.*;
+import com.flowledger.product.entity.Product;
+import com.flowledger.product.mapper.ProductMapper;
+import com.flowledger.product.repository.ProductRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.UUID;
+
+@Service
+@Transactional
+public class ProductService extends OrganizationScopedService {
+    private final ProductRepository repo;
+    private final ProductMapper mapper;
+
+    public ProductService(ProductRepository repo, ProductMapper mapper) {
+        this.repo = repo;
+        this.mapper = mapper;
+    }
+
+    public Response create(Create dto) {
+        UUID org = orgId();
+        if (repo.existsByOrganizationIdAndSku(org, dto.sku())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "SKU already exists");
+        }
+        Product product = mapper.toEntity(dto);
+        product.setOrganizationId(org);
+        if (dto.itemType() != null) {
+            product.setItemType(dto.itemType());
+        }
+        return mapper.toResponse(repo.save(product));
+    }
+
+    @Transactional(readOnly = true)
+    public Response get(UUID id) {
+        return mapper.toResponse(load(id));
+    }
+
+    public Response update(UUID id, Update dto) {
+        Product product = load(id);
+        mapper.update(dto, product);
+        if (dto.active() != null) {
+            product.setActive(dto.active());
+        }
+        return mapper.toResponse(repo.save(product));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Response> search(Search filter, Pageable pageable) {
+        UUID org = orgId();
+        Specification<Product> spec = (root, query, builder) -> builder.equal(root.get("organizationId"), org);
+        if (filter.active() != null) {
+            spec = spec.and((root, query, builder) -> builder.equal(root.get("active"), filter.active()));
+        }
+        if (filter.search() != null && !filter.search().isBlank()) {
+            String pattern = "%" + filter.search().toLowerCase() + "%";
+            spec = spec.and((root, query, builder) -> builder.or(
+                    builder.like(builder.lower(root.get("name")), pattern),
+                    builder.like(builder.lower(root.get("sku")), pattern),
+                    builder.like(builder.lower(root.get("barcode")), pattern)
+            ));
+        }
+        return repo.findAll(spec, pageable).map(mapper::toResponse);
+    }
+
+    private Product load(UUID id) {
+        return required(repo.findByIdAndOrganizationId(id, orgId()), "Product");
+    }
+}

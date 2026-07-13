@@ -1,1 +1,61 @@
-package com.flowledger.product.service; import com.flowledger.common.service.OrganizationScopedService; import com.flowledger.product.dto.CategoryDtos.*; import com.flowledger.product.entity.Category; import com.flowledger.product.mapper.CategoryMapper; import com.flowledger.product.repository.CategoryRepository; import org.springframework.data.domain.*; import org.springframework.data.jpa.domain.Specification; import org.springframework.http.*; import org.springframework.stereotype.*; import org.springframework.transaction.annotation.*; import org.springframework.web.server.*; import java.util.*; @Service @Transactional public class CategoryService extends OrganizationScopedService {private final CategoryRepository r;private final CategoryMapper m;public CategoryService(CategoryRepository r,CategoryMapper m){this.r=r;this.m=m;}public Response create(Create d){if(r.existsByOrganizationIdAndName(orgId(),d.name()))throw new ResponseStatusException(HttpStatus.CONFLICT,"Category name already exists");validateParent(d.parentId());Category e=m.toEntity(d);e.setOrganizationId(orgId());return m.toResponse(r.save(e));}@Transactional(readOnly=true)public Response get(UUID id){return m.toResponse(load(id));}public Response update(UUID id,Update d){validateParent(d.parentId());Category e=load(id);m.update(d,e);return m.toResponse(r.save(e));}public void delete(UUID id){r.delete(load(id));}@Transactional(readOnly=true)public Page<Response> list(String search,Pageable p){Specification<Category>s=(x,q,b)->b.equal(x.get("organizationId"),orgId());if(search!=null&&!search.isBlank()){String v="%"+search.toLowerCase()+"%";s=s.and((x,q,b)->b.like(b.lower(x.get("name")),v));}return r.findAll(s,p).map(m::toResponse);}private void validateParent(UUID id){if(id!=null)load(id);}private Category load(UUID id){return required(r.findByIdAndOrganizationId(id,orgId()),"Category");}}
+package com.flowledger.product.service;
+
+import com.flowledger.common.service.OrganizationScopedService;
+import com.flowledger.product.dto.CategoryDtos.*;
+import com.flowledger.product.entity.Category;
+import com.flowledger.product.mapper.CategoryMapper;
+import com.flowledger.product.repository.CategoryRepository;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@Transactional
+public class CategoryService extends OrganizationScopedService {
+    private final CategoryRepository repo;
+    private final CategoryMapper mapper;
+
+    public CategoryService(CategoryRepository repo, CategoryMapper mapper) {
+        this.repo = repo;
+        this.mapper = mapper;
+    }
+
+    public Response create(Create dto) {
+        UUID org = orgId();
+        if (repo.existsByOrganizationIdAndName(org, dto.name())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Category name already exists");
+        }
+        Category category = mapper.toEntity(dto);
+        category.setOrganizationId(org);
+        return mapper.toResponse(repo.save(category));
+    }
+
+    @Transactional(readOnly = true)
+    public Response get(UUID id) {
+        return mapper.toResponse(load(id));
+    }
+
+    public Response update(UUID id, Update dto) {
+        Category category = load(id);
+        mapper.update(dto, category);
+        if (dto.active() != null) {
+            category.setActive(dto.active());
+        }
+        return mapper.toResponse(repo.save(category));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Response> list() {
+        Specification<Category> spec = (root, query, builder) -> builder.equal(root.get("organizationId"), orgId());
+        return repo.findAll(spec).stream().map(mapper::toResponse).toList();
+    }
+
+    private Category load(UUID id) {
+        return required(repo.findByIdAndOrganizationId(id, orgId()), "Category");
+    }
+}

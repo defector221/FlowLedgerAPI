@@ -2,6 +2,7 @@ package com.flowledger.auth.controller;
 
 import com.flowledger.auth.dto.*;
 import com.flowledger.auth.service.AuthService;
+import com.flowledger.auth.service.UserService;
 import com.flowledger.common.dto.ApiResponse;
 import com.flowledger.common.security.SecurityUtils;
 import jakarta.validation.Valid;
@@ -11,9 +12,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
     private final AuthService service;
+    private final UserService userService;
 
-    public AuthController(AuthService service) {
+    public AuthController(AuthService service, UserService userService) {
         this.service = service;
+        this.userService = userService;
     }
 
     @PostMapping("/login")
@@ -53,5 +56,16 @@ public class AuthController {
     @PostMapping("/register")
     ApiResponse<LoginResponse> register(@Valid @RequestBody RegisterOrganizationRequest r) {
         return ApiResponse.of(service.registerOrganization(r));
+    }
+
+    @GetMapping("/invitation")
+    ApiResponse<UserDtos.InvitationPreviewResponse> previewInvitation(@RequestParam String token) {
+        return ApiResponse.of(userService.previewInvitation(token));
+    }
+
+    @PostMapping("/accept-invitation")
+    ApiResponse<Void> acceptInvitation(@Valid @RequestBody UserDtos.AcceptInvitationRequest request) {
+        userService.acceptInvitation(request);
+        return ApiResponse.of(null, "Invitation accepted");
     }
 }

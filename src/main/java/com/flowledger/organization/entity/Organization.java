@@ -4,6 +4,8 @@ import com.flowledger.common.entity.AuditableEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
+
 @Entity @Table(name="organizations") @Getter @Setter @NoArgsConstructor
 public class Organization extends AuditableEntity {
     @Column(nullable=false) private String name;
@@ -18,4 +20,6 @@ public class Organization extends AuditableEntity {
     private String invoiceNumberFormat="{PREFIX}/{FY}/{SEQ:6}";
     private java.util.UUID defaultTaxRateId; private String bankName; private String bankAccountNumber; private String bankIfsc; private String bankBranch; private String upiId; private String paymentTerms;
     private boolean allowNegativeStock; private boolean active=true;
+    @Column(nullable=false) private boolean onboardingCompleted;
+    private Instant onboardingCompletedAt;
 }

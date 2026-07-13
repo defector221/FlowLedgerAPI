@@ -68,4 +68,5 @@ logging:
   level:
     root: INFO
     com.flowledger: DEBUG
-    org.hibernate.SQL: WARN
+    org.hibernate.SQL: DEBUG
+    com.flowledger.common.security: DEBUG

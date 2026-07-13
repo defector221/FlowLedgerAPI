@@ -5,6 +5,7 @@ import com.flowledger.customer.service.CustomerService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.*;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.*;
@@ -21,6 +22,7 @@ public class CustomerController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ORGANIZATION_ADMIN', 'SALES_MANAGER')")
     public Response create(@Valid @RequestBody Create dto) {
         return service.create(dto);
     }

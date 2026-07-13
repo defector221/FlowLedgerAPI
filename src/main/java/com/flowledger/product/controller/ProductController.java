@@ -1,1 +1,49 @@
-package com.flowledger.product.controller; import com.flowledger.product.dto.ProductDtos.*; import com.flowledger.product.entity.Product.ItemType; import com.flowledger.product.service.ProductService; import jakarta.validation.*; import org.springframework.data.domain.*; import org.springframework.http.*; import org.springframework.web.bind.annotation.*; import java.util.*; @RestController @RequestMapping("/api/v1/products") public class ProductController{private final ProductService s;public ProductController(ProductService s){this.s=s;}@PostMapping @ResponseStatus(HttpStatus.CREATED)public Response create(@Valid @RequestBody Create d){return s.create(d);}@GetMapping public Page<Response> search(@RequestParam(required=false)ItemType type,@RequestParam(required=false)UUID categoryId,@RequestParam(required=false)String search,@RequestParam(required=false)String barcode,@RequestParam(required=false)Boolean active,Pageable p){return s.search(new Filter(type,categoryId,search,barcode,active),p);}@GetMapping("/{id}")public Response get(@PathVariable UUID id){return s.get(id);}@PutMapping("/{id}")public Response update(@PathVariable UUID id,@Valid @RequestBody Update d){return s.update(id,d);}@DeleteMapping("/{id}")@ResponseStatus(HttpStatus.NO_CONTENT)public void delete(@PathVariable UUID id){s.delete(id);}}
+package com.flowledger.product.controller;
+
+import com.flowledger.product.dto.ProductDtos.*;
+import com.flowledger.product.service.ProductService;
+import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1/products")
+public class ProductController {
+    private final ProductService service;
+
+    public ProductController(ProductService service) {
+        this.service = service;
+    }
+
+    @GetMapping
+    public Page<Response> search(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Boolean active,
+            Pageable pageable
+    ) {
+        return service.search(new Search(search, active), pageable);
+    }
+
+    @GetMapping("/{id}")
+    public Response get(@PathVariable UUID id) {
+        return service.get(id);
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ORGANIZATION_ADMIN', 'INVENTORY_MANAGER')")
+    public Response create(@Valid @RequestBody Create dto) {
+        return service.create(dto);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_ADMIN', 'INVENTORY_MANAGER')")
+    public Response update(@PathVariable UUID id, @Valid @RequestBody Update dto) {
+        return service.update(id, dto);
+    }
+}

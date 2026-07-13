@@ -1,1 +1,65 @@
-package com.flowledger.warehouse.service; import com.flowledger.common.service.OrganizationScopedService; import com.flowledger.warehouse.dto.WarehouseDtos.*; import com.flowledger.warehouse.entity.Warehouse; import com.flowledger.warehouse.mapper.WarehouseMapper; import com.flowledger.warehouse.repository.WarehouseRepository; import org.springframework.http.*; import org.springframework.stereotype.*; import org.springframework.transaction.annotation.*; import org.springframework.web.server.*; import java.util.*; @Service @Transactional public class WarehouseService extends OrganizationScopedService{private final WarehouseRepository r;private final WarehouseMapper m;public WarehouseService(WarehouseRepository r,WarehouseMapper m){this.r=r;this.m=m;}public Response create(Create d){if(r.existsByOrganizationIdAndWarehouseCode(orgId(),d.warehouseCode()))throw new ResponseStatusException(HttpStatus.CONFLICT,"Warehouse code already exists");Warehouse e=m.toEntity(d);e.setOrganizationId(orgId());if(Boolean.TRUE.equals(d.defaultWarehouse()))setDefault(e);return m.toResponse(r.save(e));}@Transactional(readOnly=true)public List<Response> list(){return r.findByOrganizationId(orgId()).stream().map(m::toResponse).toList();}@Transactional(readOnly=true)public Response get(UUID id){return m.toResponse(load(id));}public Response update(UUID id,Update d){Warehouse e=load(id);m.update(d,e);return m.toResponse(r.save(e));}public Response setDefault(UUID id){Warehouse e=load(id);setDefault(e);return m.toResponse(r.save(e));}public void delete(UUID id){r.delete(load(id));}private void setDefault(Warehouse e){r.clearDefault(orgId());e.setDefaultWarehouse(true);}private Warehouse load(UUID id){return required(r.findByIdAndOrganizationId(id,orgId()),"Warehouse");}}
+package com.flowledger.warehouse.service;
+
+import com.flowledger.common.service.OrganizationScopedService;
+import com.flowledger.warehouse.dto.WarehouseDtos.*;
+import com.flowledger.warehouse.entity.Warehouse;
+import com.flowledger.warehouse.mapper.WarehouseMapper;
+import com.flowledger.warehouse.repository.WarehouseRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@Transactional
+public class WarehouseService extends OrganizationScopedService {
+    private final WarehouseRepository repo;
+    private final WarehouseMapper mapper;
+
+    public WarehouseService(WarehouseRepository repo, WarehouseMapper mapper) {
+        this.repo = repo;
+        this.mapper = mapper;
+    }
+
+    public Response create(Create dto) {
+        UUID org = orgId();
+        if (repo.existsByOrganizationIdAndWarehouseCode(org, dto.warehouseCode())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Warehouse code already exists");
+        }
+        if (Boolean.TRUE.equals(dto.defaultWarehouse())) {
+            repo.clearDefault(org);
+        }
+        Warehouse warehouse = mapper.toEntity(dto);
+        warehouse.setOrganizationId(org);
+        if (dto.defaultWarehouse() != null) {
+            warehouse.setDefaultWarehouse(dto.defaultWarehouse());
+        }
+        return mapper.toResponse(repo.save(warehouse));
+    }
+
+    @Transactional(readOnly = true)
+    public Response get(UUID id) {
+        return mapper.toResponse(load(id));
+    }
+
+    public Response update(UUID id, Update dto) {
+        Warehouse warehouse = load(id);
+        mapper.update(dto, warehouse);
+        if (dto.active() != null) {
+            warehouse.setActive(dto.active());
+        }
+        return mapper.toResponse(repo.save(warehouse));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Response> list() {
+        return repo.findByOrganizationId(orgId()).stream().map(mapper::toResponse).toList();
+    }
+
+    private Warehouse load(UUID id) {
+        return required(repo.findByIdAndOrganizationId(id, orgId()), "Warehouse");
+    }
+}

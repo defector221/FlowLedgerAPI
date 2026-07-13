@@ -1,1 +1,44 @@
-package com.flowledger.warehouse.controller; import com.flowledger.warehouse.dto.WarehouseDtos.*; import com.flowledger.warehouse.service.WarehouseService; import jakarta.validation.*; import org.springframework.http.*; import org.springframework.web.bind.annotation.*; import java.util.*; @RestController @RequestMapping("/api/v1/warehouses") public class WarehouseController{private final WarehouseService s;public WarehouseController(WarehouseService s){this.s=s;}@PostMapping @ResponseStatus(HttpStatus.CREATED)public Response create(@Valid @RequestBody Create d){return s.create(d);}@GetMapping public List<Response> list(){return s.list();}@GetMapping("/{id}")public Response get(@PathVariable UUID id){return s.get(id);}@PutMapping("/{id}")public Response update(@PathVariable UUID id,@Valid @RequestBody Update d){return s.update(id,d);}@PostMapping("/{id}/set-default")public Response setDefault(@PathVariable UUID id){return s.setDefault(id);}@DeleteMapping("/{id}")@ResponseStatus(HttpStatus.NO_CONTENT)public void delete(@PathVariable UUID id){s.delete(id);}}
+package com.flowledger.warehouse.controller;
+
+import com.flowledger.warehouse.dto.WarehouseDtos.*;
+import com.flowledger.warehouse.service.WarehouseService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1/warehouses")
+public class WarehouseController {
+    private final WarehouseService service;
+
+    public WarehouseController(WarehouseService service) {
+        this.service = service;
+    }
+
+    @GetMapping
+    public List<Response> list() {
+        return service.list();
+    }
+
+    @GetMapping("/{id}")
+    public Response get(@PathVariable UUID id) {
+        return service.get(id);
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ORGANIZATION_ADMIN', 'INVENTORY_MANAGER')")
+    public Response create(@Valid @RequestBody Create dto) {
+        return service.create(dto);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_ADMIN', 'INVENTORY_MANAGER')")
+    public Response update(@PathVariable UUID id, @Valid @RequestBody Update dto) {
+        return service.update(id, dto);
+    }
+}
