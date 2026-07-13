@@ -1,0 +1,2 @@
+package com.flowledger.sales.repository; import com.flowledger.sales.entity.DeliveryChallan; import org.springframework.data.jpa.repository.JpaRepository; import java.util.*;
+public interface DeliveryChallanRepository extends JpaRepository<DeliveryChallan,UUID>{Optional<DeliveryChallan> findByIdAndOrganizationId(UUID id,UUID org);Optional<DeliveryChallan> findByOrganizationIdAndSalesOrderId(UUID org,UUID orderId);}

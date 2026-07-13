@@ -1,0 +1,6 @@
+package com.flowledger.common.security;
+import com.flowledger.auth.service.CustomUserDetailsService; import com.flowledger.common.tenant.TenantContext; import jakarta.servlet.*; import jakarta.servlet.http.*; import org.springframework.security.authentication.UsernamePasswordAuthenticationToken; import org.springframework.security.core.context.SecurityContextHolder; import org.springframework.stereotype.Component; import org.springframework.web.filter.OncePerRequestFilter; import java.io.IOException;
+@Component public class JwtAuthenticationFilter extends OncePerRequestFilter {
+ private final JwtService jwt; private final CustomUserDetailsService users; public JwtAuthenticationFilter(JwtService jwt,CustomUserDetailsService users){this.jwt=jwt;this.users=users;}
+ protected void doFilterInternal(HttpServletRequest r,HttpServletResponse s,FilterChain c)throws ServletException,IOException {try{String h=r.getHeader("Authorization");if(h!=null&&h.startsWith("Bearer ")){String token=h.substring(7);if(jwt.isValid(token,"access")){UserPrincipal p=users.load(jwt.userId(token));SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(p,null,p.getAuthorities()));TenantContext.set(p.getOrgId(),p.getId());}}c.doFilter(r,s);}finally{TenantContext.clear();}}
+}

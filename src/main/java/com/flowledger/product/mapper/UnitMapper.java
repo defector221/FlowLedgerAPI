@@ -1,0 +1,1 @@
+package com.flowledger.product.mapper; import com.flowledger.product.dto.UnitDtos.*; import com.flowledger.product.entity.Unit; import org.mapstruct.*; @Mapper(componentModel="spring") public interface UnitMapper{Unit toEntity(Create d);Response toResponse(Unit e);}
