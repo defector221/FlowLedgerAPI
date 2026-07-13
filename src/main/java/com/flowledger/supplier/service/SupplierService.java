@@ -32,6 +32,12 @@ public class SupplierService extends OrganizationScopedService {
         }
         Supplier supplier = mapper.toEntity(dto);
         supplier.setOrganizationId(org);
+        if (supplier.getCountry() == null || supplier.getCountry().isBlank()) {
+            supplier.setCountry("India");
+        }
+        if (supplier.getOpeningBalance() == null) {
+            supplier.setOpeningBalance(java.math.BigDecimal.ZERO);
+        }
         return mapper.toResponse(repo.save(supplier));
     }
 

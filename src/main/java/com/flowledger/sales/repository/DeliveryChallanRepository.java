@@ -8,4 +8,6 @@ public interface DeliveryChallanRepository extends JpaRepository<DeliveryChallan
     Optional<DeliveryChallan> findByIdAndOrganizationId(UUID id, UUID org);
 
     Optional<DeliveryChallan> findByOrganizationIdAndSalesOrderId(UUID org, UUID orderId);
+
+    List<DeliveryChallan> findByOrganizationIdOrderByChallanDateDesc(UUID org);
 }

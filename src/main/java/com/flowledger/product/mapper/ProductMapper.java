@@ -6,9 +6,17 @@ import org.mapstruct.*;
 
 @Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface ProductMapper {
-    Product toEntity(Create d);
+    default Product toEntity(Create d) {
+        Product entity = new Product();
+        updateFromCreate(d, entity);
+        return entity;
+    }
+
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    void updateFromCreate(Create d, @MappingTarget Product entity);
 
     Response toResponse(Product e);
 
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void update(Update d, @MappingTarget Product e);
 }

@@ -7,6 +7,7 @@ import com.flowledger.common.exception.*;
 import com.flowledger.common.security.*;
 import com.flowledger.organization.entity.*;
 import com.flowledger.organization.repository.*;
+import com.flowledger.subscription.service.SubscriptionService;
 import java.time.*;
 import java.util.*;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,7 @@ public class AuthService {
     private final JwtService jwt;
     private final CustomUserDetailsService details;
     private final OrganizationMembershipService membershipService;
+    private final SubscriptionService subscriptions;
 
     @Value("${flowledger.app.frontend-url}")
     private String frontendUrl;
@@ -40,7 +42,8 @@ public class AuthService {
             PasswordEncoder encoder,
             JwtService jwt,
             CustomUserDetailsService details,
-            OrganizationMembershipService membershipService) {
+            OrganizationMembershipService membershipService,
+            SubscriptionService subscriptions) {
         this.users = users;
         this.roles = roles;
         this.refreshTokens = refreshTokens;
@@ -50,6 +53,7 @@ public class AuthService {
         this.jwt = jwt;
         this.details = details;
         this.membershipService = membershipService;
+        this.subscriptions = subscriptions;
     }
 
     @Transactional
@@ -100,6 +104,7 @@ public class AuthService {
     public LoginResponse createOrganization(UUID userId, CreateOrganizationRequest request) {
         User user =
                 users.findByIdAndActiveTrue(userId).orElseThrow(() -> new UnauthorizedException("User unavailable"));
+        subscriptions.checkCanCreateOrganization(userId);
         Organization organization = new Organization();
         organization.setName(request.organizationName());
         organization.setEmail(user.getEmail());
@@ -199,6 +204,7 @@ public class AuthService {
         user.getRoles().add(role);
         users.save(user);
         membershipService.createAdminMembership(user, organization, role);
+        subscriptions.ensureDefaultSubscription(user.getId(), "FREE");
         return tokens(user, organization.getId());
     }
 

@@ -55,12 +55,21 @@ public final class SupplierDtos {
             String supplierName,
             String companyName,
             String gstin,
+            String pan,
             String email,
             String phone,
+            String billingAddress,
+            String shippingAddress,
             String city,
             String state,
             String stateCode,
+            String country,
+            String paymentTerms,
             BigDecimal openingBalance,
+            String bankName,
+            String bankAccountNumber,
+            String bankIfsc,
+            String notes,
             boolean archived) {}
 
     public record Search(String search, Boolean archived) {}

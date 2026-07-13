@@ -32,10 +32,32 @@ public class ProductService extends OrganizationScopedService {
         }
         Product product = mapper.toEntity(dto);
         product.setOrganizationId(org);
-        if (dto.itemType() != null) {
-            product.setItemType(dto.itemType());
-        }
+        applyDefaults(product);
         return mapper.toResponse(repo.save(product));
+    }
+
+    private void applyDefaults(Product product) {
+        if (product.getItemType() == null || product.getItemType().isBlank()) {
+            product.setItemType("PRODUCT");
+        }
+        if (product.getPurchasePrice() == null) {
+            product.setPurchasePrice(java.math.BigDecimal.ZERO);
+        }
+        if (product.getSellingPrice() == null) {
+            product.setSellingPrice(java.math.BigDecimal.ZERO);
+        }
+        if (product.getMrp() == null) {
+            product.setMrp(java.math.BigDecimal.ZERO);
+        }
+        if (product.getOpeningStock() == null) {
+            product.setOpeningStock(java.math.BigDecimal.ZERO);
+        }
+        if (product.getMinimumStockLevel() == null) {
+            product.setMinimumStockLevel(java.math.BigDecimal.ZERO);
+        }
+        if (product.getReorderLevel() == null) {
+            product.setReorderLevel(java.math.BigDecimal.ZERO);
+        }
     }
 
     @Transactional(readOnly = true)

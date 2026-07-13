@@ -1,25 +1,28 @@
-package com.flowledger.report;
+package com.flowledger.report.service;
 
 import com.flowledger.common.tenant.TenantContext;
-import jakarta.persistence.*;
+import com.flowledger.report.dto.ReportFilter;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Query;
 import java.time.LocalDate;
-import java.util.*;
-import org.springframework.http.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.*;
-
-record ReportFilter(
-        LocalDate from, LocalDate to, UUID customer, UUID supplier, UUID product, UUID category, UUID warehouse) {}
 
 @Service
-class ReportService {
+public class ReportService {
     @PersistenceContext
-    EntityManager em;
+    private EntityManager em;
 
-    List<Map<String, Object>> report(String name, ReportFilter f) {
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> report(String name, ReportFilter f) {
         UUID org = TenantContext.getOrganizationId();
-        LocalDate from = f.from() == null ? LocalDate.now().minusMonths(12) : f.from(),
-                to = f.to() == null ? LocalDate.now() : f.to();
+        LocalDate from = f.from() == null ? LocalDate.now().minusMonths(12) : f.from();
+        LocalDate to = f.to() == null ? LocalDate.now() : f.to();
         String sql =
                 switch (name) {
                     case "sales", "gstr1" ->
@@ -45,13 +48,17 @@ class ReportService {
                     default -> throw new IllegalArgumentException("Unsupported report: " + name);
                 };
         Query q = em.createNativeQuery(sql).setParameter("org", org);
-        if (sql.contains(":from")) q.setParameter("from", from).setParameter("to", to);
+        if (sql.contains(":from")) {
+            q.setParameter("from", from).setParameter("to", to);
+        }
         List<Object[]> rows = q.getResultList();
         List<String> cols = columns(name);
         List<Map<String, Object>> result = new ArrayList<>();
         for (Object[] row : rows) {
             Map<String, Object> m = new LinkedHashMap<>();
-            for (int i = 0; i < row.length; i++) m.put(i < cols.size() ? cols.get(i) : "value" + i, row[i]);
+            for (int i = 0; i < row.length; i++) {
+                m.put(i < cols.size() ? cols.get(i) : "value" + i, row[i]);
+            }
             result.add(m);
         }
         return result;
@@ -65,48 +72,5 @@ class ReportService {
             case "hsn", "product-sales" -> List.of("productId", "quantity", "amount");
             default -> List.of("partyId", "number", "date", "grandTotal", "amountPaid", "outstanding");
         };
-    }
-}
-
-@RestController
-@RequestMapping("/api/v1/reports")
-class ReportController {
-    private final ReportService reports;
-
-    ReportController(ReportService r) {
-        reports = r;
-    }
-
-    @GetMapping("/{name}")
-    List<Map<String, Object>> get(
-            @PathVariable String name,
-            @RequestParam(required = false) LocalDate from,
-            @RequestParam(required = false) LocalDate to,
-            @RequestParam(required = false) UUID customer,
-            @RequestParam(required = false) UUID supplier,
-            @RequestParam(required = false) UUID product,
-            @RequestParam(required = false) UUID category,
-            @RequestParam(required = false) UUID warehouse) {
-        return reports.report(name, new ReportFilter(from, to, customer, supplier, product, category, warehouse));
-    }
-
-    @GetMapping(value = "/{name}/export", produces = "text/csv")
-    ResponseEntity<String> csv(
-            @PathVariable String name,
-            @RequestParam(required = false) LocalDate from,
-            @RequestParam(required = false) LocalDate to) {
-        List<Map<String, Object>> rows = reports.report(name, new ReportFilter(from, to, null, null, null, null, null));
-        StringBuilder csv = new StringBuilder();
-        if (!rows.isEmpty()) {
-            csv.append(String.join(",", rows.get(0).keySet())).append('\n');
-            for (Map<String, Object> r : rows)
-                csv.append(r.values().stream()
-                                .map(v -> "\"" + String.valueOf(v).replace("\"", "\"\"") + "\"")
-                                .collect(java.util.stream.Collectors.joining(",")))
-                        .append('\n');
-        }
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + name + ".csv")
-                .body(csv.toString());
     }
 }

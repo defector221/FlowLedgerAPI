@@ -1,13 +1,13 @@
 package com.flowledger.sales.controller;
 
-import com.flowledger.sales.entity.DeliveryChallan;
-import com.flowledger.sales.entity.Quotation;
-import com.flowledger.sales.entity.SalesInvoice;
-import com.flowledger.sales.entity.SalesOrder;
+import com.flowledger.sales.dto.SalesDtos.*;
+import com.flowledger.sales.entity.*;
 import com.flowledger.sales.service.SalesDocumentService;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,6 +20,8 @@ public class SalesDocumentController {
         this.service = service;
     }
 
+    // ── Quotations ──────────────────────────────────────────────────────────
+
     @GetMapping("/quotations")
     public List<Quotation> quotations() {
         return service.listQuotations();
@@ -30,9 +32,53 @@ public class SalesDocumentController {
         return service.getQuotation(id);
     }
 
+    @PostMapping("/quotations")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Quotation createQuotation(@Valid @RequestBody QuotationRequest request) {
+        return service.createQuotation(request);
+    }
+
+    @PutMapping("/quotations/{id}")
+    public Quotation updateQuotation(@PathVariable UUID id, @Valid @RequestBody QuotationRequest request) {
+        return service.updateQuotation(id, request);
+    }
+
+    @PostMapping("/quotations/{id}/cancel")
+    public Quotation cancelQuotation(@PathVariable UUID id) {
+        return service.cancelQuotation(id);
+    }
+
     @PostMapping("/quotations/{id}/convert-to-order")
     public SalesOrder convertQuotation(@PathVariable UUID id) {
         return service.convertQuotationToOrder(id);
+    }
+
+    // ── Orders ──────────────────────────────────────────────────────────────
+
+    @GetMapping("/orders")
+    public List<SalesOrder> orders() {
+        return service.listOrders();
+    }
+
+    @GetMapping("/orders/{id}")
+    public SalesOrder order(@PathVariable UUID id) {
+        return service.getOrder(id);
+    }
+
+    @PostMapping("/orders")
+    @ResponseStatus(HttpStatus.CREATED)
+    public SalesOrder createOrder(@Valid @RequestBody OrderRequest request) {
+        return service.createOrder(request);
+    }
+
+    @PutMapping("/orders/{id}")
+    public SalesOrder updateOrder(@PathVariable UUID id, @Valid @RequestBody OrderRequest request) {
+        return service.updateOrder(id, request);
+    }
+
+    @PostMapping("/orders/{id}/cancel")
+    public SalesOrder cancelOrder(@PathVariable UUID id) {
+        return service.cancelOrder(id);
     }
 
     @PostMapping("/orders/{id}/convert-to-challan")
@@ -45,8 +91,77 @@ public class SalesDocumentController {
         return service.convertOrderToInvoice(id, body.get("warehouseId"));
     }
 
+    // ── Challans ────────────────────────────────────────────────────────────
+
+    @GetMapping("/challans")
+    public List<DeliveryChallan> challans() {
+        return service.listChallans();
+    }
+
+    @GetMapping("/challans/{id}")
+    public DeliveryChallan challan(@PathVariable UUID id) {
+        return service.getChallan(id);
+    }
+
+    @PostMapping("/challans")
+    @ResponseStatus(HttpStatus.CREATED)
+    public DeliveryChallan createChallan(@Valid @RequestBody ChallanRequest request) {
+        return service.createChallan(request);
+    }
+
+    @PutMapping("/challans/{id}")
+    public DeliveryChallan updateChallan(@PathVariable UUID id, @Valid @RequestBody ChallanRequest request) {
+        return service.updateChallan(id, request);
+    }
+
+    @PostMapping("/challans/{id}/cancel")
+    public DeliveryChallan cancelChallan(@PathVariable UUID id) {
+        return service.cancelChallan(id);
+    }
+
     @PostMapping("/challans/{id}/convert-to-invoice")
     public SalesInvoice convertChallanToInvoice(@PathVariable UUID id) {
         return service.convertChallanToInvoice(id);
+    }
+
+    // ── Returns ─────────────────────────────────────────────────────────────
+
+    @GetMapping("/returns")
+    public List<SalesReturn> returns() {
+        return service.listReturns();
+    }
+
+    @GetMapping("/returns/{id}")
+    public SalesReturn getReturn(@PathVariable UUID id) {
+        return service.getReturn(id);
+    }
+
+    @PostMapping("/returns")
+    @ResponseStatus(HttpStatus.CREATED)
+    public SalesReturn createReturn(@Valid @RequestBody ReturnRequest request) {
+        return service.createReturn(request);
+    }
+
+    @PostMapping("/returns/{id}/confirm")
+    public SalesReturn confirmReturn(@PathVariable UUID id) {
+        return service.confirmReturn(id);
+    }
+
+    // ── Credit notes ────────────────────────────────────────────────────────
+
+    @GetMapping("/credit-notes")
+    public List<CreditNote> creditNotes() {
+        return service.listCreditNotes();
+    }
+
+    @GetMapping("/credit-notes/{id}")
+    public CreditNote creditNote(@PathVariable UUID id) {
+        return service.getCreditNote(id);
+    }
+
+    @PostMapping("/credit-notes")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CreditNote createCreditNote(@Valid @RequestBody CreditNoteRequest request) {
+        return service.createCreditNote(request);
     }
 }

@@ -51,13 +51,19 @@ public final class CustomerDtos {
             String customerName,
             String companyName,
             String gstin,
+            String pan,
             String email,
             String phone,
+            String billingAddress,
+            String shippingAddress,
             String city,
             String state,
             String stateCode,
+            String country,
             BigDecimal creditLimit,
+            String paymentTerms,
             BigDecimal openingBalance,
+            String notes,
             boolean archived) {}
 
     public record Search(String search, Boolean archived) {}

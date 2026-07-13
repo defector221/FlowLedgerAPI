@@ -1,20 +1,24 @@
-package com.flowledger.dashboard;
+package com.flowledger.dashboard.service;
 
 import com.flowledger.common.tenant.TenantContext;
-import jakarta.persistence.*;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.*;
 
 @Service
-class DashboardService {
+public class DashboardService {
     @PersistenceContext
-    EntityManager em;
+    private EntityManager em;
 
-    Map<String, Object> summary() {
+    public Map<String, Object> summary() {
         UUID org = TenantContext.getOrganizationId();
-        LocalDate today = LocalDate.now(), month = today.withDayOfMonth(1);
+        LocalDate today = LocalDate.now();
+        LocalDate month = today.withDayOfMonth(1);
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("todaySales", sum("sales_invoices", "invoice_date", today, today, org));
         r.put("monthSales", sum("sales_invoices", "invoice_date", month, today, org));
@@ -80,20 +84,5 @@ class DashboardService {
                         "select customer_id,sum(grand_total) amount from sales_invoices where organization_id=:org group by customer_id order by amount desc limit 5")
                 .setParameter("org", org)
                 .getResultList();
-    }
-}
-
-@RestController
-@RequestMapping("/api/v1/dashboard")
-class DashboardController {
-    private final DashboardService service;
-
-    DashboardController(DashboardService s) {
-        service = s;
-    }
-
-    @GetMapping
-    Map<String, Object> summary() {
-        return service.summary();
     }
 }

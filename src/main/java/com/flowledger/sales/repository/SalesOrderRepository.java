@@ -8,4 +8,6 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, UUID> {
     Optional<SalesOrder> findByIdAndOrganizationId(UUID id, UUID org);
 
     Optional<SalesOrder> findByOrganizationIdAndQuotationId(UUID org, UUID quotationId);
+
+    List<SalesOrder> findByOrganizationIdOrderByOrderDateDesc(UUID org);
 }

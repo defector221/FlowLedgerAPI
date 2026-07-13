@@ -63,6 +63,15 @@ flowledger:
   app:
     frontend-url: ${FRONTEND_URL:http://localhost:5173}
     allow-negative-stock-default: false
+  # Notification channels (email SMTP vs mock; WhatsApp is always mock until a provider is wired)
+  notifications:
+    email:
+      # When false (default), emails are logged by MockEmailNotificationService.
+      # When true, uses spring.mail.* via SmtpEmailNotificationService.
+      enabled: ${FLOWLEDGER_EMAIL_ENABLED:false}
+    whatsapp:
+      # Placeholder for a future provider; MockWhatsAppNotificationService is used today.
+      enabled: ${FLOWLEDGER_WHATSAPP_ENABLED:false}
 
 logging:
   level:

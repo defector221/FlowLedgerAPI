@@ -31,7 +31,20 @@ public class CustomerService extends OrganizationScopedService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Customer code already exists");
         Customer c = mapper.toEntity(dto);
         c.setOrganizationId(org);
+        applyDefaults(c);
         return mapper.toResponse(repo.save(c));
+    }
+
+    private void applyDefaults(Customer c) {
+        if (c.getCountry() == null || c.getCountry().isBlank()) {
+            c.setCountry("India");
+        }
+        if (c.getCreditLimit() == null) {
+            c.setCreditLimit(BigDecimal.ZERO);
+        }
+        if (c.getOpeningBalance() == null) {
+            c.setOpeningBalance(BigDecimal.ZERO);
+        }
     }
 
     @Transactional(readOnly = true)

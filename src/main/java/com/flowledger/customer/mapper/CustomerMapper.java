@@ -6,7 +6,14 @@ import org.mapstruct.*;
 
 @Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface CustomerMapper {
-    Customer toEntity(Create dto);
+    default Customer toEntity(Create dto) {
+        Customer entity = new Customer();
+        updateFromCreate(dto, entity);
+        return entity;
+    }
+
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    void updateFromCreate(Create dto, @MappingTarget Customer entity);
 
     Response toResponse(Customer entity);
 

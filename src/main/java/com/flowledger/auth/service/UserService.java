@@ -12,6 +12,7 @@ import com.flowledger.common.exception.ResourceNotFoundException;
 import com.flowledger.common.service.OrganizationScopedService;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
+import com.flowledger.subscription.service.SubscriptionService;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -31,6 +32,7 @@ public class UserService extends OrganizationScopedService {
     private final OrganizationMembershipRepository memberships;
     private final OrganizationMembershipService membershipService;
     private final PasswordEncoder encoder;
+    private final SubscriptionService subscriptions;
 
     public UserService(
             UserRepository users,
@@ -38,13 +40,15 @@ public class UserService extends OrganizationScopedService {
             OrganizationRepository organizations,
             OrganizationMembershipRepository memberships,
             OrganizationMembershipService membershipService,
-            PasswordEncoder encoder) {
+            PasswordEncoder encoder,
+            SubscriptionService subscriptions) {
         this.users = users;
         this.roles = roles;
         this.organizations = organizations;
         this.memberships = memberships;
         this.membershipService = membershipService;
         this.encoder = encoder;
+        this.subscriptions = subscriptions;
     }
 
     @Transactional(readOnly = true)
@@ -61,6 +65,7 @@ public class UserService extends OrganizationScopedService {
 
     public UserListResponse invite(InviteUserRequest request) {
         UUID organizationId = orgId();
+        subscriptions.checkCanInvite(organizationId);
         Role role = requireRole(request.role());
         String email = request.email().trim().toLowerCase();
         User user = users.findByEmailIgnoreCase(email).orElse(null);
