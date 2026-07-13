@@ -1,3 +1,25 @@
 package com.flowledger.common.security;
-import com.flowledger.common.exception.UnauthorizedException; import org.springframework.security.core.context.SecurityContextHolder; import java.util.UUID;
-public final class SecurityUtils {private SecurityUtils(){} public static UserPrincipal currentUser(){Object p=SecurityContextHolder.getContext().getAuthentication()==null?null:SecurityContextHolder.getContext().getAuthentication().getPrincipal();if(p instanceof UserPrincipal u)return u;throw new UnauthorizedException("Authentication required");}public static UUID currentUserId(){return currentUser().getId();}public static UUID currentOrganizationId(){return currentUser().getOrgId();}}
+
+import com.flowledger.common.exception.UnauthorizedException;
+import java.util.UUID;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+public final class SecurityUtils {
+    private SecurityUtils() {}
+
+    public static UserPrincipal currentUser() {
+        Object p = SecurityContextHolder.getContext().getAuthentication() == null
+                ? null
+                : SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (p instanceof UserPrincipal u) return u;
+        throw new UnauthorizedException("Authentication required");
+    }
+
+    public static UUID currentUserId() {
+        return currentUser().getId();
+    }
+
+    public static UUID currentOrganizationId() {
+        return currentUser().getOrgId();
+    }
+}

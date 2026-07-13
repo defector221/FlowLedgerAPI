@@ -6,15 +6,14 @@ import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.sales.entity.*;
 import com.flowledger.sales.repository.*;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class SalesDocumentService {
@@ -27,13 +26,14 @@ public class SalesDocumentService {
     private final DocumentNumberService numbers;
     private final SalesInvoiceService invoiceService;
 
-    public SalesDocumentService(QuotationRepository quotations,
-                                SalesOrderRepository orders,
-                                DeliveryChallanRepository challans,
-                                SalesInvoiceRepository invoices,
-                                OrganizationRepository organizations,
-                                DocumentNumberService numbers,
-                                SalesInvoiceService invoiceService) {
+    public SalesDocumentService(
+            QuotationRepository quotations,
+            SalesOrderRepository orders,
+            DeliveryChallanRepository challans,
+            SalesInvoiceRepository invoices,
+            OrganizationRepository organizations,
+            DocumentNumberService numbers,
+            SalesInvoiceService invoiceService) {
         this.quotations = quotations;
         this.orders = orders;
         this.challans = challans;
@@ -50,7 +50,8 @@ public class SalesDocumentService {
 
     @Transactional(readOnly = true)
     public Quotation getQuotation(UUID id) {
-        return quotations.findByIdAndOrganizationId(id, orgId())
+        return quotations
+                .findByIdAndOrganizationId(id, orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quotation not found"));
     }
 
@@ -72,8 +73,13 @@ public class SalesDocumentService {
         order.setPlaceOfSupply(q.getPlaceOfSupply());
         order.setTermsAndConditions(q.getTermsAndConditions());
         order.setNotes(q.getNotes());
-        order.setOrderNumber(numbers.next(org.getId(), "SALES_ORDER", org.getSalesOrderPrefix(),
-                "{PREFIX}/{FY}/{SEQ:6}", org.getFinancialYearStart(), order.getOrderDate()));
+        order.setOrderNumber(numbers.next(
+                org.getId(),
+                "SALES_ORDER",
+                org.getSalesOrderPrefix(),
+                "{PREFIX}/{FY}/{SEQ:6}",
+                org.getFinancialYearStart(),
+                order.getOrderDate()));
         order.setSubtotal(q.getSubtotal());
         order.setDiscountTotal(q.getDiscountTotal());
         order.setTaxTotal(q.getTaxTotal());
@@ -122,8 +128,13 @@ public class SalesDocumentService {
         challan.setWarehouseId(warehouseId);
         challan.setChallanDate(LocalDate.now());
         challan.setStatus(DeliveryChallan.Status.DELIVERED);
-        challan.setChallanNumber(numbers.next(org.getId(), "DELIVERY_CHALLAN", org.getDeliveryChallanPrefix(),
-                "{PREFIX}/{FY}/{SEQ:6}", org.getFinancialYearStart(), challan.getChallanDate()));
+        challan.setChallanNumber(numbers.next(
+                org.getId(),
+                "DELIVERY_CHALLAN",
+                org.getDeliveryChallanPrefix(),
+                "{PREFIX}/{FY}/{SEQ:6}",
+                org.getFinancialYearStart(),
+                challan.getChallanDate()));
         int i = 0;
         for (SalesOrderItem oi : order.getItems()) {
             DeliveryChallanItem item = new DeliveryChallanItem();
@@ -152,8 +163,10 @@ public class SalesDocumentService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Challan not found"));
         return invoices.findByOrganizationIdAndDeliveryChallanId(orgId(), challanId)
                 .orElseGet(() -> {
-                    SalesOrder order = challan.getSalesOrderId() == null ? null
-                            : orders.findByIdAndOrganizationId(challan.getSalesOrderId(), orgId()).orElse(null);
+                    SalesOrder order = challan.getSalesOrderId() == null
+                            ? null
+                            : orders.findByIdAndOrganizationId(challan.getSalesOrderId(), orgId())
+                                    .orElse(null);
                     if (order == null) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Challan has no linked sales order");
                     }
@@ -165,14 +178,32 @@ public class SalesDocumentService {
         Organization org = organization();
         var requestItems = order.getItems().stream()
                 .map(i -> new com.flowledger.sales.dto.SalesDtos.Item(
-                        i.getProductId(), i.getDescription(), i.getHsnSacCode(), i.getQuantity(),
-                        i.getUnitId(), i.getRate(), i.getDiscountPercent(), i.getTaxRate()))
+                        i.getProductId(),
+                        i.getDescription(),
+                        i.getHsnSacCode(),
+                        i.getQuantity(),
+                        i.getUnitId(),
+                        i.getRate(),
+                        i.getDiscountPercent(),
+                        i.getTaxRate()))
                 .toList();
         var request = new com.flowledger.sales.dto.SalesDtos.Invoice(
-                order.getCustomerId(), LocalDate.now(), LocalDate.now().plusDays(30), warehouseId,
-                order.getId(), challanId, order.getBillingAddress(), order.getShippingAddress(),
-                order.getPlaceOfSupply(), false, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                order.getNotes(), order.getTermsAndConditions(), requestItems);
+                order.getCustomerId(),
+                LocalDate.now(),
+                LocalDate.now().plusDays(30),
+                warehouseId,
+                order.getId(),
+                challanId,
+                order.getBillingAddress(),
+                order.getShippingAddress(),
+                order.getPlaceOfSupply(),
+                false,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                order.getNotes(),
+                order.getTermsAndConditions(),
+                requestItems);
         SalesInvoice draft = invoiceService.createDraft(request);
         return invoiceService.confirm(draft.getId());
     }
@@ -182,7 +213,8 @@ public class SalesDocumentService {
     }
 
     private Organization organization() {
-        return organizations.findById(orgId())
+        return organizations
+                .findById(orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found"));
     }
 }

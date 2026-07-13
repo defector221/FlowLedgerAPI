@@ -9,12 +9,13 @@ import com.flowledger.organization.mapper.OrganizationMapper;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.organization.repository.OrganizationSettingsRepository;
 import com.flowledger.storage.StorageService;
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.time.Instant;
-import java.util.UUID;
 
 @Service
 public class OrganizationService {
@@ -27,8 +28,7 @@ public class OrganizationService {
             OrganizationRepository repo,
             OrganizationSettingsRepository settingsRepo,
             OrganizationMapper mapper,
-            StorageService storage
-    ) {
+            StorageService storage) {
         this.repo = repo;
         this.settingsRepo = settingsRepo;
         this.mapper = mapper;
@@ -43,6 +43,7 @@ public class OrganizationService {
     public OrganizationResponse update(UUID id, UpdateOrganizationRequest request) {
         Organization organization = get(id);
         mapper.update(request, organization);
+        validateRequiredFields(organization);
         return mapper.toResponse(repo.save(organization));
     }
 
@@ -59,6 +60,7 @@ public class OrganizationService {
     @Transactional
     public OrganizationResponse completeOnboarding(UUID id) {
         Organization organization = get(id);
+        validateRequiredFields(organization);
         organization.setOnboardingCompleted(true);
         organization.setOnboardingCompletedAt(Instant.now());
         return mapper.toResponse(repo.save(organization));
@@ -67,7 +69,8 @@ public class OrganizationService {
     @Transactional(readOnly = true)
     public OrganizationSettingsResponse settings() {
         UUID orgId = SecurityUtils.currentOrganizationId();
-        OrganizationSettings settings = settingsRepo.findByOrganizationId(orgId)
+        OrganizationSettings settings = settingsRepo
+                .findByOrganizationId(orgId)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization settings not found"));
         return mapper.toResponse(settings);
     }
@@ -75,7 +78,8 @@ public class OrganizationService {
     @Transactional
     public OrganizationSettingsResponse updateSettings(UpdateOrganizationSettingsRequest request) {
         UUID orgId = SecurityUtils.currentOrganizationId();
-        OrganizationSettings settings = settingsRepo.findByOrganizationId(orgId)
+        OrganizationSettings settings = settingsRepo
+                .findByOrganizationId(orgId)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization settings not found"));
         if (request.inventoryDeductionEvent() != null) {
             settings.setInventoryDeductionEvent(request.inventoryDeductionEvent());
@@ -93,6 +97,30 @@ public class OrganizationService {
             settings.setSettingsJson(request.settingsJson());
         }
         return mapper.toResponse(settingsRepo.save(settings));
+    }
+
+    private void validateRequiredFields(Organization organization) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        checkText(errors, "name", organization.getName(), "Organization name is required");
+        checkText(errors, "country", organization.getCountry(), "Country is required");
+        checkText(errors, "currency", organization.getCurrency(), "Currency is required");
+        checkText(
+                errors, "financialYearStart", organization.getFinancialYearStart(), "Financial year start is required");
+        checkText(errors, "invoicePrefix", organization.getInvoicePrefix(), "Invoice prefix is required");
+        checkText(
+                errors,
+                "invoiceNumberFormat",
+                organization.getInvoiceNumberFormat(),
+                "Invoice number format is required");
+        if (!errors.isEmpty()) {
+            throw new com.flowledger.common.exception.ValidationException(errors);
+        }
+    }
+
+    private void checkText(Map<String, String> errors, String field, String value, String message) {
+        if (value == null || value.isBlank()) {
+            errors.put(field, message);
+        }
     }
 
     private Organization get(UUID id) {

@@ -5,6 +5,7 @@ import com.flowledger.supplier.dto.SupplierDtos.*;
 import com.flowledger.supplier.entity.Supplier;
 import com.flowledger.supplier.mapper.SupplierMapper;
 import com.flowledger.supplier.repository.SupplierRepository;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -12,8 +13,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-
-import java.util.UUID;
 
 @Service
 @Transactional
@@ -62,8 +61,7 @@ public class SupplierService extends OrganizationScopedService {
             spec = spec.and((root, query, builder) -> builder.or(
                     builder.like(builder.lower(root.get("supplierName")), pattern),
                     builder.like(builder.lower(root.get("supplierCode")), pattern),
-                    builder.like(builder.lower(root.get("phone")), pattern)
-            ));
+                    builder.like(builder.lower(root.get("phone")), pattern)));
         }
         return repo.findAll(spec, pageable).map(mapper::toResponse);
     }

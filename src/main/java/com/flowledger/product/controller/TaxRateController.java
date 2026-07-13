@@ -1,1 +1,45 @@
-package com.flowledger.product.controller; import com.flowledger.product.dto.TaxRateDtos.*; import com.flowledger.product.service.TaxRateService; import jakarta.validation.*; import org.springframework.http.*; import org.springframework.web.bind.annotation.*; import java.util.*; @RestController @RequestMapping("/api/v1/tax-rates") public class TaxRateController{private final TaxRateService s;public TaxRateController(TaxRateService s){this.s=s;}@PostMapping @ResponseStatus(HttpStatus.CREATED)public Response create(@Valid @RequestBody Create d){return s.create(d);}@GetMapping public List<Response> list(){return s.list();}@GetMapping("/{id}")public Response get(@PathVariable UUID id){return s.get(id);}@PutMapping("/{id}")public Response update(@PathVariable UUID id,@Valid @RequestBody Update d){return s.update(id,d);}@DeleteMapping("/{id}")@ResponseStatus(HttpStatus.NO_CONTENT)public void delete(@PathVariable UUID id){s.delete(id);}}
+package com.flowledger.product.controller;
+
+import com.flowledger.product.dto.TaxRateDtos.*;
+import com.flowledger.product.service.TaxRateService;
+import jakarta.validation.*;
+import java.util.*;
+import org.springframework.http.*;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/v1/tax-rates")
+public class TaxRateController {
+    private final TaxRateService s;
+
+    public TaxRateController(TaxRateService s) {
+        this.s = s;
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Response create(@Valid @RequestBody Create d) {
+        return s.create(d);
+    }
+
+    @GetMapping
+    public List<Response> list() {
+        return s.list();
+    }
+
+    @GetMapping("/{id}")
+    public Response get(@PathVariable UUID id) {
+        return s.get(id);
+    }
+
+    @PutMapping("/{id}")
+    public Response update(@PathVariable UUID id, @Valid @RequestBody Update d) {
+        return s.update(id, d);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable UUID id) {
+        s.delete(id);
+    }
+}

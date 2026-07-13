@@ -1,7 +1,6 @@
 package com.flowledger.supplier.dto;
 
 import jakarta.validation.constraints.*;
-
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -27,8 +26,7 @@ public final class SupplierDtos {
             String bankName,
             String bankAccountNumber,
             String bankIfsc,
-            String notes
-    ) {}
+            String notes) {}
 
     public record Update(
             @NotBlank String supplierName,
@@ -49,8 +47,7 @@ public final class SupplierDtos {
             String bankAccountNumber,
             String bankIfsc,
             String notes,
-            Boolean archived
-    ) {}
+            Boolean archived) {}
 
     public record Response(
             UUID id,
@@ -64,8 +61,7 @@ public final class SupplierDtos {
             String state,
             String stateCode,
             BigDecimal openingBalance,
-            boolean archived
-    ) {}
+            boolean archived) {}
 
     public record Search(String search, Boolean archived) {}
 }

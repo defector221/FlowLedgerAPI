@@ -5,6 +5,7 @@ import java.time.MonthDay;
 
 public final class FinancialYearUtil {
     private FinancialYearUtil() {}
+
     public static String financialYear(LocalDate date, String startMonthDay) {
         MonthDay start = MonthDay.parse("--" + startMonthDay);
         int startYear = date.isBefore(start.atYear(date.getYear())) ? date.getYear() - 1 : date.getYear();

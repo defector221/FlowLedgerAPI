@@ -1,7 +1,6 @@
 package com.flowledger.product.dto;
 
 import jakarta.validation.constraints.*;
-
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -28,8 +27,7 @@ public final class ProductDtos {
             @DecimalMin("0.0") BigDecimal reorderLevel,
             Boolean batchTracking,
             Boolean serialTracking,
-            Boolean expiryTracking
-    ) {}
+            Boolean expiryTracking) {}
 
     public record Update(
             @NotBlank String name,
@@ -49,8 +47,7 @@ public final class ProductDtos {
             Boolean batchTracking,
             Boolean serialTracking,
             Boolean expiryTracking,
-            Boolean active
-    ) {}
+            Boolean active) {}
 
     public record Response(
             UUID id,
@@ -69,8 +66,7 @@ public final class ProductDtos {
             UUID taxRateId,
             BigDecimal minimumStockLevel,
             BigDecimal reorderLevel,
-            boolean active
-    ) {}
+            boolean active) {}
 
     public record Search(String search, Boolean active) {}
 }

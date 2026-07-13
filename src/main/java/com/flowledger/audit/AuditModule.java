@@ -1,8 +1,10 @@
 package com.flowledger.audit;
 
-import com.flowledger.common.tenant.TenantContext;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.flowledger.common.tenant.TenantContext;
 import jakarta.persistence.*;
+import java.time.OffsetDateTime;
+import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -14,9 +16,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.OffsetDateTime;
-import java.util.UUID;
-
 @Entity
 @Table(name = "audit_logs")
 @Getter
@@ -26,26 +25,36 @@ class AuditLog {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
     @Column(name = "organization_id")
     private UUID organizationId;
+
     @Column(name = "user_id")
     private UUID userId;
+
     @Column(nullable = false)
     private String action;
+
     @Column(name = "entity_type", nullable = false)
     private String entityType;
+
     @Column(name = "entity_id")
     private UUID entityId;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "old_value", columnDefinition = "jsonb")
     private JsonNode oldValue;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "new_value", columnDefinition = "jsonb")
     private JsonNode newValue;
+
     @Column(name = "ip_address")
     private String ipAddress;
+
     @Column(name = "user_agent")
     private String userAgent;
+
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 

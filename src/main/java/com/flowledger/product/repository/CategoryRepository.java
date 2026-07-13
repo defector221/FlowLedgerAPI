@@ -1,1 +1,11 @@
-package com.flowledger.product.repository; import com.flowledger.product.entity.Category; import org.springframework.data.jpa.repository.*; import java.util.*; public interface CategoryRepository extends JpaRepository<Category,UUID>,JpaSpecificationExecutor<Category>{Optional<Category> findByIdAndOrganizationId(UUID id,UUID org);boolean existsByOrganizationIdAndName(UUID org,String name);}
+package com.flowledger.product.repository;
+
+import com.flowledger.product.entity.Category;
+import java.util.*;
+import org.springframework.data.jpa.repository.*;
+
+public interface CategoryRepository extends JpaRepository<Category, UUID>, JpaSpecificationExecutor<Category> {
+    Optional<Category> findByIdAndOrganizationId(UUID id, UUID org);
+
+    boolean existsByOrganizationIdAndName(UUID org, String name);
+}

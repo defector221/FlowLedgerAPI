@@ -31,5 +31,4 @@ public record OrganizationResponse(
         String upiId,
         String paymentTerms,
         boolean onboardingCompleted,
-        Instant onboardingCompletedAt
-) {}
+        Instant onboardingCompletedAt) {}

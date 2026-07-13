@@ -1,3 +1,54 @@
 package com.flowledger.sales.entity;
-import com.flowledger.common.entity.AuditedEntity; import jakarta.persistence.*; import lombok.*; import java.math.*; import java.time.*; import java.util.*;
-@Entity @Table(name="sales_orders") @Getter @Setter @NoArgsConstructor public class SalesOrder extends AuditedEntity {public enum Status{DRAFT,CONFIRMED,FULFILLED,CANCELLED}@Column(nullable=false)private String orderNumber;@Column(nullable=false)private UUID customerId;@Column(nullable=false)private LocalDate orderDate;private LocalDate expectedDeliveryDate;private UUID quotationId;@Column(columnDefinition="text")private String billingAddress,shippingAddress,termsAndConditions,notes;private String placeOfSupply;@Enumerated(EnumType.STRING)@Column(nullable=false)private Status status=Status.DRAFT;@Column(nullable=false)private BigDecimal subtotal=BigDecimal.ZERO,discountTotal=BigDecimal.ZERO,taxTotal=BigDecimal.ZERO,grandTotal=BigDecimal.ZERO;@Version private Long version;@OneToMany(mappedBy="salesOrder",cascade=CascadeType.ALL,orphanRemoval=true)@OrderBy("lineOrder")private List<SalesOrderItem> items=new ArrayList<>();}
+
+import com.flowledger.common.entity.AuditedEntity;
+import jakarta.persistence.*;
+import java.math.*;
+import java.time.*;
+import java.util.*;
+import lombok.*;
+
+@Entity
+@Table(name = "sales_orders")
+@Getter
+@Setter
+@NoArgsConstructor
+public class SalesOrder extends AuditedEntity {
+    public enum Status {
+        DRAFT,
+        CONFIRMED,
+        FULFILLED,
+        CANCELLED
+    }
+
+    @Column(nullable = false)
+    private String orderNumber;
+
+    @Column(nullable = false)
+    private UUID customerId;
+
+    @Column(nullable = false)
+    private LocalDate orderDate;
+
+    private LocalDate expectedDeliveryDate;
+    private UUID quotationId;
+    @Column(columnDefinition = "text")
+    private String billingAddress, shippingAddress, termsAndConditions, notes;
+    private String placeOfSupply;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Status status = Status.DRAFT;
+
+    @Column(nullable = false)
+    private BigDecimal subtotal = BigDecimal.ZERO,
+            discountTotal = BigDecimal.ZERO,
+            taxTotal = BigDecimal.ZERO,
+            grandTotal = BigDecimal.ZERO;
+
+    @Version
+    private Long version;
+
+    @OneToMany(mappedBy = "salesOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("lineOrder")
+    private List<SalesOrderItem> items = new ArrayList<>();
+}

@@ -1,9 +1,8 @@
 package com.flowledger.auth.repository;
 
 import com.flowledger.auth.entity.User;
-import org.springframework.data.jpa.repository.*;
-
 import java.util.*;
+import org.springframework.data.jpa.repository.*;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByIdAndActiveTrue(UUID id);

@@ -1,12 +1,11 @@
 package com.flowledger.common.util;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 class CommonUtilTest {
 
@@ -19,6 +18,7 @@ class CommonUtilTest {
     @Test
     void amountInWordsContainsRupees() {
         String words = AmountInWords.inr(new BigDecimal("1234.50"));
-        assertTrue(words.toLowerCase().contains("thousand") || words.toLowerCase().contains("rupee"));
+        assertTrue(
+                words.toLowerCase().contains("thousand") || words.toLowerCase().contains("rupee"));
     }
 }

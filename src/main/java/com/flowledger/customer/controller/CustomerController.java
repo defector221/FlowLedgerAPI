@@ -3,13 +3,12 @@ package com.flowledger.customer.controller;
 import com.flowledger.customer.dto.CustomerDtos.*;
 import com.flowledger.customer.service.CustomerService;
 import jakarta.validation.Valid;
+import java.math.*;
+import java.util.*;
 import org.springframework.data.domain.*;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.math.*;
-import java.util.*;
 
 @RestController
 @RequestMapping("/api/v1/customers")
@@ -44,7 +43,10 @@ public class CustomerController {
     }
 
     @GetMapping
-    public Page<Response> search(@RequestParam(required = false) String search, @RequestParam(required = false) Boolean archived, Pageable pageable) {
+    public Page<Response> search(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Boolean archived,
+            Pageable pageable) {
         return service.search(new Search(search, archived), pageable);
     }
 

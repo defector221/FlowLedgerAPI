@@ -1,1 +1,30 @@
-package com.flowledger.product.dto; import jakarta.validation.constraints.*; import java.math.*; import java.util.*; public final class TaxRateDtos{private TaxRateDtos(){} public record Create(@NotBlank String name,@NotNull @DecimalMin("0.0") BigDecimal rate,@DecimalMin("0.0") BigDecimal cessRate){} public record Update(@NotBlank String name,@NotNull @DecimalMin("0.0") BigDecimal rate,@DecimalMin("0.0") BigDecimal cessRate,Boolean active){} public record Response(UUID id,String name,BigDecimal rate,BigDecimal cgstRate,BigDecimal sgstRate,BigDecimal igstRate,BigDecimal cessRate,boolean active){} }
+package com.flowledger.product.dto;
+
+import jakarta.validation.constraints.*;
+import java.math.*;
+import java.util.*;
+
+public final class TaxRateDtos {
+    private TaxRateDtos() {}
+
+    public record Create(
+            @NotBlank String name,
+            @NotNull @DecimalMin("0.0") BigDecimal rate,
+            @DecimalMin("0.0") BigDecimal cessRate) {}
+
+    public record Update(
+            @NotBlank String name,
+            @NotNull @DecimalMin("0.0") BigDecimal rate,
+            @DecimalMin("0.0") BigDecimal cessRate,
+            Boolean active) {}
+
+    public record Response(
+            UUID id,
+            String name,
+            BigDecimal rate,
+            BigDecimal cgstRate,
+            BigDecimal sgstRate,
+            BigDecimal igstRate,
+            BigDecimal cessRate,
+            boolean active) {}
+}

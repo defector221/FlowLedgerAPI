@@ -21,10 +21,18 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity h, JwtAuthenticationFilter f) throws Exception {
-        return h.csrf(c -> c.disable()).cors(c -> {
-        }).sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(a -> a.requestMatchers("/api/v1/auth/**", "/swagger-ui/**", "/swagger-ui.html", "/api-docs/**", "/actuator/health")
-                        .permitAll().anyRequest().authenticated())
+        return h.csrf(c -> c.disable())
+                .cors(c -> {})
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(a -> a.requestMatchers(
+                                "/api/v1/auth/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/api-docs/**",
+                                "/actuator/health")
+                        .permitAll()
+                        .anyRequest()
+                        .authenticated())
                 .addFilterBefore(f, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

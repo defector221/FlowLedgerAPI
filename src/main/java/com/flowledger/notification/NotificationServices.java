@@ -15,6 +15,7 @@ interface WhatsAppNotificationService {
 @Service
 class MockEmailNotificationService implements EmailNotificationService {
     private static final Logger log = LoggerFactory.getLogger(MockEmailNotificationService.class);
+
     public void sendInvoice(String recipient, String subject, byte[] pdf) {
         log.info("Mock email invoice delivery to {}: {} ({} bytes)", recipient, subject, pdf.length);
     }
@@ -23,6 +24,7 @@ class MockEmailNotificationService implements EmailNotificationService {
 @Service
 class MockWhatsAppNotificationService implements WhatsAppNotificationService {
     private static final Logger log = LoggerFactory.getLogger(MockWhatsAppNotificationService.class);
+
     public void sendInvoice(String phoneNumber, String message, byte[] pdf) {
         log.info("Mock WhatsApp invoice delivery to {}: {} ({} bytes)", phoneNumber, message, pdf.length);
     }

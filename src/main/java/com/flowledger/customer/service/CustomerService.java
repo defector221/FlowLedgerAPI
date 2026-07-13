@@ -1,3 +1,83 @@
 package com.flowledger.customer.service;
-import com.flowledger.customer.dto.CustomerDtos.*; import com.flowledger.customer.entity.Customer; import com.flowledger.customer.mapper.CustomerMapper; import com.flowledger.customer.repository.CustomerRepository; import com.flowledger.common.service.OrganizationScopedService; import org.springframework.data.domain.*; import org.springframework.data.jpa.domain.Specification; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional; import org.springframework.web.server.ResponseStatusException; import org.springframework.http.HttpStatus; import java.math.*; import java.util.*;
-@Service @Transactional public class CustomerService extends OrganizationScopedService { private final CustomerRepository repo; private final CustomerMapper mapper; public CustomerService(CustomerRepository repo,CustomerMapper mapper){this.repo=repo;this.mapper=mapper;} public Response create(Create dto){UUID org=orgId();if(repo.existsByOrganizationIdAndCustomerCode(org,dto.customerCode()))throw new ResponseStatusException(HttpStatus.CONFLICT,"Customer code already exists"); Customer c=mapper.toEntity(dto);c.setOrganizationId(org);return mapper.toResponse(repo.save(c));} @Transactional(readOnly=true) public Response get(UUID id){return mapper.toResponse(load(id));} public Response update(UUID id,Update dto){Customer c=load(id);mapper.update(dto,c);return mapper.toResponse(repo.save(c));} public void archive(UUID id){Customer c=load(id);c.setArchived(true);repo.save(c);} @Transactional(readOnly=true) public Page<Response> search(Search f,Pageable pageable){UUID org=orgId(); Specification<Customer>s=(r,q,b)->b.equal(r.get("organizationId"),org);if(f.archived()!=null)s=s.and((r,q,b)->b.equal(r.get("archived"),f.archived()));if(f.search()!=null&&!f.search().isBlank()){String p="%"+f.search().toLowerCase()+"%";s=s.and((r,q,b)->b.or(b.like(b.lower(r.get("customerName")),p),b.like(b.lower(r.get("customerCode")),p),b.like(b.lower(r.get("phone")),p)));}return repo.findAll(s,pageable).map(mapper::toResponse);} @Transactional(readOnly=true) public Statement statement(UUID id){Customer c=load(id);return new Statement(c.getOpeningBalance(),BigDecimal.ZERO,c.getOpeningBalance());} @Transactional(readOnly=true) public BigDecimal outstanding(UUID id){return statement(id).balance();} private Customer load(UUID id){return required(repo.findByIdAndOrganizationId(id,orgId()),"Customer");} }
+
+import com.flowledger.common.service.OrganizationScopedService;
+import com.flowledger.customer.dto.CustomerDtos.*;
+import com.flowledger.customer.entity.Customer;
+import com.flowledger.customer.mapper.CustomerMapper;
+import com.flowledger.customer.repository.CustomerRepository;
+import java.math.*;
+import java.util.*;
+import org.springframework.data.domain.*;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+@Service
+@Transactional
+public class CustomerService extends OrganizationScopedService {
+    private final CustomerRepository repo;
+    private final CustomerMapper mapper;
+
+    public CustomerService(CustomerRepository repo, CustomerMapper mapper) {
+        this.repo = repo;
+        this.mapper = mapper;
+    }
+
+    public Response create(Create dto) {
+        UUID org = orgId();
+        if (repo.existsByOrganizationIdAndCustomerCode(org, dto.customerCode()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Customer code already exists");
+        Customer c = mapper.toEntity(dto);
+        c.setOrganizationId(org);
+        return mapper.toResponse(repo.save(c));
+    }
+
+    @Transactional(readOnly = true)
+    public Response get(UUID id) {
+        return mapper.toResponse(load(id));
+    }
+
+    public Response update(UUID id, Update dto) {
+        Customer c = load(id);
+        mapper.update(dto, c);
+        return mapper.toResponse(repo.save(c));
+    }
+
+    public void archive(UUID id) {
+        Customer c = load(id);
+        c.setArchived(true);
+        repo.save(c);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Response> search(Search f, Pageable pageable) {
+        UUID org = orgId();
+        Specification<Customer> s = (r, q, b) -> b.equal(r.get("organizationId"), org);
+        if (f.archived() != null) s = s.and((r, q, b) -> b.equal(r.get("archived"), f.archived()));
+        if (f.search() != null && !f.search().isBlank()) {
+            String p = "%" + f.search().toLowerCase() + "%";
+            s = s.and((r, q, b) -> b.or(
+                    b.like(b.lower(r.get("customerName")), p),
+                    b.like(b.lower(r.get("customerCode")), p),
+                    b.like(b.lower(r.get("phone")), p)));
+        }
+        return repo.findAll(s, pageable).map(mapper::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Statement statement(UUID id) {
+        Customer c = load(id);
+        return new Statement(c.getOpeningBalance(), BigDecimal.ZERO, c.getOpeningBalance());
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal outstanding(UUID id) {
+        return statement(id).balance();
+    }
+
+    private Customer load(UUID id) {
+        return required(repo.findByIdAndOrganizationId(id, orgId()), "Customer");
+    }
+}

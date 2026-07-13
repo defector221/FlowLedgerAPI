@@ -3,13 +3,12 @@ package com.flowledger.supplier.controller;
 import com.flowledger.supplier.dto.SupplierDtos.*;
 import com.flowledger.supplier.service.SupplierService;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/suppliers")
@@ -24,8 +23,7 @@ public class SupplierController {
     public Page<Response> search(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Boolean archived,
-            Pageable pageable
-    ) {
+            Pageable pageable) {
         return service.search(new Search(search, archived), pageable);
     }
 

@@ -7,5 +7,4 @@ public record UpdateOrganizationSettingsRequest(
         Boolean taxInclusiveDefault,
         Boolean roundOffEnabled,
         UUID defaultWarehouseId,
-        String settingsJson
-) {}
+        String settingsJson) {}

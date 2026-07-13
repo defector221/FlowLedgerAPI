@@ -1,1 +1,14 @@
-package com.flowledger.supplier.mapper; import com.flowledger.supplier.dto.SupplierDtos.*; import com.flowledger.supplier.entity.Supplier; import org.mapstruct.*; @Mapper(componentModel="spring",nullValuePropertyMappingStrategy=NullValuePropertyMappingStrategy.IGNORE) public interface SupplierMapper {Supplier toEntity(Create dto);Response toResponse(Supplier entity);void update(Update dto,@MappingTarget Supplier entity);}
+package com.flowledger.supplier.mapper;
+
+import com.flowledger.supplier.dto.SupplierDtos.*;
+import com.flowledger.supplier.entity.Supplier;
+import org.mapstruct.*;
+
+@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+public interface SupplierMapper {
+    Supplier toEntity(Create dto);
+
+    Response toResponse(Supplier entity);
+
+    void update(Update dto, @MappingTarget Supplier entity);
+}

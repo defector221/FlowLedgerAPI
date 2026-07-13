@@ -1,3 +1,43 @@
 package com.flowledger.sales.entity;
-import jakarta.persistence.*; import lombok.*; import java.math.*; import java.util.*;
-@Entity @Table(name="sales_invoice_items") @Getter @Setter @NoArgsConstructor public class SalesInvoiceItem {@Id @GeneratedValue(strategy=GenerationType.UUID)private UUID id;@ManyToOne(fetch=FetchType.LAZY)@JoinColumn(name="sales_invoice_id")private SalesInvoice salesInvoice;@Column(nullable=false)private UUID productId;private String description,hsnSacCode;@Column(nullable=false)private BigDecimal quantity,rate;private UUID unitId;@Column(nullable=false)private BigDecimal discountPercent=BigDecimal.ZERO,discountAmount=BigDecimal.ZERO,taxRate=BigDecimal.ZERO,taxableAmount=BigDecimal.ZERO,cgstRate=BigDecimal.ZERO,sgstRate=BigDecimal.ZERO,igstRate=BigDecimal.ZERO,cgstAmount=BigDecimal.ZERO,sgstAmount=BigDecimal.ZERO,igstAmount=BigDecimal.ZERO,cessAmount=BigDecimal.ZERO,lineTotal=BigDecimal.ZERO;private int lineOrder;}
+
+import jakarta.persistence.*;
+import java.math.*;
+import java.util.*;
+import lombok.*;
+
+@Entity
+@Table(name = "sales_invoice_items")
+@Getter
+@Setter
+@NoArgsConstructor
+public class SalesInvoiceItem {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sales_invoice_id")
+    private SalesInvoice salesInvoice;
+
+    @Column(nullable = false)
+    private UUID productId;
+
+    private String description, hsnSacCode;
+    @Column(nullable = false)
+    private BigDecimal quantity, rate;
+    private UUID unitId;
+    @Column(nullable = false)
+    private BigDecimal discountPercent = BigDecimal.ZERO,
+            discountAmount = BigDecimal.ZERO,
+            taxRate = BigDecimal.ZERO,
+            taxableAmount = BigDecimal.ZERO,
+            cgstRate = BigDecimal.ZERO,
+            sgstRate = BigDecimal.ZERO,
+            igstRate = BigDecimal.ZERO,
+            cgstAmount = BigDecimal.ZERO,
+            sgstAmount = BigDecimal.ZERO,
+            igstAmount = BigDecimal.ZERO,
+            cessAmount = BigDecimal.ZERO,
+            lineTotal = BigDecimal.ZERO;
+    private int lineOrder;
+}

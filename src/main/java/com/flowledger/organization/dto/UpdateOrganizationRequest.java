@@ -5,8 +5,10 @@ import jakarta.validation.constraints.Pattern;
 public record UpdateOrganizationRequest(
         String name,
         String legalName,
-        @Pattern(regexp = "^$|^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$", message = "Invalid GSTIN format")
-        String gstin,
+        @Pattern(
+                        regexp = "^$|^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$",
+                        message = "Invalid GSTIN format")
+                String gstin,
         String pan,
         String cin,
         String email,
@@ -27,5 +29,4 @@ public record UpdateOrganizationRequest(
         String bankIfsc,
         String bankBranch,
         String upiId,
-        String paymentTerms
-) {}
+        String paymentTerms) {}

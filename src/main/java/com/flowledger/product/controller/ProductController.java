@@ -3,13 +3,12 @@ package com.flowledger.product.controller;
 import com.flowledger.product.dto.ProductDtos.*;
 import com.flowledger.product.service.ProductService;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/products")
@@ -24,8 +23,7 @@ public class ProductController {
     public Page<Response> search(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Boolean active,
-            Pageable pageable
-    ) {
+            Pageable pageable) {
         return service.search(new Search(search, active), pageable);
     }
 

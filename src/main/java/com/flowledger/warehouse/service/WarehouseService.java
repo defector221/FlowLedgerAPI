@@ -5,13 +5,12 @@ import com.flowledger.warehouse.dto.WarehouseDtos.*;
 import com.flowledger.warehouse.entity.Warehouse;
 import com.flowledger.warehouse.mapper.WarehouseMapper;
 import com.flowledger.warehouse.repository.WarehouseRepository;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-
-import java.util.List;
-import java.util.UUID;
 
 @Service
 @Transactional
@@ -56,7 +55,9 @@ public class WarehouseService extends OrganizationScopedService {
 
     @Transactional(readOnly = true)
     public List<Response> list() {
-        return repo.findByOrganizationId(orgId()).stream().map(mapper::toResponse).toList();
+        return repo.findByOrganizationId(orgId()).stream()
+                .map(mapper::toResponse)
+                .toList();
     }
 
     private Warehouse load(UUID id) {

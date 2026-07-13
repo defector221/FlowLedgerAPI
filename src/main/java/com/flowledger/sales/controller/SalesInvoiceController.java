@@ -1,3 +1,51 @@
 package com.flowledger.sales.controller;
-import com.flowledger.sales.dto.SalesDtos.*;import com.flowledger.sales.entity.SalesInvoice;import com.flowledger.sales.service.SalesInvoiceService;import jakarta.validation.Valid;import org.springframework.http.*;import org.springframework.web.bind.annotation.*;import java.util.*;
-@RestController @RequestMapping("/api/v1/sales/invoices") public class SalesInvoiceController {private final SalesInvoiceService service;public SalesInvoiceController(SalesInvoiceService s){service=s;}@PostMapping @ResponseStatus(HttpStatus.CREATED)public SalesInvoice create(@Valid @RequestBody Invoice d){return service.createDraft(d);}@PutMapping("/{id}")public SalesInvoice update(@PathVariable UUID id,@Valid @RequestBody Invoice d){return service.updateDraft(id,d);}@PostMapping("/{id}/confirm")public SalesInvoice confirm(@PathVariable UUID id){return service.confirm(id);}@PostMapping("/{id}/cancel")public SalesInvoice cancel(@PathVariable UUID id){return service.cancel(id);}@GetMapping("/{id}")public SalesInvoice get(@PathVariable UUID id){return service.get(id);}@GetMapping public List<SalesInvoice> list(@RequestParam(required=false)String status,@RequestParam(required=false)UUID customerId){return service.list(status,customerId);}}
+
+import com.flowledger.sales.dto.SalesDtos.*;
+import com.flowledger.sales.entity.SalesInvoice;
+import com.flowledger.sales.service.SalesInvoiceService;
+import jakarta.validation.Valid;
+import java.util.*;
+import org.springframework.http.*;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/v1/sales/invoices")
+public class SalesInvoiceController {
+    private final SalesInvoiceService service;
+
+    public SalesInvoiceController(SalesInvoiceService s) {
+        service = s;
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public SalesInvoice create(@Valid @RequestBody Invoice d) {
+        return service.createDraft(d);
+    }
+
+    @PutMapping("/{id}")
+    public SalesInvoice update(@PathVariable UUID id, @Valid @RequestBody Invoice d) {
+        return service.updateDraft(id, d);
+    }
+
+    @PostMapping("/{id}/confirm")
+    public SalesInvoice confirm(@PathVariable UUID id) {
+        return service.confirm(id);
+    }
+
+    @PostMapping("/{id}/cancel")
+    public SalesInvoice cancel(@PathVariable UUID id) {
+        return service.cancel(id);
+    }
+
+    @GetMapping("/{id}")
+    public SalesInvoice get(@PathVariable UUID id) {
+        return service.get(id);
+    }
+
+    @GetMapping
+    public List<SalesInvoice> list(
+            @RequestParam(required = false) String status, @RequestParam(required = false) UUID customerId) {
+        return service.list(status, customerId);
+    }
+}

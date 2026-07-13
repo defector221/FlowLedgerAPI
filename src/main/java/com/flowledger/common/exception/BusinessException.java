@@ -1,2 +1,7 @@
 package com.flowledger.common.exception;
-public class BusinessException extends RuntimeException { public BusinessException(String message) { super(message); } }
+
+public class BusinessException extends RuntimeException {
+    public BusinessException(String message) {
+        super(message);
+    }
+}

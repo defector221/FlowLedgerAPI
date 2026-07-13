@@ -5,12 +5,11 @@ import com.flowledger.product.dto.UnitDtos.*;
 import com.flowledger.product.entity.Unit;
 import com.flowledger.product.mapper.UnitMapper;
 import com.flowledger.product.repository.UnitRepository;
+import java.util.*;
 import org.springframework.http.*;
 import org.springframework.stereotype.*;
 import org.springframework.transaction.annotation.*;
 import org.springframework.web.server.*;
-
-import java.util.*;
 
 @Service
 @Transactional
@@ -25,7 +24,9 @@ public class UnitService extends OrganizationScopedService {
 
     @Transactional(readOnly = true)
     public List<Response> list() {
-        return r.findBySystemUnitTrueOrOrganizationId(orgId()).stream().map(m::toResponse).toList();
+        return r.findBySystemUnitTrueOrOrganizationId(orgId()).stream()
+                .map(m::toResponse)
+                .toList();
     }
 
     public Response create(Create d) {

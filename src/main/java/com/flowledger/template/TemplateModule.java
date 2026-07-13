@@ -6,6 +6,7 @@ import com.flowledger.common.entity.AuditedEntity;
 import com.flowledger.common.tenant.TenantContext;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
+import java.util.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -15,8 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.*;
-
 @Entity
 @Table(name = "invoice_templates")
 @Getter
@@ -25,25 +24,27 @@ import java.util.*;
 class InvoiceTemplate extends AuditedEntity {
     @Column(name = "template_name")
     String templateName;
+
     String presetKey;
     boolean isDefault;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "config_json", columnDefinition = "jsonb")
     JsonNode configJson;
+
     @Version
     Long version;
 }
 
-record TemplateRequest(@NotBlank String templateName, String presetKey, JsonNode configJson) {
-}
+record TemplateRequest(@NotBlank String templateName, String presetKey, JsonNode configJson) {}
 
-record Preset(String key, String name, JsonNode config) {
-}
+record Preset(String key, String name, JsonNode config) {}
 
 @Service
 @Transactional
 class InvoiceTemplateService {
     private final ObjectMapper json;
+
     @PersistenceContext
     EntityManager em;
 
@@ -52,13 +53,20 @@ class InvoiceTemplateService {
     }
 
     List<Preset> presets() {
-        return List.of("Professional", "Modern", "Minimal", "GST Standard", "Retail", "Wholesale").stream().map(this::preset).toList();
+        return List.of("Professional", "Modern", "Minimal", "GST Standard", "Retail", "Wholesale").stream()
+                .map(this::preset)
+                .toList();
     }
 
     InvoiceTemplate create(TemplateRequest r) {
         if (r.configJson() == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "configJson is required");
-        if (!em.createQuery("from InvoiceTemplate t where t.organizationId=:org and t.templateName=:name", InvoiceTemplate.class).setParameter("org", TenantContext.getOrganizationId()).setParameter("name", r.templateName()).getResultList().isEmpty())
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Template name already exists");
+        if (!em.createQuery(
+                        "from InvoiceTemplate t where t.organizationId=:org and t.templateName=:name",
+                        InvoiceTemplate.class)
+                .setParameter("org", TenantContext.getOrganizationId())
+                .setParameter("name", r.templateName())
+                .getResultList()
+                .isEmpty()) throw new ResponseStatusException(HttpStatus.CONFLICT, "Template name already exists");
         InvoiceTemplate t = new InvoiceTemplate();
         t.setOrganizationId(TenantContext.getOrganizationId());
         t.setTemplateName(r.templateName());
@@ -77,12 +85,18 @@ class InvoiceTemplateService {
     }
 
     List<InvoiceTemplate> list() {
-        return em.createQuery("from InvoiceTemplate t where t.organizationId=:org order by t.isDefault desc,t.templateName", InvoiceTemplate.class).setParameter("org", TenantContext.getOrganizationId()).getResultList();
+        return em.createQuery(
+                        "from InvoiceTemplate t where t.organizationId=:org order by t.isDefault desc,t.templateName",
+                        InvoiceTemplate.class)
+                .setParameter("org", TenantContext.getOrganizationId())
+                .getResultList();
     }
 
     InvoiceTemplate setDefault(UUID id) {
         InvoiceTemplate t = get(id);
-        em.createQuery("update InvoiceTemplate t set t.isDefault=false where t.organizationId=:org").setParameter("org", TenantContext.getOrganizationId()).executeUpdate();
+        em.createQuery("update InvoiceTemplate t set t.isDefault=false where t.organizationId=:org")
+                .setParameter("org", TenantContext.getOrganizationId())
+                .executeUpdate();
         t.setDefault(true);
         return t;
     }
@@ -100,10 +114,32 @@ class InvoiceTemplateService {
 
     private Preset preset(String name) {
         String key = name.toLowerCase(Locale.ROOT).replace(" ", "-");
-        return new Preset(key, name, json.valueToTree(Map.of(
-                "logo", Map.of("visible", true, "position", "left"), "header", Map.of("title", "TAX INVOICE", "accentColor", "#1F4E78", "showGstin", true),
-                "items", Map.of("columns", List.of("#", "Description", "HSN/SAC", "Qty", "Rate", "GST", "Amount"), "showHsn", true, "showTax", true),
-                "footer", Map.of("showBankDetails", true, "showTerms", true, "showSignature", true, "note", "This is a computer-generated invoice."))));
+        return new Preset(
+                key,
+                name,
+                json.valueToTree(Map.of(
+                        "logo",
+                        Map.of("visible", true, "position", "left"),
+                        "header",
+                        Map.of("title", "TAX INVOICE", "accentColor", "#1F4E78", "showGstin", true),
+                        "items",
+                        Map.of(
+                                "columns",
+                                List.of("#", "Description", "HSN/SAC", "Qty", "Rate", "GST", "Amount"),
+                                "showHsn",
+                                true,
+                                "showTax",
+                                true),
+                        "footer",
+                        Map.of(
+                                "showBankDetails",
+                                true,
+                                "showTerms",
+                                true,
+                                "showSignature",
+                                true,
+                                "note",
+                                "This is a computer-generated invoice."))));
     }
 }
 

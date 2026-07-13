@@ -68,4 +68,14 @@ public class AuthController {
         userService.acceptInvitation(request);
         return ApiResponse.of(null, "Invitation accepted");
     }
+
+    @PostMapping("/switch-organization")
+    ApiResponse<LoginResponse> switchOrganization(@Valid @RequestBody SwitchOrganizationRequest request) {
+        return ApiResponse.of(service.switchOrganization(SecurityUtils.currentUserId(), request));
+    }
+
+    @PostMapping("/create-organization")
+    ApiResponse<LoginResponse> createOrganization(@Valid @RequestBody CreateOrganizationRequest request) {
+        return ApiResponse.of(service.createOrganization(SecurityUtils.currentUserId(), request));
+    }
 }

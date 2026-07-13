@@ -7,14 +7,13 @@ import com.flowledger.common.exception.*;
 import com.flowledger.common.security.*;
 import com.flowledger.organization.entity.*;
 import com.flowledger.organization.repository.*;
+import java.time.*;
+import java.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.*;
-import java.util.*;
 
 @Service
 @Slf4j
@@ -27,10 +26,21 @@ public class AuthService {
     private final PasswordEncoder encoder;
     private final JwtService jwt;
     private final CustomUserDetailsService details;
+    private final OrganizationMembershipService membershipService;
+
     @Value("${flowledger.app.frontend-url}")
     private String frontendUrl;
 
-    public AuthService(UserRepository users, RoleRepository roles, RefreshTokenRepository refreshTokens, OrganizationRepository organizations, OrganizationSettingsRepository settings, PasswordEncoder encoder, JwtService jwt, CustomUserDetailsService details) {
+    public AuthService(
+            UserRepository users,
+            RoleRepository roles,
+            RefreshTokenRepository refreshTokens,
+            OrganizationRepository organizations,
+            OrganizationSettingsRepository settings,
+            PasswordEncoder encoder,
+            JwtService jwt,
+            CustomUserDetailsService details,
+            OrganizationMembershipService membershipService) {
         this.users = users;
         this.roles = roles;
         this.refreshTokens = refreshTokens;
@@ -39,108 +49,192 @@ public class AuthService {
         this.encoder = encoder;
         this.jwt = jwt;
         this.details = details;
+        this.membershipService = membershipService;
     }
 
     @Transactional
-    public LoginResponse login(LoginRequest r) {
-        User u = users.findByEmailIgnoreCase(r.email()).orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
-        if (!u.isActive() || !encoder.matches(r.password(), u.getPasswordHash()))
+    public LoginResponse login(LoginRequest request) {
+        User user = users.findByEmailIgnoreCase(request.email())
+                .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
+        if (!user.isActive() || !encoder.matches(request.password(), user.getPasswordHash())) {
             throw new UnauthorizedException("Invalid credentials");
-        if ("INVITED".equals(u.getUserStatus())) {
+        }
+        if ("INVITED".equals(user.getUserStatus())) {
             throw new UnauthorizedException("Please accept your invitation before signing in");
         }
-        if ("INACTIVE".equals(u.getUserStatus())) {
+        if ("INACTIVE".equals(user.getUserStatus())) {
             throw new UnauthorizedException("Your account has been deactivated");
         }
-        u.setLastLoginAt(Instant.now());
-        return tokens(u);
+        user.setLastLoginAt(Instant.now());
+        OrganizationAccessResponse activeOrganization = membershipService.resolveActiveOrganization(user);
+        membershipService.requireActiveMembership(user.getId(), activeOrganization.id());
+        return tokens(user, activeOrganization.id());
     }
 
     @Transactional
-    public LoginResponse refresh(RefreshTokenRequest r) {
-        if (!jwt.isValid(r.refreshToken(), "refresh")) throw new UnauthorizedException("Invalid refresh token");
-        String h = hash(r.refreshToken());
-        RefreshToken t = refreshTokens.findByTokenHashAndRevokedFalse(h).filter(x -> x.getExpiresAt().isAfter(Instant.now())).orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
-        t.setRevoked(true);
-        User u = users.findByIdAndActiveTrue(t.getUserId()).orElseThrow(() -> new UnauthorizedException("User unavailable"));
-        LoginResponse result = tokens(u);
-        t.setReplacedBy(refreshTokens.findByTokenHashAndRevokedFalse(hash(result.refreshToken())).orElseThrow().getId());
+    public LoginResponse refresh(RefreshTokenRequest request) {
+        if (!jwt.isValid(request.refreshToken(), "refresh")) {
+            throw new UnauthorizedException("Invalid refresh token");
+        }
+        String hash = hash(request.refreshToken());
+        RefreshToken token = refreshTokens
+                .findByTokenHashAndRevokedFalse(hash)
+                .filter(existing -> existing.getExpiresAt().isAfter(Instant.now()))
+                .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
+        token.setRevoked(true);
+        User user = users.findByIdAndActiveTrue(token.getUserId())
+                .orElseThrow(() -> new UnauthorizedException("User unavailable"));
+        UUID organizationId = jwt.organizationId(request.refreshToken());
+        if (organizationId == null) {
+            organizationId = membershipService.resolveActiveOrganization(user).id();
+        }
+        LoginResponse result = tokens(user, organizationId);
+        token.setReplacedBy(refreshTokens
+                .findByTokenHashAndRevokedFalse(hash(result.refreshToken()))
+                .orElseThrow()
+                .getId());
         return result;
     }
 
     @Transactional
-    public void logout(String token) {
-        refreshTokens.findByTokenHashAndRevokedFalse(hash(token)).ifPresent(t -> t.setRevoked(true));
+    public LoginResponse createOrganization(UUID userId, CreateOrganizationRequest request) {
+        User user =
+                users.findByIdAndActiveTrue(userId).orElseThrow(() -> new UnauthorizedException("User unavailable"));
+        Organization organization = new Organization();
+        organization.setName(request.organizationName());
+        organization.setEmail(user.getEmail());
+        organization.setCountry("India");
+        organization.setCurrency("INR");
+        organization.setFinancialYearStart("04-01");
+        organization.setInvoicePrefix("INV");
+        organization.setInvoiceNumberFormat("{PREFIX}/{FY}/{SEQ:6}");
+        organization.setOnboardingCompleted(false);
+        organizations.save(organization);
+
+        OrganizationSettings settingsEntity = new OrganizationSettings();
+        settingsEntity.setOrganizationId(organization.getId());
+        settings.save(settingsEntity);
+
+        Role role = roles.findByCode("ORGANIZATION_ADMIN")
+                .orElseThrow(() -> new BusinessException("Organization admin role is unavailable"));
+        membershipService.createAdminMembership(user, organization, role);
+        return tokens(user, organization.getId());
     }
 
     @Transactional
-    public void forgotPassword(ForgotPasswordRequest r) {
-        User u = users.findByOrganizationIdAndEmailIgnoreCase(r.organizationId(), r.email()).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    public LoginResponse switchOrganization(UUID userId, SwitchOrganizationRequest request) {
+        User user =
+                users.findByIdAndActiveTrue(userId).orElseThrow(() -> new UnauthorizedException("User unavailable"));
+        membershipService.requireActiveMembership(userId, request.organizationId());
+        user.setLastActiveOrganizationId(request.organizationId());
+        user.setOrganizationId(request.organizationId());
+        users.save(user);
+        return tokens(user, request.organizationId());
+    }
+
+    @Transactional
+    public void logout(String token) {
+        refreshTokens.findByTokenHashAndRevokedFalse(hash(token)).ifPresent(existing -> existing.setRevoked(true));
+    }
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        User user = users.findByOrganizationIdAndEmailIgnoreCase(request.organizationId(), request.email())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         String token = UUID.randomUUID().toString();
-        u.setPasswordResetToken(hash(token));
-        u.setPasswordResetExpiry(Instant.now().plus(Duration.ofHours(1)));
+        user.setPasswordResetToken(hash(token));
+        user.setPasswordResetExpiry(Instant.now().plus(Duration.ofHours(1)));
         log.info("Password reset link: {}/reset-password?token={}", frontendUrl, token);
     }
 
     @Transactional
-    public void resetPassword(ResetPasswordRequest r) {
-        User u = users.findByPasswordResetToken(hash(r.token())).filter(x -> x.getPasswordResetExpiry().isAfter(Instant.now())).orElseThrow(() -> new BusinessException("Invalid or expired reset token"));
-        u.setPasswordHash(encoder.encode(r.newPassword()));
-        u.setPasswordResetToken(null);
-        u.setPasswordResetExpiry(null);
-        refreshTokens.deleteByUserId(u.getId());
+    public void resetPassword(ResetPasswordRequest request) {
+        User user = users.findByPasswordResetToken(hash(request.token()))
+                .filter(existing -> existing.getPasswordResetExpiry().isAfter(Instant.now()))
+                .orElseThrow(() -> new BusinessException("Invalid or expired reset token"));
+        user.setPasswordHash(encoder.encode(request.newPassword()));
+        user.setPasswordResetToken(null);
+        user.setPasswordResetExpiry(null);
+        refreshTokens.deleteByUserId(user.getId());
     }
 
     @Transactional
-    public void changePassword(UUID userId, ChangePasswordRequest r) {
-        User u = users.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        if (!encoder.matches(r.currentPassword(), u.getPasswordHash()))
+    public void changePassword(UUID userId, ChangePasswordRequest request) {
+        User user = users.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (!encoder.matches(request.currentPassword(), user.getPasswordHash())) {
             throw new BusinessException("Current password is incorrect");
-        u.setPasswordHash(encoder.encode(r.newPassword()));
+        }
+        user.setPasswordHash(encoder.encode(request.newPassword()));
         refreshTokens.deleteByUserId(userId);
     }
 
     @Transactional
-    public LoginResponse registerOrganization(RegisterOrganizationRequest r) {
-        Organization o = new Organization();
-        o.setName(r.organizationName());
-        o.setEmail(r.email());
-        o.setOnboardingCompleted(false);
-        organizations.save(o);
-        OrganizationSettings s = new OrganizationSettings();
-        s.setOrganizationId(o.getId());
-        settings.save(s);
-        Role role = roles.findByCode("ORGANIZATION_ADMIN").orElseThrow(() -> new BusinessException("Organization admin role is unavailable"));
-        User u = new User();
-        u.setOrganizationId(o.getId());
-        u.setEmail(r.email());
-        u.setPasswordHash(encoder.encode(r.password()));
-        u.setFirstName(r.firstName());
-        u.setLastName(r.lastName());
-        u.setPhone(r.phone());
-        u.getRoles().add(role);
-        users.save(u);
-        return tokens(u);
+    public LoginResponse registerOrganization(RegisterOrganizationRequest request) {
+        Organization organization = new Organization();
+        organization.setName(request.organizationName());
+        organization.setEmail(request.email());
+        organization.setCountry("India");
+        organization.setCurrency("INR");
+        organization.setFinancialYearStart("04-01");
+        organization.setInvoicePrefix("INV");
+        organization.setInvoiceNumberFormat("{PREFIX}/{FY}/{SEQ:6}");
+        organization.setOnboardingCompleted(false);
+        organizations.save(organization);
+
+        OrganizationSettings settingsEntity = new OrganizationSettings();
+        settingsEntity.setOrganizationId(organization.getId());
+        settings.save(settingsEntity);
+
+        Role role = roles.findByCode("ORGANIZATION_ADMIN")
+                .orElseThrow(() -> new BusinessException("Organization admin role is unavailable"));
+
+        User user = new User();
+        user.setEmail(request.email().trim().toLowerCase());
+        user.setPasswordHash(encoder.encode(request.password()));
+        user.setFirstName(request.firstName());
+        user.setLastName(request.lastName());
+        user.setPhone(request.phone());
+        user.setOrganizationId(organization.getId());
+        user.setLastActiveOrganizationId(organization.getId());
+        user.getRoles().add(role);
+        users.save(user);
+        membershipService.createAdminMembership(user, organization, role);
+        return tokens(user, organization.getId());
     }
 
-    private LoginResponse tokens(User u) {
-        UserPrincipal p = details.load(u.getId());
-        String access = jwt.createAccessToken(p), refresh = jwt.createRefreshToken(p);
-        RefreshToken t = new RefreshToken();
-        t.setUserId(u.getId());
-        t.setTokenHash(hash(refresh));
-        t.setExpiresAt(Instant.now().plus(Duration.ofDays(14)));
-        refreshTokens.save(t);
-        return new LoginResponse(access, refresh, jwt.accessExpirySeconds(), response(u));
+    private LoginResponse tokens(User user, UUID organizationId) {
+        UserPrincipal principal = details.load(user.getId(), organizationId);
+        String access = jwt.createAccessToken(principal);
+        String refresh = jwt.createRefreshToken(principal);
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUserId(user.getId());
+        refreshToken.setTokenHash(hash(refresh));
+        refreshToken.setExpiresAt(Instant.now().plus(Duration.ofDays(14)));
+        refreshTokens.save(refreshToken);
+        OrganizationAccessResponse activeOrganization =
+                membershipService.listAccessibleOrganizations(user.getId()).stream()
+                        .filter(org -> org.id().equals(organizationId))
+                        .findFirst()
+                        .orElseThrow(() -> new UnauthorizedException("Organization access denied"));
+        return new LoginResponse(
+                access,
+                refresh,
+                jwt.accessExpirySeconds(),
+                response(user),
+                activeOrganization,
+                membershipService.listAccessibleOrganizations(user.getId()));
     }
 
-    private UserResponse response(User u) {
-        return new UserResponse(u.getId(), u.getOrganizationId(), u.getEmail(), u.getFirstName(), u.getLastName(), u.getUserStatus(), u.getRoles().stream().map(Role::getCode).collect(java.util.stream.Collectors.toSet()));
+    private UserResponse response(User user) {
+        return new UserResponse(
+                user.getId(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getUserStatus());
     }
 
     private String hash(String value) {
         try {
-            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            return java.util.HexFormat.of()
+                    .formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                            .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
         } catch (java.security.NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }

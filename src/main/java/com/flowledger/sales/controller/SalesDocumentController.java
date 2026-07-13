@@ -5,11 +5,10 @@ import com.flowledger.sales.entity.Quotation;
 import com.flowledger.sales.entity.SalesInvoice;
 import com.flowledger.sales.entity.SalesOrder;
 import com.flowledger.sales.service.SalesDocumentService;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/sales")

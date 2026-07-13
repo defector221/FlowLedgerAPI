@@ -48,7 +48,8 @@ public class OrganizationController {
 
     @PutMapping("/current/settings")
     @PreAuthorize("hasRole('ORGANIZATION_ADMIN')")
-    ApiResponse<OrganizationSettingsResponse> updateSettings(@Valid @RequestBody UpdateOrganizationSettingsRequest request) {
+    ApiResponse<OrganizationSettingsResponse> updateSettings(
+            @Valid @RequestBody UpdateOrganizationSettingsRequest request) {
         return ApiResponse.of(service.updateSettings(request));
     }
 }
