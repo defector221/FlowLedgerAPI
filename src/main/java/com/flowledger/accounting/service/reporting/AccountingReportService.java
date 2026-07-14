@@ -12,6 +12,7 @@ import com.flowledger.accounting.repository.JournalEntryLineRepository;
 import com.flowledger.accounting.repository.JournalEntryRepository;
 import com.flowledger.accounting.util.AccountingMoney;
 import com.flowledger.common.tenant.TenantContext;
+import com.flowledger.common.util.FinancialYearUtil;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -261,7 +262,7 @@ public class AccountingReportService {
     public DashboardSummaryResponse dashboard() {
         UUID org = TenantContext.getOrganizationId();
         LocalDate today = LocalDate.now();
-        LocalDate monthStart = today.withDayOfMonth(1);
+        LocalDate fyStart = FinancialYearUtil.financialYearStart(today, "04-01");
         TrialBalanceResponse tb = trialBalance(null, today);
         BigDecimal receivables = AccountingMoney.zero();
         BigDecimal payables = AccountingMoney.zero();
@@ -279,9 +280,9 @@ public class AccountingReportService {
                 default -> {}
             }
         }
-        ProfitAndLossResponse pl = profitAndLoss(monthStart, today);
+        ProfitAndLossResponse pl = profitAndLoss(fyStart, today);
         long journalCount = journals
-                .findByOrganizationIdAndStatusAndEntryDateBetween(org, JournalStatus.POSTED, monthStart, today)
+                .findByOrganizationIdAndStatusAndEntryDateBetween(org, JournalStatus.POSTED, fyStart, today)
                 .size();
         return new DashboardSummaryResponse(
                 receivables,
