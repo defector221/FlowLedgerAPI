@@ -85,11 +85,33 @@ public class InvoicePdfService {
 
     public byte[] renderPreview(
             String documentType, UUID sampleInvoiceId, JsonNode configJson, String editorMode, String html) {
+        TemplateConfig previewCfg = configJson == null || configJson.isNull() ? null : TemplateConfig.from(configJson);
+        String type =
+                documentType == null ? "SALES_INVOICE" : documentType.trim().toUpperCase(Locale.ROOT);
+        boolean salesDoc = "SALES_INVOICE".equals(type) || "INVOICE".equals(type);
+        if (previewCfg != null && FixedInvoiceLayouts.supports(previewCfg.layoutKey)) {
+            Map<String, String> tags = sampleInvoiceId != null
+                    ? salesInvoiceHtmlTags(org(), sampleInvoiceId)
+                    : sampleDocumentTags(org(), documentType);
+            applyTemplateTerms(tags, previewCfg);
+            return htmlRenderer.render(FixedInvoiceLayouts.html(previewCfg.layoutKey), tags);
+        }
         if ("UNLAYER".equalsIgnoreCase(editorMode) && html != null && !html.isBlank()) {
             if (sampleInvoiceId != null) {
                 return renderDocumentWithHtml(documentType, sampleInvoiceId, html);
             }
             return htmlRenderer.render(html, sampleDocumentTags(org(), documentType));
+        }
+        // SECTION / missing layoutKey: still use a fixed design for sales invoices (not legacy OpenPDF)
+        if (salesDoc) {
+            String layoutKey = previewCfg != null
+                    ? FixedInvoiceLayouts.resolveKey(previewCfg.layoutKey)
+                    : FixedInvoiceLayouts.DEFAULT_KEY;
+            Map<String, String> tags = sampleInvoiceId != null
+                    ? salesInvoiceHtmlTags(org(), sampleInvoiceId)
+                    : sampleDocumentTags(org(), documentType);
+            applyTemplateTerms(tags, previewCfg);
+            return htmlRenderer.render(FixedInvoiceLayouts.html(layoutKey), tags);
         }
         return renderWithConfig(configJson, documentType, sampleInvoiceId);
     }
@@ -113,47 +135,38 @@ public class InvoicePdfService {
         if (rows.isEmpty()) throw new IllegalArgumentException("Invoice not found");
         Object[] inv = rows.get(0);
         UUID templateId = inv[8] instanceof UUID u ? u : null;
-        String html = resolveHtml(null, templateId, "SALES_INVOICE");
-        if (html != null) {
-            return htmlRenderer.render(html, salesInvoiceHtmlTags(org, invoiceId));
-        }
         TemplateConfig cfg = resolveConfig(overrideConfig, templateId, "SALES_INVOICE");
+        String html = resolveHtml(null, templateId, "SALES_INVOICE");
+        Map<String, String> tags = salesInvoiceHtmlTags(org, invoiceId);
+        applyTemplateTerms(tags, cfg);
 
-        @SuppressWarnings("unchecked")
-        List<Object[]> lines = em.createNativeQuery(
-                        """
-                        select description, quantity, rate, line_total, coalesce(hsn_sac_code, '')
-                        from sales_invoice_items
-                        where sales_invoice_id = :id
-                        order by line_order
-                        """)
-                .setParameter("id", invoiceId)
-                .getResultList();
+        // Prefer fixed design when layoutKey is set, or when there is no Unlayer HTML export
+        if (FixedInvoiceLayouts.supports(cfg.layoutKey) || html == null || html.isBlank()) {
+            String layoutKey = FixedInvoiceLayouts.resolveKey(cfg.layoutKey);
+            return htmlRenderer.render(FixedInvoiceLayouts.html(layoutKey), tags);
+        }
+        return htmlRenderer.render(html, tags);
+    }
 
-        String customerName = str(inv[11]);
-        String billTo = firstNonBlank(str(inv[9]), str(inv[12]));
-        String customerGstin = firstNonBlank(str(inv[10]), str(inv[13]));
-        String cityState = joinNonBlank(", ", str(inv[14]), str(inv[15]), str(inv[16]));
-        if (!cityState.isBlank()) billTo = billTo.isBlank() ? cityState : billTo + "\n" + cityState;
-
-        DocumentModel model = new DocumentModel(
-                cfg.titleOr("TAX INVOICE"),
-                "Invoice No",
-                str(inv[0]),
-                "Date",
-                str(inv[1]),
-                customerName,
-                billTo,
-                customerGstin,
-                lines,
-                (BigDecimal) inv[2],
-                inv[3],
-                inv[4],
-                inv[5],
-                str(inv[6]),
-                str(inv[7]),
-                true);
-        return buildPdf(org, cfg, model);
+    private static void applyTemplateTerms(Map<String, String> tags, TemplateConfig cfg) {
+        if (cfg == null) return;
+        String terms = tags.get("terms");
+        if ((terms == null || terms.isBlank()) && cfg.defaultTerms != null && !cfg.defaultTerms.isBlank()) {
+            tags.put("terms", cfg.defaultTerms);
+        }
+        if (cfg.note != null && !cfg.note.isBlank()) {
+            tags.putIfAbsent("templateNote", cfg.note);
+            String notes = tags.get("notes");
+            if (notes == null || notes.isBlank()) {
+                String effectiveTerms = tags.get("terms");
+                // Avoid repeating the same footer text under Terms and Notes
+                if (effectiveTerms == null || !effectiveTerms.equals(cfg.note)) {
+                    tags.put("notes", cfg.note);
+                } else {
+                    tags.put("notes", "");
+                }
+            }
+        }
     }
 
     private byte[] renderQuotation(UUID quotationId, JsonNode overrideConfig) {
@@ -335,7 +348,7 @@ public class InvoicePdfService {
             parties.setSpacingAfter(10);
             PdfPCell billTo = new PdfPCell();
             billTo.setBorder(Rectangle.BOX);
-            billTo.setPadding(6);
+            billTo.setPadding(10);
             billTo.addElement(new Paragraph("Bill To", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9)));
             billTo.addElement(new Paragraph(model.partyName, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
             if (model.partyAddress != null && !model.partyAddress.isBlank()) {
@@ -349,7 +362,7 @@ public class InvoicePdfService {
 
             PdfPCell meta = new PdfPCell();
             meta.setBorder(Rectangle.BOX);
-            meta.setPadding(6);
+            meta.setPadding(10);
             meta.addElement(new Paragraph(
                     model.numberLabel + ": " + model.number, FontFactory.getFont(FontFactory.HELVETICA, 9)));
             meta.addElement(
@@ -370,27 +383,33 @@ public class InvoicePdfService {
 
             int n = 1;
             for (Object[] line : model.lines) {
-                table.addCell(cell(String.valueOf(n++)));
-                table.addCell(cell(str(line[0])));
-                if (cfg.showHsn) table.addCell(cell(str(line[4])));
-                table.addCell(cell(str(line[1])));
-                table.addCell(cell(str(line[2])));
-                table.addCell(cell(str(line[3])));
+                table.addCell(cell(String.valueOf(n++), Element.ALIGN_LEFT));
+                table.addCell(cell(str(line[0]), Element.ALIGN_LEFT));
+                if (cfg.showHsn) table.addCell(cell(str(line[4]), Element.ALIGN_LEFT));
+                table.addCell(cell(DocumentHtmlTags.fmtQty(asBd(line[1])), Element.ALIGN_RIGHT));
+                table.addCell(cell(DocumentHtmlTags.fmtMoney(asBd(line[2])), Element.ALIGN_RIGHT));
+                table.addCell(cell(DocumentHtmlTags.fmtMoney(asBd(line[3])), Element.ALIGN_RIGHT));
             }
             doc.add(table);
 
             doc.add(Chunk.NEWLINE);
             if (model.showGstBreakdown) {
                 doc.add(new Paragraph(
-                        "CGST: " + Objects.toString(model.cgst, "0") + "   SGST: " + Objects.toString(model.sgst, "0")
-                                + "   IGST: " + Objects.toString(model.igst, "0"),
+                        "CGST: " + DocumentHtmlTags.fmtMoney(asBd(model.cgst))
+                                + "   SGST: " + DocumentHtmlTags.fmtMoney(asBd(model.sgst))
+                                + "   IGST: " + DocumentHtmlTags.fmtMoney(asBd(model.igst)),
                         FontFactory.getFont(FontFactory.HELVETICA, 9)));
             } else if (model.igst != null) {
-                doc.add(new Paragraph("Tax: " + model.igst, FontFactory.getFont(FontFactory.HELVETICA, 9)));
+                doc.add(new Paragraph(
+                        "Tax: " + DocumentHtmlTags.fmtMoney(asBd(model.igst)),
+                        FontFactory.getFont(FontFactory.HELVETICA, 9)));
             }
             BigDecimal total = model.grandTotal == null ? BigDecimal.ZERO : model.grandTotal;
             doc.add(new Paragraph(
-                    "Grand Total: INR " + total, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, cfg.accentColor)));
+                    "Grand Total: "
+                            + DocumentHtmlTags.pdfCurrencyPrefix(org.getCurrency())
+                            + DocumentHtmlTags.fmtMoney(total),
+                    FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, cfg.accentColor)));
             doc.add(new Paragraph(
                     "Amount in words: " + AmountInWords.inr(total), FontFactory.getFont(FontFactory.HELVETICA, 9)));
 
@@ -503,7 +522,8 @@ public class InvoicePdfService {
                                si.notes, si.terms_and_conditions, si.billing_address, si.customer_gstin,
                                c.customer_name, c.company_name, c.customer_code, c.billing_address as customer_billing,
                                c.shipping_address, c.gstin as customer_gstin_master, c.pan, c.email, c.phone,
-                               c.city, c.state, c.state_code, c.country
+                               c.city, c.state, c.state_code, c.country,
+                               si.subtotal, si.discount_total, si.amount_paid, si.outstanding_amount
                         from sales_invoices si
                         join customers c on c.id = si.customer_id
                         where si.id = :id and si.organization_id = :org
@@ -518,10 +538,13 @@ public class InvoicePdfService {
         @SuppressWarnings("unchecked")
         List<Object[]> lineRows = em.createNativeQuery(
                         """
-                        select description, quantity, rate, line_total, coalesce(hsn_sac_code, '')
-                        from sales_invoice_items
-                        where sales_invoice_id = :id
-                        order by line_order
+                        select coalesce(nullif(trim(sii.description), ''), p.name, '') as description,
+                               sii.quantity, sii.rate, sii.line_total, coalesce(sii.hsn_sac_code, ''),
+                               coalesce(sii.discount_percent, 0), coalesce(sii.tax_rate, 0)
+                        from sales_invoice_items sii
+                        left join products p on p.id = sii.product_id
+                        where sii.sales_invoice_id = :id
+                        order by sii.line_order
                         """)
                 .setParameter("id", invoiceId)
                 .getResultList();
@@ -550,7 +573,11 @@ public class InvoicePdfService {
                 str(inv[21]),
                 str(inv[22]),
                 lineRows,
-                true);
+                true,
+                asBd(inv[23]),
+                asBd(inv[24]),
+                asBd(inv[25]),
+                asBd(inv[26]));
     }
 
     private Map<String, String> quotationHtmlTags(Organization org, UUID quotationId) {
@@ -575,7 +602,8 @@ public class InvoicePdfService {
         @SuppressWarnings("unchecked")
         List<Object[]> lineRows = em.createNativeQuery(
                         """
-                        select description, quantity, rate, line_total, coalesce(hsn_sac_code, '')
+                        select description, quantity, rate, line_total, coalesce(hsn_sac_code, ''),
+                               coalesce(discount_percent, 0), coalesce(tax_rate, 0)
                         from quotation_items
                         where quotation_id = :id
                         order by line_order
@@ -609,7 +637,11 @@ public class InvoicePdfService {
                 str(q[18]),
                 str(q[19]),
                 lineRows,
-                true);
+                true,
+                grand.subtract(tax),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                grand);
     }
 
     private Map<String, String> documentTags(
@@ -637,12 +669,24 @@ public class InvoicePdfService {
             String stateCode,
             String country,
             List<Object[]> lineRows,
-            boolean showHsn) {
+            boolean showHsn,
+            BigDecimal subtotal,
+            BigDecimal discountTotal,
+            BigDecimal amountPaid,
+            BigDecimal outstandingAmount) {
         Map<String, String> tags = new HashMap<>();
+        String currencyPrefix = DocumentHtmlTags.pdfCurrencyPrefix(org.getCurrency());
+        tags.put("currency", org.getCurrency() == null || org.getCurrency().isBlank() ? "INR" : org.getCurrency().trim().toUpperCase(Locale.ROOT));
+        tags.put("currencyPrefix", currencyPrefix);
         tags.put("organizationName", org.getName() == null ? "FlowLedger" : org.getName());
         tags.put("gstin", nullToEmpty(org.getGstin()));
         tags.put("organizationEmail", nullToEmpty(org.getEmail()));
         tags.put("organizationPhone", nullToEmpty(org.getPhone()));
+        tags.put(
+                "organizationAddress",
+                firstNonBlank(
+                        org.getBillingAddress(),
+                        joinAddress(org.getCity(), org.getState(), org.getCountry())));
         tags.put("logoHtml", DocumentHtmlTags.logoHtml(loadOrgLogo(org)));
         tags.put("documentTitle", documentTitle);
         tags.put("invoiceNumber", number);
@@ -651,6 +695,10 @@ public class InvoicePdfService {
         tags.put("cgstTotal", DocumentHtmlTags.fmt(cgst));
         tags.put("sgstTotal", DocumentHtmlTags.fmt(sgst));
         tags.put("igstTotal", DocumentHtmlTags.fmt(igst));
+        tags.put("subtotal", DocumentHtmlTags.fmt(subtotal));
+        tags.put("discountTotal", DocumentHtmlTags.fmt(discountTotal));
+        tags.put("amountPaid", DocumentHtmlTags.fmt(amountPaid));
+        tags.put("outstandingAmount", DocumentHtmlTags.fmt(outstandingAmount));
         tags.put("notes", nullToEmpty(notes));
         tags.put("terms", nullToEmpty(terms));
         tags.put("customerName", nullToEmpty(customerName));
@@ -684,17 +732,43 @@ public class InvoicePdfService {
                 .map(row -> new DocumentHtmlTags.Line(
                         str(row[0]),
                         str(row[4]),
-                        row[1] instanceof BigDecimal q ? q : BigDecimal.ZERO,
-                        row[2] instanceof BigDecimal r ? r : BigDecimal.ZERO,
-                        row[3] instanceof BigDecimal a ? a : BigDecimal.ZERO))
+                        asBd(row[1]),
+                        asBd(row[2]),
+                        asBd(row[3]),
+                        row.length > 5 ? asBd(row[5]) : BigDecimal.ZERO,
+                        row.length > 6 ? asBd(row[6]) : BigDecimal.ZERO))
                 .toList();
-        tags.put("lineItemsHtml", DocumentHtmlTags.lineItemsTableHtml(lines, cgst, sgst, igst, grandTotal, showHsn));
+        tags.put(
+                "lineItemsHtml",
+                DocumentHtmlTags.lineItemsTableHtml(
+                        lines, cgst, sgst, igst, subtotal, discountTotal, grandTotal, showHsn, currencyPrefix));
+        tags.put(
+                "lineItemsHtmlIvonne",
+                DocumentHtmlTags.lineItemsTableHtmlIvonne(
+                        lines, cgst, sgst, igst, subtotal, discountTotal, grandTotal, currencyPrefix));
         return tags;
+    }
+
+    private static BigDecimal asBd(Object value) {
+        if (value instanceof BigDecimal bd) return bd;
+        if (value == null) return BigDecimal.ZERO;
+        try {
+            return new BigDecimal(value.toString());
+        } catch (NumberFormatException ex) {
+            return BigDecimal.ZERO;
+        }
+    }
+
+    private static String joinAddress(String city, String state, String country) {
+        return DocumentHtmlTags.joinNonBlank(", ", city, state, country);
     }
 
     private Map<String, String> sampleDocumentTags(Organization org, String documentType) {
         Map<String, String> tags = DocumentHtmlTags.sample(
-                loadOrgLogo(org), org.getName() == null ? "FlowLedger" : org.getName(), org.getGstin());
+                loadOrgLogo(org),
+                org.getName() == null ? "FlowLedger" : org.getName(),
+                org.getGstin(),
+                org.getCurrency());
         if ("QUOTATION".equalsIgnoreCase(documentType)) {
             tags.put("documentTitle", "QUOTATION");
         }
@@ -807,8 +881,14 @@ public class InvoicePdfService {
     }
 
     private PdfPCell cell(String text) {
+        return cell(text, Element.ALIGN_LEFT);
+    }
+
+    private PdfPCell cell(String text, int alignment) {
         PdfPCell c = new PdfPCell(new Phrase(text == null ? "" : text, FontFactory.getFont(FontFactory.HELVETICA, 9)));
-        c.setPadding(5);
+        c.setPadding(6);
+        c.setHorizontalAlignment(alignment);
+        c.setVerticalAlignment(Element.ALIGN_MIDDLE);
         return c;
     }
 
@@ -867,6 +947,8 @@ public class InvoicePdfService {
         final boolean showBankDetails;
         final boolean showTerms;
         final String note;
+        final String layoutKey;
+        final String defaultTerms;
 
         TemplateConfig(
                 boolean logoVisible,
@@ -876,7 +958,9 @@ public class InvoicePdfService {
                 boolean showHsn,
                 boolean showBankDetails,
                 boolean showTerms,
-                String note) {
+                String note,
+                String layoutKey,
+                String defaultTerms) {
             this.logoVisible = logoVisible;
             this.title = title;
             this.accentColor = accentColor;
@@ -885,6 +969,8 @@ public class InvoicePdfService {
             this.showBankDetails = showBankDetails;
             this.showTerms = showTerms;
             this.note = note;
+            this.layoutKey = layoutKey;
+            this.defaultTerms = defaultTerms;
         }
 
         static TemplateConfig from(JsonNode root) {
@@ -892,6 +978,14 @@ public class InvoicePdfService {
             JsonNode header = root.path("header");
             JsonNode items = root.path("items");
             JsonNode footer = root.path("footer");
+            String layout = text(root, "layoutKey", null);
+            if (layout == null || layout.isBlank()) {
+                layout = text(header, "layoutKey", null);
+            }
+            String defaultTerms = text(footer, "defaultTerms", null);
+            if (defaultTerms == null || defaultTerms.isBlank()) {
+                defaultTerms = text(footer, "note", null);
+            }
             return new TemplateConfig(
                     logo.path("visible").asBoolean(true),
                     text(header, "title", null),
@@ -900,7 +994,9 @@ public class InvoicePdfService {
                     items.path("showHsn").asBoolean(true),
                     footer.path("showBankDetails").asBoolean(true),
                     footer.path("showTerms").asBoolean(true),
-                    text(footer, "note", "This is a computer-generated document."));
+                    text(footer, "note", "This is a computer-generated document."),
+                    layout,
+                    defaultTerms);
         }
 
         String titleOr(String fallback) {

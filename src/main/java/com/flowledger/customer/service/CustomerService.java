@@ -89,7 +89,12 @@ public class CustomerService extends OrganizationScopedService {
     public Page<Response> search(Search f, Pageable pageable) {
         UUID org = orgId();
         Specification<Customer> s = (r, q, b) -> b.equal(r.get("organizationId"), org);
-        if (f.archived() != null) s = s.and((r, q, b) -> b.equal(r.get("archived"), f.archived()));
+        // Default: hide archived (soft-deleted) customers unless explicitly requested
+        if (f.archived() == null) {
+            s = s.and((r, q, b) -> b.equal(r.get("archived"), false));
+        } else {
+            s = s.and((r, q, b) -> b.equal(r.get("archived"), f.archived()));
+        }
         if (f.search() != null && !f.search().isBlank()) {
             String p = "%" + f.search().toLowerCase() + "%";
             s = s.and((r, q, b) -> b.or(

@@ -71,7 +71,9 @@ public class SupplierService extends OrganizationScopedService {
     public Page<Response> search(Search filter, Pageable pageable) {
         UUID org = orgId();
         Specification<Supplier> spec = (root, query, builder) -> builder.equal(root.get("organizationId"), org);
-        if (filter.archived() != null) {
+        if (filter.archived() == null) {
+            spec = spec.and((root, query, builder) -> builder.equal(root.get("archived"), false));
+        } else {
             spec = spec.and((root, query, builder) -> builder.equal(root.get("archived"), filter.archived()));
         }
         if (filter.search() != null && !filter.search().isBlank()) {

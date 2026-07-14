@@ -7,7 +7,10 @@ public final class GstCalculationDtos {
     private GstCalculationDtos() {}
 
     /**
-     * @param taxType GST (default), IGST, or OTHER — controls split behaviour
+     * @param taxType fallback when splitStrategy is null (GST / IGST / OTHER)
+     * @param splitStrategy PLACE_OF_SUPPLY, NO_SPLIT_IGST, NO_SPLIT_OTHER, CUSTOM_PERCENT
+     * @param cgstSharePercent share of total tax for CGST (default 50)
+     * @param sgstSharePercent share of total tax for SGST (default 50)
      */
     public record Request(
             @NotBlank String organizationStateCode,
@@ -17,7 +20,11 @@ public final class GstCalculationDtos {
             @NotNull @DecimalMin("0.0") BigDecimal quantity,
             @NotNull @DecimalMin("0.0") BigDecimal rate,
             @DecimalMin("0.0") BigDecimal discount,
-            String taxType) {
+            String taxType,
+            String splitStrategy,
+            BigDecimal cgstSharePercent,
+            BigDecimal sgstSharePercent) {
+
         public Request(
                 String organizationStateCode,
                 String placeOfSupplyStateCode,
@@ -26,13 +33,46 @@ public final class GstCalculationDtos {
                 BigDecimal quantity,
                 BigDecimal rate,
                 BigDecimal discount) {
-            this(organizationStateCode, placeOfSupplyStateCode, taxRate, taxInclusive, quantity, rate, discount, "GST");
+            this(
+                    organizationStateCode,
+                    placeOfSupplyStateCode,
+                    taxRate,
+                    taxInclusive,
+                    quantity,
+                    rate,
+                    discount,
+                    "GST",
+                    null,
+                    null,
+                    null);
+        }
+
+        public Request(
+                String organizationStateCode,
+                String placeOfSupplyStateCode,
+                BigDecimal taxRate,
+                Boolean taxInclusive,
+                BigDecimal quantity,
+                BigDecimal rate,
+                BigDecimal discount,
+                String taxType) {
+            this(
+                    organizationStateCode,
+                    placeOfSupplyStateCode,
+                    taxRate,
+                    taxInclusive,
+                    quantity,
+                    rate,
+                    discount,
+                    taxType,
+                    null,
+                    null,
+                    null);
         }
     }
 
     public record Response(
             BigDecimal taxable, BigDecimal cgst, BigDecimal sgst, BigDecimal igst, BigDecimal otherTax, BigDecimal lineTotal) {
-        /** Back-compat helper when callers only need GST components. */
         public Response(BigDecimal taxable, BigDecimal cgst, BigDecimal sgst, BigDecimal igst, BigDecimal lineTotal) {
             this(taxable, cgst, sgst, igst, BigDecimal.ZERO, lineTotal);
         }

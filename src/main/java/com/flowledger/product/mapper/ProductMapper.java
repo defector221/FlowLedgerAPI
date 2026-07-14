@@ -12,7 +12,16 @@ public interface ProductMapper {
         return entity;
     }
 
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @BeanMapping(
+            nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+            ignoreUnmappedSourceProperties = {"warehouseId"})
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "organizationId", ignore = true)
+    @Mapping(target = "active", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "createdBy", ignore = true)
+    @Mapping(target = "updatedBy", ignore = true)
     void updateFromCreate(Create d, @MappingTarget Product entity);
 
     @Mapping(target = "categoryName", ignore = true)

@@ -13,6 +13,7 @@ public interface TaxRateRepository extends JpaRepository<TaxRate, UUID> {
             select case when count(t) > 0 then true else false end
             from TaxRate t
             where t.organizationId = :organizationId
+              and t.active = true
               and lower(trim(t.name)) = lower(trim(:name))
             """)
     boolean existsByOrganizationIdAndNameIgnoreCase(

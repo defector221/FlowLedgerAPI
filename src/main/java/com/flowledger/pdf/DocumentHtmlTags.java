@@ -1,6 +1,7 @@
 package com.flowledger.pdf;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
@@ -11,6 +12,12 @@ final class DocumentHtmlTags {
     private DocumentHtmlTags() {}
 
     static Map<String, String> sample(OrganizationLogo logo, String organizationName, String organizationGstin) {
+        return sample(logo, organizationName, organizationGstin, "INR");
+    }
+
+    static Map<String, String> sample(
+            OrganizationLogo logo, String organizationName, String organizationGstin, String currencyCode) {
+        String currencyPrefix = pdfCurrencyPrefix(currencyCode);
         Map<String, String> tags = new HashMap<>();
         tags.put("organizationName", nullToEmpty(organizationName));
         tags.put("gstin", nullToEmpty(organizationGstin));
@@ -47,22 +54,44 @@ final class DocumentHtmlTags {
                         "AAAAA0000A",
                         "accounts@acme.example",
                         "+91 99887 76655"));
+        List<Line> sampleLines = List.of(
+                new Line("Industrial motor 5HP", "8501", bd("2"), bd("4500.00"), bd("9000.00"), bd("0"), bd("18")),
+                new Line("Mounting kit", "8487", bd("2"), bd("350.00"), bd("665.00"), bd("5"), bd("18")),
+                new Line("Installation service", "9987", bd("1"), bd("1500.00"), bd("1500.00"), bd("0"), bd("18")));
         tags.put(
                 "lineItemsHtml",
                 lineItemsTableHtml(
-                        List.of(
-                                new Line("Industrial motor 5HP", "8501", bd("2"), bd("4500.00"), bd("9000.00")),
-                                new Line("Mounting kit", "8487", bd("2"), bd("350.00"), bd("700.00")),
-                                new Line("Installation service", "9987", bd("1"), bd("1500.00"), bd("1500.00"))),
+                        sampleLines,
                         bd("900.00"),
                         bd("900.00"),
                         bd("0.00"),
+                        bd("11165.00"),
+                        bd("35.00"),
                         bd("11800.00"),
-                        true));
+                        true,
+                        currencyPrefix));
+        tags.put(
+                "lineItemsHtmlIvonne",
+                lineItemsTableHtmlIvonne(
+                        sampleLines,
+                        bd("900.00"),
+                        bd("900.00"),
+                        bd("0.00"),
+                        bd("11165.00"),
+                        bd("35.00"),
+                        bd("11800.00"),
+                        currencyPrefix));
+        tags.put("currency", currencyCode == null || currencyCode.isBlank() ? "INR" : currencyCode.trim().toUpperCase(Locale.ROOT));
+        tags.put("currencyPrefix", currencyPrefix);
         tags.put("cgstTotal", "900.00");
         tags.put("sgstTotal", "900.00");
         tags.put("igstTotal", "0.00");
+        tags.put("subtotal", "11,165.00");
+        tags.put("discountTotal", "35.00");
+        tags.put("amountPaid", "0.00");
+        tags.put("outstandingAmount", "11,800.00");
         tags.put("grandTotal", "11,800.00");
+        tags.put("organizationAddress", "237 Business Park, Andheri East, Mumbai, Maharashtra, India");
         tags.put("notes", "Goods once sold will not be taken back.");
         tags.put("terms", "Payment due within 15 days of invoice date.");
         return tags;
@@ -155,21 +184,51 @@ final class DocumentHtmlTags {
             BigDecimal igst,
             BigDecimal grandTotal,
             boolean showHsn) {
+        return lineItemsTableHtml(lines, cgst, sgst, igst, null, null, grandTotal, showHsn);
+    }
+
+    static String lineItemsTableHtml(
+            List<Line> lines,
+            BigDecimal cgst,
+            BigDecimal sgst,
+            BigDecimal igst,
+            BigDecimal subtotal,
+            BigDecimal discountTotal,
+            BigDecimal grandTotal,
+            boolean showHsn) {
+        return lineItemsTableHtml(lines, cgst, sgst, igst, subtotal, discountTotal, grandTotal, showHsn, "INR ");
+    }
+
+    static String lineItemsTableHtml(
+            List<Line> lines,
+            BigDecimal cgst,
+            BigDecimal sgst,
+            BigDecimal igst,
+            BigDecimal subtotal,
+            BigDecimal discountTotal,
+            BigDecimal grandTotal,
+            boolean showHsn,
+            String currencyPrefix) {
+        String cur = currencyPrefix == null || currencyPrefix.isBlank() ? "INR " : currencyPrefix;
+        int cols = showHsn ? 8 : 7;
+        int labelCols = cols - 1;
         StringBuilder sb = new StringBuilder();
         sb.append("<table width=\"100%\" style=\"border-collapse:collapse;font-size:12px;width:100%;\">");
-        sb.append("<thead><tr style=\"background:#0f172a;color:#ffffff;\">");
-        sb.append("<th align=\"left\" style=\"padding:8px;\">#</th>");
-        sb.append("<th align=\"left\" style=\"padding:8px;\">Description</th>");
+        sb.append("<thead><tr style=\"background:#334155;color:#ffffff;\">");
+        sb.append("<th align=\"left\" style=\"padding:10px 8px;font-weight:600;\">#</th>");
+        sb.append("<th align=\"left\" style=\"padding:10px 8px;font-weight:600;\">Description</th>");
         if (showHsn) {
-            sb.append("<th align=\"left\" style=\"padding:8px;\">HSN/SAC</th>");
+            sb.append("<th align=\"left\" style=\"padding:10px 8px;font-weight:600;\">HSN/SAC</th>");
         }
-        sb.append("<th align=\"right\" style=\"padding:8px;\">Qty</th>");
-        sb.append("<th align=\"right\" style=\"padding:8px;\">Rate</th>");
-        sb.append("<th align=\"right\" style=\"padding:8px;\">Amount</th>");
+        sb.append("<th align=\"right\" style=\"padding:10px 8px;font-weight:600;\">Qty</th>");
+        sb.append("<th align=\"right\" style=\"padding:10px 8px;font-weight:600;\">Rate</th>");
+        sb.append("<th align=\"right\" style=\"padding:10px 8px;font-weight:600;\">Disc %</th>");
+        sb.append("<th align=\"right\" style=\"padding:10px 8px;font-weight:600;\">Tax %</th>");
+        sb.append("<th align=\"right\" style=\"padding:10px 8px;font-weight:600;\">Amount</th>");
         sb.append("</tr></thead><tbody>");
         if (lines == null || lines.isEmpty()) {
             sb.append("<tr><td colspan=\"")
-                    .append(showHsn ? 6 : 5)
+                    .append(cols)
                     .append("\" style=\"padding:12px;color:#64748b;\">No line items</td></tr>");
         } else {
             int i = 1;
@@ -186,46 +245,171 @@ final class DocumentHtmlTags {
                             .append(esc(nullToEmpty(line.hsn())))
                             .append("</td>");
                 }
-                sb.append("<td align=\"right\" style=\"padding:8px;\">")
-                        .append(esc(fmt(line.quantity())))
+                sb.append("<td align=\"right\" style=\"padding:8px 10px;\">")
+                        .append(esc(fmtQty(line.quantity())))
                         .append("</td>");
-                sb.append("<td align=\"right\" style=\"padding:8px;\">")
-                        .append(esc(fmt(line.rate())))
+                sb.append("<td align=\"right\" style=\"padding:8px 10px;\">")
+                        .append(esc(money(cur, line.rate())))
                         .append("</td>");
-                sb.append("<td align=\"right\" style=\"padding:8px;font-weight:600;\">")
-                        .append(esc(fmt(line.amount())))
+                sb.append("<td align=\"right\" style=\"padding:8px 10px;\">")
+                        .append(esc(fmtPct(line.discountPercent())))
+                        .append("</td>");
+                sb.append("<td align=\"right\" style=\"padding:8px 10px;\">")
+                        .append(esc(fmtPct(line.taxRate())))
+                        .append("</td>");
+                sb.append("<td align=\"right\" style=\"padding:8px 10px;font-weight:600;\">")
+                        .append(esc(money(cur, line.amount())))
                         .append("</td>");
                 sb.append("</tr>");
             }
         }
         sb.append("</tbody><tfoot>");
-        appendTotalRow(sb, "CGST", cgst, showHsn);
-        appendTotalRow(sb, "SGST", sgst, showHsn);
-        appendTotalRow(sb, "IGST", igst, showHsn);
+        appendTotalRow(sb, "Subtotal", subtotal, labelCols, cur);
+        appendTotalRow(sb, "Discount", discountTotal, labelCols, cur);
+        appendTotalRow(sb, "CGST", cgst, labelCols, cur);
+        appendTotalRow(sb, "SGST", sgst, labelCols, cur);
+        appendTotalRow(sb, "IGST", igst, labelCols, cur);
         sb.append("<tr>");
         sb.append("<td colspan=\"")
-                .append(showHsn ? 5 : 4)
+                .append(labelCols)
                 .append("\" align=\"right\" style=\"padding:10px 8px;font-weight:700;\">Grand total</td>");
         sb.append("<td align=\"right\" style=\"padding:10px 8px;font-weight:700;color:#0f766e;\">")
-                .append(esc(fmt(grandTotal)))
+                .append(esc(money(cur, grandTotal)))
                 .append("</td></tr>");
         sb.append("</tfoot></table>");
         return sb.toString();
     }
 
-    private static void appendTotalRow(StringBuilder sb, String label, BigDecimal amount, boolean showHsn) {
+    /** Light Ivonne-style table: Items / Price / Tax % / Disc % / Total */
+    static String lineItemsTableHtmlIvonne(
+            List<Line> lines,
+            BigDecimal cgst,
+            BigDecimal sgst,
+            BigDecimal igst,
+            BigDecimal subtotal,
+            BigDecimal discountTotal,
+            BigDecimal grandTotal) {
+        return lineItemsTableHtmlIvonne(lines, cgst, sgst, igst, subtotal, discountTotal, grandTotal, "INR ");
+    }
+
+    static String lineItemsTableHtmlIvonne(
+            List<Line> lines,
+            BigDecimal cgst,
+            BigDecimal sgst,
+            BigDecimal igst,
+            BigDecimal subtotal,
+            BigDecimal discountTotal,
+            BigDecimal grandTotal,
+            String currencyPrefix) {
+        String cur = currencyPrefix == null || currencyPrefix.isBlank() ? "INR " : currencyPrefix;
+        StringBuilder sb = new StringBuilder();
+        sb.append(
+                "<table width=\"100%\" style=\"border-collapse:collapse;font-size:13px;width:100%;font-family:Helvetica,Arial,sans-serif;\">");
+        sb.append("<thead><tr style=\"background:#F3F4F6;color:#6B7280;\">");
+        sb.append(
+                "<th align=\"left\" style=\"padding:12px 10px;font-weight:600;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;\">Items Details</th>");
+        sb.append(
+                "<th align=\"right\" style=\"padding:12px 10px;font-weight:600;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;\">Price</th>");
+        sb.append(
+                "<th align=\"right\" style=\"padding:12px 10px;font-weight:600;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;\">Tax %</th>");
+        sb.append(
+                "<th align=\"right\" style=\"padding:12px 10px;font-weight:600;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;\">Disc %</th>");
+        sb.append(
+                "<th align=\"right\" style=\"padding:12px 10px;font-weight:600;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;\">Total</th>");
+        sb.append("</tr></thead><tbody>");
+        if (lines == null || lines.isEmpty()) {
+            sb.append(
+                    "<tr><td colspan=\"5\" style=\"padding:14px;color:#9CA3AF;\">No line items</td></tr>");
+        } else {
+            for (Line line : lines) {
+                sb.append("<tr style=\"border-bottom:1px solid #E5E7EB;\">");
+                sb.append("<td style=\"padding:14px 10px;color:#111827;\">");
+                sb.append("<div style=\"font-weight:600;\">").append(esc(line.description())).append("</div>");
+                if (notBlank(line.hsn())) {
+                    sb.append("<div style=\"margin-top:2px;font-size:12px;color:#9CA3AF;\">HSN/SAC ")
+                            .append(esc(line.hsn()))
+                            .append(" · Qty ")
+                            .append(esc(fmtQty(line.quantity())))
+                            .append("</div>");
+                } else {
+                    sb.append("<div style=\"margin-top:2px;font-size:12px;color:#9CA3AF;\">Qty ")
+                            .append(esc(fmtQty(line.quantity())))
+                            .append("</div>");
+                }
+                sb.append("</td>");
+                sb.append("<td align=\"right\" style=\"padding:14px 10px;color:#374151;\">")
+                        .append(esc(money(cur, line.rate())))
+                        .append("</td>");
+                sb.append("<td align=\"right\" style=\"padding:14px 10px;color:#374151;\">")
+                        .append(esc(fmtPct(line.taxRate())))
+                        .append("%</td>");
+                sb.append("<td align=\"right\" style=\"padding:14px 10px;color:#374151;\">")
+                        .append(esc(fmtPct(line.discountPercent())))
+                        .append("%</td>");
+                sb.append("<td align=\"right\" style=\"padding:14px 10px;font-weight:600;color:#111827;\">")
+                        .append(esc(money(cur, line.amount())))
+                        .append("</td>");
+                sb.append("</tr>");
+            }
+        }
+        sb.append("</tbody><tfoot>");
+        if (subtotal != null && subtotal.signum() != 0) {
+            sb.append(
+                    "<tr><td colspan=\"4\" align=\"right\" style=\"padding:8px 10px;color:#6B7280;\">Subtotal</td>");
+            sb.append("<td align=\"right\" style=\"padding:8px 10px;\">")
+                    .append(esc(money(cur, subtotal)))
+                    .append("</td></tr>");
+        }
+        if (discountTotal != null && discountTotal.signum() != 0) {
+            sb.append(
+                    "<tr><td colspan=\"4\" align=\"right\" style=\"padding:8px 10px;color:#6B7280;\">Discount</td>");
+            sb.append("<td align=\"right\" style=\"padding:8px 10px;\">- ")
+                    .append(esc(money(cur, discountTotal)))
+                    .append("</td></tr>");
+        }
+        appendIvonneTaxRow(sb, "CGST", cgst, cur);
+        appendIvonneTaxRow(sb, "SGST", sgst, cur);
+        appendIvonneTaxRow(sb, "IGST", igst, cur);
+        sb.append(
+                "<tr><td colspan=\"4\" align=\"right\" style=\"padding:14px 10px;font-weight:700;font-size:14px;color:#111827;\">Total Amount</td>");
+        sb.append(
+                        "<td align=\"right\" style=\"padding:14px 10px;font-weight:700;font-size:16px;color:#111827;\">")
+                .append(esc(money(cur, grandTotal)))
+                .append("</td></tr>");
+        sb.append("</tfoot></table>");
+        return sb.toString();
+    }
+
+    private static void appendIvonneTaxRow(StringBuilder sb, String label, BigDecimal amount, String currencyPrefix) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) == 0) {
+            return;
+        }
+        sb.append("<tr><td colspan=\"4\" align=\"right\" style=\"padding:6px 10px;color:#6B7280;\">")
+                .append(label)
+                .append("</td>");
+        sb.append("<td align=\"right\" style=\"padding:6px 10px;\">")
+                .append(esc(money(currencyPrefix, amount)))
+                .append("</td></tr>");
+    }
+
+    private static void appendTotalRow(
+            StringBuilder sb, String label, BigDecimal amount, int labelCols, String currencyPrefix) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) == 0) {
             return;
         }
         sb.append("<tr>");
         sb.append("<td colspan=\"")
-                .append(showHsn ? 5 : 4)
+                .append(labelCols)
                 .append("\" align=\"right\" style=\"padding:6px 8px;color:#64748b;\">")
                 .append(label)
                 .append("</td>");
         sb.append("<td align=\"right\" style=\"padding:6px 8px;\">")
-                .append(esc(fmt(amount)))
+                .append(esc(money(currencyPrefix, amount)))
                 .append("</td></tr>");
+    }
+
+    private static void appendTotalRow(StringBuilder sb, String label, BigDecimal amount, boolean showHsn) {
+        appendTotalRow(sb, label, amount, showHsn ? 7 : 6, "INR ");
     }
 
     static String mimeFromKey(String objectKey) {
@@ -248,6 +432,31 @@ final class DocumentHtmlTags {
         return "image/png";
     }
 
+    /**
+     * PDF-safe currency label from organization currency code. Helvetica cannot render ₹ / € / £,
+     * which often appear as "#" in PDFs — prefer ISO codes or ASCII symbols.
+     */
+    static String pdfCurrencyPrefix(String currencyCode) {
+        String code = currencyCode == null || currencyCode.isBlank()
+                ? "INR"
+                : currencyCode.trim().toUpperCase(Locale.ROOT);
+        return switch (code) {
+            case "INR" -> "INR ";
+            case "USD" -> "USD ";
+            case "EUR" -> "EUR ";
+            case "GBP" -> "GBP ";
+            case "AED" -> "AED ";
+            case "SGD" -> "SGD ";
+            case "AUD" -> "AUD ";
+            case "CAD" -> "CAD ";
+            default -> code + " ";
+        };
+    }
+
+    static String money(String currencyPrefix, BigDecimal value) {
+        return nullToEmpty(currencyPrefix) + fmtMoney(value);
+    }
+
     static String esc(String value) {
         if (value == null || value.isEmpty()) {
             return "";
@@ -259,12 +468,38 @@ final class DocumentHtmlTags {
     }
 
     static String fmt(BigDecimal value) {
+        return fmtMoney(value);
+    }
+
+    /** Money and rates: always 2 decimal places with grouping (en-IN friendly). */
+    static String fmtMoney(BigDecimal value) {
         if (value == null) {
             return "0.00";
         }
-        return value.stripTrailingZeros().scale() <= 0
-                ? value.toPlainString()
-                : String.format(Locale.ROOT, "%,.2f", value);
+        return String.format(Locale.ROOT, "%,.2f", value.setScale(2, RoundingMode.HALF_UP));
+    }
+
+    /** Quantity: whole numbers without decimals; otherwise up to 2 decimals. */
+    static String fmtQty(BigDecimal value) {
+        if (value == null) {
+            return "0";
+        }
+        BigDecimal normalized = value.stripTrailingZeros();
+        if (normalized.scale() <= 0) {
+            return normalized.toPlainString();
+        }
+        return String.format(Locale.ROOT, "%,.2f", value.setScale(2, RoundingMode.HALF_UP));
+    }
+
+    static String fmtPct(BigDecimal value) {
+        if (value == null) {
+            return "0";
+        }
+        BigDecimal normalized = value.stripTrailingZeros();
+        if (normalized.scale() <= 0) {
+            return normalized.toPlainString();
+        }
+        return String.format(Locale.ROOT, "%.2f", value.setScale(2, RoundingMode.HALF_UP));
     }
 
     static String nullToEmpty(String value) {
@@ -302,7 +537,18 @@ final class DocumentHtmlTags {
         return new BigDecimal(value);
     }
 
-    record Line(String description, String hsn, BigDecimal quantity, BigDecimal rate, BigDecimal amount) {}
+    record Line(
+            String description,
+            String hsn,
+            BigDecimal quantity,
+            BigDecimal rate,
+            BigDecimal amount,
+            BigDecimal discountPercent,
+            BigDecimal taxRate) {
+        Line(String description, String hsn, BigDecimal quantity, BigDecimal rate, BigDecimal amount) {
+            this(description, hsn, quantity, rate, amount, BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+    }
 
     record OrganizationLogo(byte[] bytes, String mimeType) {}
 }

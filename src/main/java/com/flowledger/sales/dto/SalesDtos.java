@@ -18,7 +18,10 @@ public final class SalesDtos {
             @NotNull @PositiveOrZero BigDecimal rate,
             BigDecimal discountPercent,
             BigDecimal taxRate,
-            String taxType) {}
+            String taxType,
+            String splitStrategy,
+            BigDecimal cgstSharePercent,
+            BigDecimal sgstSharePercent) {}
 
     public record ChallanItem(
             @NotNull UUID productId, String description, @NotNull @Positive BigDecimal quantity, UUID unitId) {}
@@ -44,6 +47,7 @@ public final class SalesDtos {
             BigDecimal roundOff,
             String notes,
             String termsAndConditions,
+            UUID templateId,
             @NotEmpty @Valid List<Item> items) {}
 
     public record QuotationRequest(
@@ -93,4 +97,54 @@ public final class SalesDtos {
 
     public record InvoiceSummary(
             UUID id, String invoiceNumber, String status, BigDecimal grandTotal, BigDecimal outstanding) {}
+
+    public record InvoiceItemDetail(
+            UUID id,
+            UUID productId,
+            String productName,
+            String itemType,
+            String unitName,
+            String description,
+            String hsnSacCode,
+            BigDecimal quantity,
+            BigDecimal rate,
+            BigDecimal discountPercent,
+            BigDecimal discountAmount,
+            BigDecimal taxRate,
+            String taxType,
+            String splitStrategy,
+            BigDecimal cgstSharePercent,
+            BigDecimal sgstSharePercent,
+            BigDecimal lineTotal,
+            String warehouseName) {}
+
+    public record InvoiceDetail(
+            UUID id,
+            String invoiceNumber,
+            LocalDate invoiceDate,
+            LocalDate dueDate,
+            UUID customerId,
+            UUID warehouseId,
+            String warehouseName,
+            String status,
+            String paymentStatus,
+            BigDecimal subtotal,
+            BigDecimal discountTotal,
+            BigDecimal taxableAmount,
+            BigDecimal cgstTotal,
+            BigDecimal sgstTotal,
+            BigDecimal igstTotal,
+            BigDecimal shippingCharges,
+            BigDecimal additionalCharges,
+            BigDecimal roundOff,
+            BigDecimal grandTotal,
+            BigDecimal amountPaid,
+            BigDecimal outstandingAmount,
+            String notes,
+            String termsAndConditions,
+            UUID templateId,
+            String billingAddress,
+            String shippingAddress,
+            String placeOfSupply,
+            List<InvoiceItemDetail> items) {}
 }

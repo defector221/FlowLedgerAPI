@@ -7,11 +7,12 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface EmailTemplateRepository extends JpaRepository<EmailTemplate, UUID> {
-    List<EmailTemplate> findByOrganizationIdOrderByUpdatedAtDesc(UUID organizationId);
+    List<EmailTemplate> findByOrganizationIdAndActiveTrueOrderByUpdatedAtDesc(UUID organizationId);
 
     Optional<EmailTemplate> findByIdAndOrganizationId(UUID id, UUID organizationId);
 
-    boolean existsByOrganizationIdAndNameIgnoreCase(UUID organizationId, String name);
+    boolean existsByOrganizationIdAndNameIgnoreCaseAndActiveTrue(UUID organizationId, String name);
 
-    boolean existsByOrganizationIdAndNameIgnoreCaseAndIdNot(UUID organizationId, String name, UUID id);
+    boolean existsByOrganizationIdAndNameIgnoreCaseAndActiveTrueAndIdNot(
+            UUID organizationId, String name, UUID id);
 }

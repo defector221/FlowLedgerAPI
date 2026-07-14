@@ -8,11 +8,13 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @RestControllerAdvice
@@ -30,6 +32,28 @@ public class GlobalExceptionHandler {
         result.setType(URI.create("https://flowledger.com/problems/503"));
         result.setInstance(URI.create(request.getRequestURI()));
         return result;
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    ProblemDetail responseStatus(ResponseStatusException ex, HttpServletRequest request) {
+        HttpStatusCode statusCode = ex.getStatusCode();
+        HttpStatus status = HttpStatus.resolve(statusCode.value());
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        String detail = ex.getReason();
+        if (detail == null || detail.isBlank()) {
+            detail = status.getReasonPhrase();
+        }
+        if (status.is5xxServerError()) {
+            log.error(
+                    "ResponseStatusException. method={}, uri={}, status={}",
+                    request.getMethod(),
+                    request.getRequestURI(),
+                    status.value(),
+                    ex);
+        }
+        return problem(status, detail, request, null);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -87,6 +111,7 @@ public class GlobalExceptionHandler {
             HttpStatus status, String detail, HttpServletRequest request, Map<String, String> fieldErrors) {
         ProblemDetail result =
                 ProblemDetail.forStatusAndDetail(status, detail == null ? status.getReasonPhrase() : detail);
+        result.setTitle(status.getReasonPhrase());
         result.setType(URI.create("https://flowledger.com/problems/" + status.value()));
         result.setInstance(URI.create(request.getRequestURI()));
         if (fieldErrors != null && !fieldErrors.isEmpty()) {

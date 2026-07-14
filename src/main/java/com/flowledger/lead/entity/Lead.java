@@ -33,6 +33,9 @@ public class Lead extends AuditedEntity {
     private UUID convertedCustomerId;
     private OffsetDateTime convertedAt;
 
+    @Column(nullable = false)
+    private boolean archived = false;
+
     @Version
     private Long version;
 }

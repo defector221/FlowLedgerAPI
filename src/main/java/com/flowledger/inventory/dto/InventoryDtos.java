@@ -38,6 +38,15 @@ public final class InventoryDtos {
 
     public record Stock(UUID productId, UUID warehouseId, BigDecimal available) {}
 
+    public record StockPosition(
+            UUID productId,
+            String productName,
+            String sku,
+            BigDecimal available,
+            BigDecimal draftReserved,
+            BigDecimal minimumStockLevel,
+            BigDecimal reorderLevel) {}
+
     public record Ledger(
             LocalDate date,
             Type type,

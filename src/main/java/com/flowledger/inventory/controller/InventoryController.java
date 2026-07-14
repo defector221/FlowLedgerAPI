@@ -30,6 +30,11 @@ public class InventoryController {
         return service.getStock(productId, warehouseId);
     }
 
+    @GetMapping("/overview")
+    public List<StockPosition> overview() {
+        return service.stockOverview();
+    }
+
     @GetMapping("/ledger/{productId}")
     public List<Ledger> ledger(
             @PathVariable UUID productId,

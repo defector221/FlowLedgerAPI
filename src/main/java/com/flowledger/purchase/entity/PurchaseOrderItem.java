@@ -37,5 +37,14 @@ public class PurchaseOrderItem {
     @Column(name = "tax_type", nullable = false, length = 16)
     private String taxType = "GST";
 
+    @Column(name = "split_strategy", nullable = false, length = 32)
+    private String splitStrategy = "PLACE_OF_SUPPLY";
+
+    @Column(name = "cgst_share_percent", nullable = false, precision = 7, scale = 4)
+    private BigDecimal cgstSharePercent = new BigDecimal("50");
+
+    @Column(name = "sgst_share_percent", nullable = false, precision = 7, scale = 4)
+    private BigDecimal sgstSharePercent = new BigDecimal("50");
+
     private Integer lineOrder = 0;
 }

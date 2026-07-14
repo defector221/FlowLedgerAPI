@@ -8,6 +8,7 @@ import com.flowledger.purchase.dto.PurchaseDtos.Line;
 import com.flowledger.purchase.dto.PurchaseDtos.OrderRequest;
 import com.flowledger.purchase.entity.PurchaseOrder;
 import com.flowledger.purchase.entity.PurchaseOrderItem;
+import com.flowledger.tax.TaxSplitDefaults;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
@@ -78,7 +79,7 @@ public class PurchaseOrderService {
     public void delete(UUID id) {
         PurchaseOrder po = get(id);
         if (!"DRAFT".equals(po.getStatus())) throw conflict("Only draft orders can be deleted");
-        em.remove(po);
+        po.setStatus("CANCELLED");
     }
 
     public PurchaseOrder confirm(UUID id) {
@@ -120,10 +121,12 @@ public class PurchaseOrderService {
             item.setRate(line.rate());
             item.setDiscountPercent(z(line.discountPercent()));
             item.setTaxRate(z(line.taxRate()));
-            item.setTaxType(
-                    line.taxType() == null || line.taxType().isBlank()
-                            ? "GST"
-                            : line.taxType().trim().toUpperCase());
+            String taxType = TaxSplitDefaults.normalizeTaxType(line.taxType());
+            String strategy = TaxSplitDefaults.normalizeStrategy(line.splitStrategy(), taxType);
+            item.setTaxType(taxType);
+            item.setSplitStrategy(strategy);
+            item.setCgstSharePercent(TaxSplitDefaults.cgstShare(strategy, taxType, line.cgstSharePercent()));
+            item.setSgstSharePercent(TaxSplitDefaults.sgstShare(strategy, taxType, line.sgstSharePercent()));
             item.setLineOrder(i++);
             calculate(item);
             po.getItems().add(item);
@@ -138,21 +141,17 @@ public class PurchaseOrderService {
         x.setTaxableAmount(gross.subtract(x.getDiscountAmount()));
         BigDecimal tax =
                 x.getTaxableAmount().multiply(x.getTaxRate()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-        String type = x.getTaxType() == null ? "GST" : x.getTaxType().trim().toUpperCase();
-        switch (type) {
-            case "IGST" -> {
-                x.setCgstAmount(BigDecimal.ZERO);
-                x.setSgstAmount(BigDecimal.ZERO);
-                x.setIgstAmount(tax);
-            }
-            case "OTHER" -> {
-                // Flat tax stored on IGST amount column for document totals compatibility
+        String strategy = TaxSplitDefaults.normalizeStrategy(x.getSplitStrategy(), x.getTaxType());
+        switch (strategy) {
+            case "NO_SPLIT_IGST", "NO_SPLIT_OTHER" -> {
                 x.setCgstAmount(BigDecimal.ZERO);
                 x.setSgstAmount(BigDecimal.ZERO);
                 x.setIgstAmount(tax);
             }
             default -> {
-                x.setCgstAmount(tax.divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP));
+                BigDecimal cgstShare =
+                        x.getCgstSharePercent() == null ? new BigDecimal("50") : x.getCgstSharePercent();
+                x.setCgstAmount(tax.multiply(cgstShare).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
                 x.setSgstAmount(tax.subtract(x.getCgstAmount()));
                 x.setIgstAmount(BigDecimal.ZERO);
             }

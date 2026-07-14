@@ -28,7 +28,7 @@ public class EmailTemplateService extends OrganizationScopedService {
 
     @Transactional(readOnly = true)
     public List<Response> list() {
-        return templates.findByOrganizationIdOrderByUpdatedAtDesc(orgId()).stream()
+        return templates.findByOrganizationIdAndActiveTrueOrderByUpdatedAtDesc(orgId()).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -49,19 +49,23 @@ public class EmailTemplateService extends OrganizationScopedService {
     }
 
     public Response create(UpsertRequest request) {
-        if (templates.existsByOrganizationIdAndNameIgnoreCase(
+        if (templates.existsByOrganizationIdAndNameIgnoreCaseAndActiveTrue(
                 orgId(), request.name().trim())) {
             throw new ConflictException("Email template name already exists");
         }
         EmailTemplate template = new EmailTemplate();
         template.setOrganizationId(orgId());
+        template.setActive(true);
         apply(template, request);
         return toResponse(templates.save(template));
     }
 
     public Response update(UUID id, UpsertRequest request) {
         EmailTemplate template = required(templates.findByIdAndOrganizationId(id, orgId()), "Email template");
-        if (templates.existsByOrganizationIdAndNameIgnoreCaseAndIdNot(
+        if (!template.isActive()) {
+            throw new BusinessException("Cannot update an archived email template");
+        }
+        if (templates.existsByOrganizationIdAndNameIgnoreCaseAndActiveTrueAndIdNot(
                 orgId(), request.name().trim(), id)) {
             throw new ConflictException("Email template name already exists");
         }
@@ -71,7 +75,8 @@ public class EmailTemplateService extends OrganizationScopedService {
 
     public void delete(UUID id) {
         EmailTemplate template = required(templates.findByIdAndOrganizationId(id, orgId()), "Email template");
-        templates.delete(template);
+        template.setActive(false);
+        templates.save(template);
     }
 
     @Transactional(readOnly = true)

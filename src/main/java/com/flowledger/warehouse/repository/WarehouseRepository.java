@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.*;
 public interface WarehouseRepository extends JpaRepository<Warehouse, UUID> {
     Optional<Warehouse> findByIdAndOrganizationId(UUID id, UUID org);
 
+    Optional<Warehouse> findFirstByOrganizationIdAndDefaultWarehouseTrue(UUID org);
+
     List<Warehouse> findByOrganizationId(UUID org);
 
     boolean existsByOrganizationIdAndWarehouseCode(UUID org, String code);

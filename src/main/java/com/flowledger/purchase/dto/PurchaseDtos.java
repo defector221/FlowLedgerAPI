@@ -21,7 +21,10 @@ public final class PurchaseDtos {
             @NotNull @DecimalMin("0") BigDecimal rate,
             BigDecimal discountPercent,
             BigDecimal taxRate,
-            String taxType) {}
+            String taxType,
+            String splitStrategy,
+            BigDecimal cgstSharePercent,
+            BigDecimal sgstSharePercent) {}
 
     public record OrderRequest(
             @NotNull UUID supplierId,

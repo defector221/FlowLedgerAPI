@@ -10,6 +10,7 @@ import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.sales.dto.SalesDtos.*;
 import com.flowledger.sales.entity.*;
 import com.flowledger.sales.repository.*;
+import com.flowledger.tax.TaxSplitDefaults;
 import com.flowledger.tax.dto.GstCalculationDtos;
 import com.flowledger.tax.service.GstCalculationService;
 import java.math.BigDecimal;
@@ -165,6 +166,14 @@ public class SalesDocumentService {
             item.setDiscountAmount(qi.getDiscountAmount());
             item.setTaxRate(qi.getTaxRate());
             item.setTaxType(qi.getTaxType() == null || qi.getTaxType().isBlank() ? "GST" : qi.getTaxType());
+            item.setSplitStrategy(
+                    qi.getSplitStrategy() == null || qi.getSplitStrategy().isBlank()
+                            ? "PLACE_OF_SUPPLY"
+                            : qi.getSplitStrategy());
+            item.setCgstSharePercent(
+                    qi.getCgstSharePercent() == null ? new BigDecimal("50") : qi.getCgstSharePercent());
+            item.setSgstSharePercent(
+                    qi.getSgstSharePercent() == null ? new BigDecimal("50") : qi.getSgstSharePercent());
             item.setTaxableAmount(qi.getTaxableAmount());
             item.setCgstAmount(qi.getCgstAmount());
             item.setSgstAmount(qi.getSgstAmount());
@@ -490,7 +499,10 @@ public class SalesDocumentService {
                         i.getRate(),
                         i.getDiscountPercent(),
                         i.getTaxRate(),
-                        i.getTaxType()))
+                        i.getTaxType(),
+                        i.getSplitStrategy(),
+                        i.getCgstSharePercent(),
+                        i.getSgstSharePercent()))
                 .toList();
         var request = new Invoice(
                 order.getCustomerId(),
@@ -508,9 +520,13 @@ public class SalesDocumentService {
                 BigDecimal.ZERO,
                 order.getNotes(),
                 order.getTermsAndConditions(),
+                null,
                 requestItems);
-        SalesInvoice draft = invoiceService.createDraft(request);
-        return invoiceService.confirm(draft.getId());
+        InvoiceDetail draft = invoiceService.createDraft(request);
+        invoiceService.confirm(draft.id());
+        return invoices
+                .findDetailedByIdAndOrganizationId(draft.id(), orgId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
     }
 
     private void applyQuotation(Quotation q, QuotationRequest request, Organization org) {
@@ -535,7 +551,12 @@ public class SalesDocumentService {
             qi.setDiscountPercent(z(item.discountPercent()));
             qi.setDiscountAmount(line.discount());
             qi.setTaxRate(z(item.taxRate()));
-            qi.setTaxType(item.taxType() == null || item.taxType().isBlank() ? "GST" : item.taxType().trim().toUpperCase());
+            String taxType = TaxSplitDefaults.normalizeTaxType(item.taxType());
+            String strategy = TaxSplitDefaults.normalizeStrategy(item.splitStrategy(), taxType);
+            qi.setTaxType(taxType);
+            qi.setSplitStrategy(strategy);
+            qi.setCgstSharePercent(TaxSplitDefaults.cgstShare(strategy, taxType, item.cgstSharePercent()));
+            qi.setSgstSharePercent(TaxSplitDefaults.sgstShare(strategy, taxType, item.sgstSharePercent()));
             qi.setTaxableAmount(line.taxable());
             qi.setCgstAmount(line.cgst());
             qi.setSgstAmount(line.sgst());
@@ -573,7 +594,12 @@ public class SalesDocumentService {
             oi.setDiscountPercent(z(item.discountPercent()));
             oi.setDiscountAmount(line.discount());
             oi.setTaxRate(z(item.taxRate()));
-            oi.setTaxType(item.taxType() == null || item.taxType().isBlank() ? "GST" : item.taxType().trim().toUpperCase());
+            String taxType = TaxSplitDefaults.normalizeTaxType(item.taxType());
+            String strategy = TaxSplitDefaults.normalizeStrategy(item.splitStrategy(), taxType);
+            oi.setTaxType(taxType);
+            oi.setSplitStrategy(strategy);
+            oi.setCgstSharePercent(TaxSplitDefaults.cgstShare(strategy, taxType, item.cgstSharePercent()));
+            oi.setSgstSharePercent(TaxSplitDefaults.sgstShare(strategy, taxType, item.sgstSharePercent()));
             oi.setTaxableAmount(line.taxable());
             oi.setCgstAmount(line.cgst());
             oi.setSgstAmount(line.sgst());
@@ -614,9 +640,11 @@ public class SalesDocumentService {
         BigDecimal disc = BigDecimal.ZERO;
         BigDecimal tax = BigDecimal.ZERO;
         BigDecimal grand = BigDecimal.ZERO;
-        String pos = placeOfSupply == null ? org.getStateCode() : placeOfSupply;
-        String state = org.getStateCode() == null ? "" : org.getStateCode();
-        String supply = pos == null ? state : pos;
+        String pos = placeOfSupply == null || placeOfSupply.isBlank()
+                ? (org.getStateCode() == null || org.getStateCode().isBlank() ? "00" : org.getStateCode().trim())
+                : placeOfSupply.trim();
+        String state = org.getStateCode() == null || org.getStateCode().isBlank() ? "00" : org.getStateCode().trim();
+        String supply = pos.isBlank() ? state : pos;
         int n = 0;
         for (Item item : items) {
             BigDecimal discount = item.quantity()
@@ -631,7 +659,10 @@ public class SalesDocumentService {
                     item.quantity(),
                     item.rate(),
                     discount,
-                    item.taxType()));
+                    item.taxType(),
+                    item.splitStrategy(),
+                    item.cgstSharePercent(),
+                    item.sgstSharePercent()));
             consumer.accept(
                     item,
                     new CalculatedLine(

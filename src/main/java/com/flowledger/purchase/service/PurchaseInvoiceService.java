@@ -12,6 +12,7 @@ import com.flowledger.purchase.entity.PurchaseInvoiceItem;
 import com.flowledger.purchase.entity.PurchaseOrder;
 import com.flowledger.search.event.SearchIndexEventPublisher;
 import com.flowledger.search.model.SearchEntityType;
+import com.flowledger.tax.TaxSplitDefaults;
 import com.flowledger.tax.dto.GstCalculationDtos;
 import com.flowledger.tax.service.GstCalculationService;
 import jakarta.persistence.EntityManager;
@@ -81,6 +82,9 @@ public class PurchaseInvoiceService {
                                 BigDecimal.ZERO,
                                 null,
                                 null,
+                                null,
+                                null,
+                                null,
                                 null))
                         .toList());
     }
@@ -104,7 +108,10 @@ public class PurchaseInvoiceService {
                                         x.getRate(),
                                         x.getDiscountPercent(),
                                         x.getTaxRate(),
-                                        x.getTaxType()))
+                                        x.getTaxType(),
+                                        x.getSplitStrategy(),
+                                        x.getCgstSharePercent(),
+                                        x.getSgstSharePercent()))
                                 .toList()
                         : r.items());
     }
@@ -172,22 +179,38 @@ public class PurchaseInvoiceService {
             x.setRate(l.rate());
             x.setDiscountPercent(l.discountPercent() == null ? BigDecimal.ZERO : l.discountPercent());
             x.setTaxRate(l.taxRate() == null ? BigDecimal.ZERO : l.taxRate());
-            x.setTaxType(l.taxType() == null || l.taxType().isBlank() ? "GST" : l.taxType().trim().toUpperCase());
+            String taxType = TaxSplitDefaults.normalizeTaxType(l.taxType());
+            String strategy = TaxSplitDefaults.normalizeStrategy(l.splitStrategy(), taxType);
+            x.setTaxType(taxType);
+            x.setSplitStrategy(strategy);
+            x.setCgstSharePercent(TaxSplitDefaults.cgstShare(strategy, taxType, l.cgstSharePercent()));
+            x.setSgstSharePercent(TaxSplitDefaults.sgstShare(strategy, taxType, l.sgstSharePercent()));
             x.setLineOrder(n++);
             BigDecimal discount = l.quantity()
                     .multiply(l.rate())
                     .multiply(x.getDiscountPercent())
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-            String place = i.getPlaceOfSupply() == null ? organization().getStateCode() : i.getPlaceOfSupply();
+            String orgState = organization().getStateCode();
+            if (orgState == null || orgState.isBlank()) {
+                orgState = "00";
+            } else {
+                orgState = orgState.trim();
+            }
+            String place = i.getPlaceOfSupply() == null || i.getPlaceOfSupply().isBlank()
+                    ? orgState
+                    : i.getPlaceOfSupply().trim();
             GstCalculationDtos.Response tax = gst.calculate(new GstCalculationDtos.Request(
-                    organization().getStateCode(),
+                    orgState,
                     place,
                     x.getTaxRate(),
                     i.isTaxInclusive(),
                     l.quantity(),
                     l.rate(),
                     discount,
-                    x.getTaxType()));
+                    x.getTaxType(),
+                    x.getSplitStrategy(),
+                    x.getCgstSharePercent(),
+                    x.getSgstSharePercent()));
             x.setDiscountAmount(discount);
             x.setTaxableAmount(tax.taxable());
             x.setCgstAmount(tax.cgst());

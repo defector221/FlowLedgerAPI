@@ -87,14 +87,15 @@ public class LeadService extends OrganizationScopedService {
 
     public void delete(UUID id) {
         Lead lead = load(id);
-        leads.delete(lead);
+        lead.setArchived(true);
+        leads.save(lead);
     }
 
     @Transactional(readOnly = true)
     public Page<Response> list(String status, Pageable pageable) {
         Page<Lead> page = status == null || status.isBlank()
-                ? leads.findByOrganizationId(orgId(), pageable)
-                : leads.findByOrganizationIdAndStatus(orgId(), status.toUpperCase(), pageable);
+                ? leads.findByOrganizationIdAndArchivedFalse(orgId(), pageable)
+                : leads.findByOrganizationIdAndStatusAndArchivedFalse(orgId(), status.toUpperCase(), pageable);
         return page.map(this::toResponse);
     }
 

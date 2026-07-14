@@ -10,7 +10,7 @@ public final class ProductDtos {
     public record Create(
             String sku,
             @NotBlank String name,
-            @NotNull UUID unitId,
+            UUID unitId,
             String itemType,
             String barcode,
             String description,
@@ -22,6 +22,7 @@ public final class ProductDtos {
             @DecimalMin("0.0") BigDecimal mrp,
             UUID taxRateId,
             @DecimalMin("0.0") BigDecimal openingStock,
+            UUID warehouseId,
             @DecimalMin("0.0") BigDecimal minimumStockLevel,
             BigDecimal maximumStockLevel,
             @DecimalMin("0.0") BigDecimal reorderLevel,

@@ -18,6 +18,17 @@ public class TaxRate extends AuditedEntity {
     @Enumerated(EnumType.STRING)
     private TaxType taxType = TaxType.GST;
 
+    @Column(name = "split_strategy", nullable = false, length = 32)
+    @Enumerated(EnumType.STRING)
+    private SplitStrategy splitStrategy = SplitStrategy.PLACE_OF_SUPPLY;
+
+    /** Share of total tax allocated to CGST (must sum with sgstSharePercent to 100 for split strategies). */
+    @Column(name = "cgst_share_percent", nullable = false, precision = 7, scale = 4)
+    private BigDecimal cgstSharePercent = new BigDecimal("50");
+
+    @Column(name = "sgst_share_percent", nullable = false, precision = 7, scale = 4)
+    private BigDecimal sgstSharePercent = new BigDecimal("50");
+
     @Column(nullable = false)
     private BigDecimal rate;
 

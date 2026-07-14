@@ -31,6 +31,9 @@ public class EmailTemplate extends AuditedEntity {
     @Column(columnDefinition = "text")
     private String html;
 
+    @Column(nullable = false)
+    private boolean active = true;
+
     @Version
     private Long version;
 }

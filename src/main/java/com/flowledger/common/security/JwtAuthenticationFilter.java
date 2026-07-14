@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -32,8 +33,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String authorizationHeader = request.getHeader("Authorization");
             if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
-                String token = authorizationHeader.substring(7);
-                if (jwt.isValid(token, "access")) {
+                String token = authorizationHeader.substring(7).trim();
+                if (token.isEmpty()) {
+                    writeUnauthorized(response, "Missing access token");
+                    return;
+                }
+                if (!jwt.isValid(token, "access")) {
+                    // Expired / malformed / wrong type — must be 401 so the UI can refresh or log out
+                    if (isPublicAuthPath(request)) {
+                        chain.doFilter(request, response);
+                        return;
+                    }
+                    writeUnauthorized(response, "Access token expired or invalid");
+                    return;
+                }
+                try {
                     UUID userId = jwt.userId(token);
                     UUID organizationId = jwt.organizationId(token);
                     UserPrincipal principal = users.load(userId, organizationId);
@@ -41,11 +55,37 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                     TenantContext.set(principal.getOrgId(), principal.getId());
+                } catch (Exception ex) {
+                    log.debug("JWT principal load failed: {}", ex.getMessage());
+                    writeUnauthorized(response, "Access token expired or invalid");
+                    return;
                 }
             }
             chain.doFilter(request, response);
         } finally {
             TenantContext.clear();
         }
+    }
+
+    private static boolean isPublicAuthPath(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path != null
+                && (path.startsWith("/api/v1/auth/")
+                        || path.contains("/swagger-ui")
+                        || path.contains("/api-docs")
+                        || path.endsWith("/actuator/health"));
+    }
+
+    private static void writeUnauthorized(HttpServletResponse response, String detail) throws IOException {
+        if (response.isCommitted()) return;
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        String escaped = detail.replace("\\", "\\\\").replace("\"", "\\\"");
+        response.getWriter()
+                .write(
+                        "{\"type\":\"https://flowledger.com/problems/401\",\"title\":\"Unauthorized\",\"status\":401,\"detail\":\""
+                                + escaped
+                                + "\"}");
     }
 }

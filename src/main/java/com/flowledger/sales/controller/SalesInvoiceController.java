@@ -19,27 +19,27 @@ public class SalesInvoiceController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public SalesInvoice create(@Valid @RequestBody Invoice d) {
+    public InvoiceDetail create(@Valid @RequestBody Invoice d) {
         return service.createDraft(d);
     }
 
     @PutMapping("/{id}")
-    public SalesInvoice update(@PathVariable UUID id, @Valid @RequestBody Invoice d) {
+    public InvoiceDetail update(@PathVariable UUID id, @Valid @RequestBody Invoice d) {
         return service.updateDraft(id, d);
     }
 
     @PostMapping("/{id}/confirm")
-    public SalesInvoice confirm(@PathVariable UUID id) {
+    public InvoiceDetail confirm(@PathVariable UUID id) {
         return service.confirm(id);
     }
 
     @PostMapping("/{id}/cancel")
-    public SalesInvoice cancel(@PathVariable UUID id) {
+    public InvoiceDetail cancel(@PathVariable UUID id) {
         return service.cancel(id);
     }
 
     @GetMapping("/{id}")
-    public SalesInvoice get(@PathVariable UUID id) {
+    public InvoiceDetail get(@PathVariable UUID id) {
         return service.get(id);
     }
 

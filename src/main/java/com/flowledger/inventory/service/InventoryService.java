@@ -5,7 +5,9 @@ import com.flowledger.inventory.dto.InventoryDtos.*;
 import com.flowledger.inventory.entity.*;
 import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.repository.*;
+import com.flowledger.product.entity.Product;
 import com.flowledger.product.repository.ProductRepository;
+import com.flowledger.sales.repository.SalesInvoiceRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
@@ -20,16 +22,19 @@ public class InventoryService {
     private final InventoryBatchRepository batches;
     private final SerialNumberRepository serials;
     private final ProductRepository products;
+    private final SalesInvoiceRepository salesInvoices;
 
     public InventoryService(
             InventoryTransactionRepository t,
             InventoryBatchRepository b,
             SerialNumberRepository s,
-            ProductRepository p) {
+            ProductRepository p,
+            SalesInvoiceRepository salesInvoices) {
         txns = t;
         batches = b;
         serials = s;
         products = p;
+        this.salesInvoices = salesInvoices;
     }
 
     @Transactional
@@ -71,6 +76,29 @@ public class InventoryService {
     @Transactional(readOnly = true)
     public Stock getStock(UUID product, UUID warehouse) {
         return new Stock(product, warehouse, txns.stockBalance(TenantContext.getOrganizationId(), product, warehouse));
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockPosition> stockOverview() {
+        UUID org = TenantContext.getOrganizationId();
+        Map<UUID, BigDecimal> draftReserved = new HashMap<>();
+        for (Object[] row : salesInvoices.sumDraftQuantitiesByProduct(org)) {
+            UUID productId = toUuid(row[0]);
+            BigDecimal qty = row[1] instanceof BigDecimal bd ? bd : new BigDecimal(row[1].toString());
+            draftReserved.put(productId, qty);
+        }
+        return products.findAll().stream()
+                .filter(p -> org.equals(p.getOrganizationId()) && p.isActive() && isStockedProduct(p))
+                .sorted(Comparator.comparing(Product::getName, String.CASE_INSENSITIVE_ORDER))
+                .map(p -> new StockPosition(
+                        p.getId(),
+                        p.getName(),
+                        p.getSku(),
+                        txns.stockBalance(org, p.getId(), null),
+                        draftReserved.getOrDefault(p.getId(), BigDecimal.ZERO),
+                        n(p.getMinimumStockLevel()),
+                        n(p.getReorderLevel())))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -183,13 +211,13 @@ public class InventoryService {
     public List<Alert> lowStockAlerts(boolean reorder) {
         UUID org = TenantContext.getOrganizationId();
         return products.findAll().stream()
-                .filter(p -> org.equals(p.getOrganizationId()) && "PRODUCT".equals(p.getItemType()))
+                .filter(p -> org.equals(p.getOrganizationId()) && p.isActive() && isStockedProduct(p))
                 .map(p -> new Alert(
                         p.getId(),
                         p.getName(),
                         txns.stockBalance(org, p.getId(), null),
-                        reorder ? p.getReorderLevel() : p.getMinimumStockLevel()))
-                .filter(a -> a.available().compareTo(a.threshold()) <= 0)
+                        reorder ? n(p.getReorderLevel()) : n(p.getMinimumStockLevel())))
+                .filter(a -> a.threshold().signum() > 0 && a.available().compareTo(a.threshold()) <= 0)
                 .toList();
     }
 
@@ -281,6 +309,15 @@ public class InventoryService {
             s.setStatus(delta.signum() >= 0 ? SerialNumber.Status.IN_STOCK : SerialNumber.Status.SOLD);
             serials.save(s);
         }
+    }
+
+    private static boolean isStockedProduct(Product p) {
+        return p.getItemType() == null || p.getItemType().isBlank() || "PRODUCT".equalsIgnoreCase(p.getItemType());
+    }
+
+    private static UUID toUuid(Object value) {
+        if (value instanceof UUID uuid) return uuid;
+        return UUID.fromString(value.toString());
     }
 
     private static BigDecimal n(BigDecimal v) {

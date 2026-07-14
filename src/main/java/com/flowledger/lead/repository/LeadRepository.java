@@ -12,9 +12,10 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 public interface LeadRepository extends JpaRepository<Lead, UUID>, JpaSpecificationExecutor<Lead> {
     Optional<Lead> findByIdAndOrganizationId(UUID id, UUID organizationId);
 
-    Page<Lead> findByOrganizationId(UUID organizationId, Pageable pageable);
+    Page<Lead> findByOrganizationIdAndArchivedFalse(UUID organizationId, Pageable pageable);
 
-    Page<Lead> findByOrganizationIdAndStatus(UUID organizationId, String status, Pageable pageable);
+    Page<Lead> findByOrganizationIdAndStatusAndArchivedFalse(
+            UUID organizationId, String status, Pageable pageable);
 
-    List<Lead> findByOrganizationId(UUID organizationId);
+    List<Lead> findByOrganizationIdAndArchivedFalse(UUID organizationId);
 }

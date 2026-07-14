@@ -1,5 +1,6 @@
 package com.flowledger.sales.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.math.*;
 import java.util.*;
@@ -15,6 +16,7 @@ public class SalesInvoiceItem {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sales_invoice_id")
     private SalesInvoice salesInvoice;
@@ -42,6 +44,15 @@ public class SalesInvoiceItem {
 
     @Column(name = "tax_type", nullable = false, length = 16)
     private String taxType = "GST";
+
+    @Column(name = "split_strategy", nullable = false, length = 32)
+    private String splitStrategy = "PLACE_OF_SUPPLY";
+
+    @Column(name = "cgst_share_percent", nullable = false, precision = 7, scale = 4)
+    private BigDecimal cgstSharePercent = new BigDecimal("50");
+
+    @Column(name = "sgst_share_percent", nullable = false, precision = 7, scale = 4)
+    private BigDecimal sgstSharePercent = new BigDecimal("50");
 
     private int lineOrder;
 }
