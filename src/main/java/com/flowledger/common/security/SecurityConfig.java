@@ -3,6 +3,7 @@ package com.flowledger.common.security;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.context.annotation.*;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -34,12 +35,16 @@ public class SecurityConfig {
                                 HttpServletResponse.SC_FORBIDDEN,
                                 "Forbidden",
                                 "You do not have permission to perform this action")))
-                .authorizeHttpRequests(a -> a.requestMatchers(
+                .authorizeHttpRequests(a -> a.requestMatchers(HttpMethod.OPTIONS, "/**")
+                        .permitAll()
+                        .requestMatchers(
                                 "/api/v1/auth/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/api-docs/**",
-                                "/actuator/health")
+                                "/v3/api-docs/**",
+                                "/actuator/health",
+                                "/error")
                         .permitAll()
                         .anyRequest()
                         .authenticated())

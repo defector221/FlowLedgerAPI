@@ -32,6 +32,9 @@ spring:
 
 server:
   port: 7070
+  # Reachable via Cloudflare tunnel / docker (not only loopback IPv6)
+  address: 0.0.0.0
+  forward-headers-strategy: framework
   error:
     include-message: always
 
@@ -53,7 +56,7 @@ flowledger:
     access-token-expiry-minutes: 30
     refresh-token-expiry-days: 14
   cors:
-    allowed-origins: http://localhost:5173,http://localhost:3000,https://flowledger.valiantxgroup.com
+    allowed-origins: http://localhost:5173,http://localhost:3000,https://flowledger.valiantxgroup.com,https://apiflowledger.valiantxgroup.com
   storage:
     minio:
       endpoint: ${MINIO_ENDPOINT:http://localhost:19000}
@@ -62,6 +65,7 @@ flowledger:
       bucket: ${MINIO_BUCKET:flowledger}
   app:
     frontend-url: ${FRONTEND_URL:https://flowledger.valiantxgroup.com}
+    public-api-url: ${PUBLIC_API_URL:https://apiflowledger.valiantxgroup.com}
     allow-negative-stock-default: false
   search:
     enabled: ${FLOWLEDGER_SEARCH_ENABLED:true}

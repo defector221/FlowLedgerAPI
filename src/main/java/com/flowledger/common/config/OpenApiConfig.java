@@ -1,16 +1,25 @@
 package com.flowledger.common.config;
 
-import io.swagger.v3.oas.models.*;
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
-import io.swagger.v3.oas.models.security.*;
-import org.springframework.context.annotation.*;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.servers.Server;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class OpenApiConfig {
     @Bean
-    OpenAPI openAPI() {
+    OpenAPI openAPI(@Value("${flowledger.app.public-api-url:https://apiflowledger.valiantxgroup.com}") String publicApiUrl) {
         return new OpenAPI()
                 .info(new Info().title("FlowLedger API").version("v1"))
+                .servers(List.of(
+                        new Server().url(publicApiUrl).description("Cloudflare tunnel"),
+                        new Server().url("http://localhost:7070").description("Local")))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                 .components(new Components()
                         .addSecuritySchemes(
