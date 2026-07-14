@@ -41,7 +41,8 @@ public class AuditActionAspect {
             "GstCalculationController",
             "SearchController",
             "DashboardController",
-            "ReportController");
+            "ReportController",
+            "InAppNotificationController");
     private static final Set<String> SKIP_METHODS = Set.of("preview", "calculate", "previewAudience", "reindex");
 
     private final AuditService auditService;

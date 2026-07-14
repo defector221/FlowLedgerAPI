@@ -10,6 +10,11 @@ import com.flowledger.auth.repository.UserRepository;
 import com.flowledger.common.exception.BusinessException;
 import com.flowledger.common.exception.ConflictException;
 import com.flowledger.common.exception.UnauthorizedException;
+import com.flowledger.notification.NotificationChannel;
+import com.flowledger.notification.NotificationRecipient;
+import com.flowledger.notification.NotificationRequest;
+import com.flowledger.notification.NotificationService;
+import com.flowledger.notification.NotificationType;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import java.nio.charset.StandardCharsets;
@@ -36,6 +41,7 @@ public class OrganizationMembershipService {
     private final UserRepository users;
     private final RoleRepository roles;
     private final OrganizationRepository organizations;
+    private final NotificationService notifications;
 
     @Value("${flowledger.app.frontend-url}")
     private String frontendUrl;
@@ -44,11 +50,13 @@ public class OrganizationMembershipService {
             OrganizationMembershipRepository memberships,
             UserRepository users,
             RoleRepository roles,
-            OrganizationRepository organizations) {
+            OrganizationRepository organizations,
+            NotificationService notifications) {
         this.memberships = memberships;
         this.users = users;
         this.roles = roles;
         this.organizations = organizations;
+        this.notifications = notifications;
     }
 
     @Transactional(readOnly = true)
@@ -147,7 +155,31 @@ public class OrganizationMembershipService {
         String token = UUID.randomUUID().toString();
         membership.setInvitationToken(hash(token));
         membership.setInvitationExpiry(Instant.now().plus(Duration.ofDays(7)));
-        log.info("Invitation link: {}/accept-invite?token={}", frontendUrl, token);
+        User user = users.findById(membership.getUserId()).orElse(null);
+        String orgName = organizations
+                .findById(membership.getOrganizationId())
+                .map(Organization::getName)
+                .orElse("your organization");
+        if (user != null && user.getEmail() != null && !user.getEmail().isBlank()) {
+            String link = frontendUrl + "/accept-invite?token=" + token;
+            String subject = "You're invited to " + orgName + " on FlowLedger";
+            String body = "Hi "
+                    + (user.getFirstName() == null ? "there" : user.getFirstName())
+                    + ",\n\nYou've been invited to join "
+                    + orgName
+                    + " on FlowLedger.\nAccept your invitation:\n"
+                    + link
+                    + "\n\nThis link expires in 7 days.";
+            notifications.send(NotificationRequest.of(
+                            NotificationType.USER_INVITATION,
+                            NotificationRecipient.email(user.getEmail(), user.getFirstName()),
+                            subject,
+                            body)
+                    .channel(NotificationChannel.EMAIL)
+                    .organizationId(membership.getOrganizationId())
+                    .related("OrganizationMembership", membership.getId()));
+        }
+        log.info("Invitation email queued for membership {}", membership.getId());
     }
 
     @Transactional(readOnly = true)

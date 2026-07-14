@@ -1,5 +1,6 @@
 package com.flowledger.auth.dto;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 
-public record ForgotPasswordRequest(@NotNull java.util.UUID organizationId, @Email @NotBlank String email) {}
+public record ForgotPasswordRequest(@Email @NotBlank String email) {}

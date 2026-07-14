@@ -61,7 +61,7 @@ flowledger:
       secret-key: ${MINIO_SECRET_KEY:Vayupa@2024@wan}
       bucket: ${MINIO_BUCKET:flowledger}
   app:
-    frontend-url: ${FRONTEND_URL:http://localhost:5173}
+    frontend-url: ${FRONTEND_URL:https://flowledger.valiantxgroup.com}
     allow-negative-stock-default: false
   search:
     enabled: ${FLOWLEDGER_SEARCH_ENABLED:true}
@@ -70,15 +70,18 @@ flowledger:
     username: ${FLOWLEDGER_SEARCH_USERNAME:admin}
     password: ${FLOWLEDGER_SEARCH_PASSWORD:Vayupa2024wan}
     ssl-verify: ${FLOWLEDGER_SEARCH_SSL_VERIFY:false}
-  # Notification channels (email SMTP vs mock; WhatsApp is always mock until a provider is wired)
+  # Notification channels (unified NotificationService → email / WhatsApp / in-app)
   notifications:
     email:
-      # When false (default), emails are logged by MockEmailNotificationService.
+      # Local default: true (MailHog on localhost:1025). Set FLOWLEDGER_EMAIL_ENABLED=false to use mock.
       # When true, uses spring.mail.* via SmtpEmailNotificationService.
-      enabled: ${FLOWLEDGER_EMAIL_ENABLED:false}
+      enabled: ${FLOWLEDGER_EMAIL_ENABLED:true}
+      from-email: ${FLOWLEDGER_EMAIL_FROM:noreply@flowledger.local}
+      from-name: ${FLOWLEDGER_EMAIL_FROM_NAME:FlowLedger}
     whatsapp:
-      # Placeholder for a future provider; MockWhatsAppNotificationService is used today.
       enabled: ${FLOWLEDGER_WHATSAPP_ENABLED:false}
+      # mock today; future: meta | twilio
+      provider: ${FLOWLEDGER_WHATSAPP_PROVIDER:mock}
 
 logging:
   level:

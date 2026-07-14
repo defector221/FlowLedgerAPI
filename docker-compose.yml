@@ -1,4 +1,13 @@
 services:
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: flowledger-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - flowledger-network
+
   opensearch:
     image: opensearchproject/opensearch:3.6.0
     container_name: flowledger-opensearch
