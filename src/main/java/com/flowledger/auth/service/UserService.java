@@ -9,6 +9,7 @@ import com.flowledger.auth.repository.RoleRepository;
 import com.flowledger.auth.repository.UserRepository;
 import com.flowledger.common.exception.BusinessException;
 import com.flowledger.common.exception.ResourceNotFoundException;
+import com.flowledger.common.security.SecurityUtils;
 import com.flowledger.common.service.OrganizationScopedService;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
@@ -99,7 +100,16 @@ public class UserService extends OrganizationScopedService {
 
     public UserListResponse changeRole(UUID userId, ChangeRoleRequest request) {
         OrganizationMembership membership = loadMembershipByUser(userId);
+        if (userId.equals(SecurityUtils.currentUserId())) {
+            throw new BusinessException("You cannot change your own role");
+        }
         Role role = requireRole(request.role());
+        boolean currentlyAdmin = membership.getRoles().stream()
+                .map(Role::getCode)
+                .anyMatch("ORGANIZATION_ADMIN"::equals);
+        if (currentlyAdmin && !"ORGANIZATION_ADMIN".equals(role.getCode()) && countActiveAdmins(orgId()) <= 1) {
+            throw new BusinessException("Cannot remove the last organization admin");
+        }
         membership.getRoles().clear();
         membership.getRoles().add(role);
         memberships.save(membership);
@@ -142,6 +152,13 @@ public class UserService extends OrganizationScopedService {
         OrganizationMembership membership = membershipService.previewInvitationMembership(request.token());
         User user = users.findById(membership.getUserId()).orElseThrow();
         membershipService.acceptInvitationMembership(membership, user, encoder.encode(request.password()));
+    }
+
+    private long countActiveAdmins(UUID organizationId) {
+        return memberships.findByOrganizationId(organizationId).stream()
+                .filter(m -> "ACTIVE".equals(m.getStatus()))
+                .filter(m -> m.getRoles().stream().map(Role::getCode).anyMatch("ORGANIZATION_ADMIN"::equals))
+                .count();
     }
 
     private OrganizationMembership loadMembershipByUser(UUID userId) {
