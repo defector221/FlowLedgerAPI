@@ -1,5 +1,6 @@
 package com.flowledger.purchase.service;
 
+import com.flowledger.accounting.service.AccountingPostingService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.inventory.service.InventoryService;
@@ -32,16 +33,19 @@ public class PurchaseReturnService {
     private final DocumentNumberService numbers;
     private final OrganizationRepository organizations;
     private final InventoryService inventory;
+    private final AccountingPostingService accounting;
 
     public PurchaseReturnService(
             PurchaseInvoiceService invoices,
             DocumentNumberService numbers,
             OrganizationRepository organizations,
-            InventoryService inventory) {
+            InventoryService inventory,
+            AccountingPostingService accounting) {
         this.invoices = invoices;
         this.numbers = numbers;
         this.organizations = organizations;
         this.inventory = inventory;
+        this.accounting = accounting;
     }
 
     public PurchaseReturn create(ReturnRequest request) {
@@ -95,6 +99,7 @@ public class PurchaseReturnService {
             pr.setInventoryPosted(true);
         }
         pr.setStatus("CONFIRMED");
+        accounting.postPurchaseReturn(pr);
         return pr;
     }
 

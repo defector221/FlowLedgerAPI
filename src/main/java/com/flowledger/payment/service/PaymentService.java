@@ -1,5 +1,8 @@
 package com.flowledger.payment.service;
 
+import com.flowledger.accounting.domain.AccountingStatus;
+import com.flowledger.accounting.domain.JournalSource;
+import com.flowledger.accounting.service.AccountingPostingService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.organization.entity.Organization;
@@ -29,10 +32,13 @@ public class PaymentService {
 
     private final DocumentNumberService numbers;
     private final OrganizationRepository organizations;
+    private final AccountingPostingService accounting;
 
-    public PaymentService(DocumentNumberService numbers, OrganizationRepository organizations) {
+    public PaymentService(
+            DocumentNumberService numbers, OrganizationRepository organizations, AccountingPostingService accounting) {
         this.numbers = numbers;
         this.organizations = organizations;
+        this.accounting = accounting;
     }
 
     public Payment create(PaymentRequest r) {
@@ -63,12 +69,16 @@ public class PaymentService {
                 allocate(p, a);
             }
         }
+        accounting.postPayment(p);
         return p;
     }
 
     public Payment allocate(UUID id, Allocation a) {
         Payment p = get(id);
         allocate(p, a);
+        if (p.getAccountingStatus() != AccountingStatus.POSTED) {
+            accounting.postPayment(p);
+        }
         return p;
     }
 
@@ -140,6 +150,13 @@ public class PaymentService {
         }
         p.getAllocations().clear();
         p.setStatus("CANCELLED");
+        if (p.getAccountingStatus() == AccountingStatus.POSTED) {
+            JournalSource source = p.getPaymentType() == Payment.Type.RECEIPT
+                    ? JournalSource.CUSTOMER_RECEIPT
+                    : JournalSource.SUPPLIER_PAYMENT;
+            accounting.reverseDocumentJournal(p.getOrganizationId(), source, p.getId());
+            p.setAccountingStatus(AccountingStatus.REVERSED);
+        }
         return p;
     }
 

@@ -1,5 +1,8 @@
 package com.flowledger.purchase.service;
 
+import com.flowledger.accounting.domain.AccountingStatus;
+import com.flowledger.accounting.domain.JournalSource;
+import com.flowledger.accounting.service.AccountingPostingService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.organization.entity.Organization;
@@ -39,6 +42,7 @@ public class PurchaseInvoiceService {
     private final OrganizationRepository organizations;
     private final GstCalculationService gst;
     private final SearchIndexEventPublisher searchEvents;
+    private final AccountingPostingService accounting;
 
     public PurchaseInvoiceService(
             GoodsReceiptService g,
@@ -46,13 +50,15 @@ public class PurchaseInvoiceService {
             DocumentNumberService n,
             OrganizationRepository r,
             GstCalculationService tax,
-            SearchIndexEventPublisher searchEvents) {
+            SearchIndexEventPublisher searchEvents,
+            AccountingPostingService accounting) {
         grns = g;
         orders = o;
         numbers = n;
         organizations = r;
         gst = tax;
         this.searchEvents = searchEvents;
+        this.accounting = accounting;
     }
 
     public PurchaseInvoice fromGrn(UUID grnId, InvoiceRequest r) {
@@ -122,6 +128,7 @@ public class PurchaseInvoiceService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled invoice cannot be confirmed");
         if (!"DRAFT".equals(i.getStatus())) return i;
         i.setStatus(i.getOutstandingAmount().signum() == 0 ? "PAID" : "CONFIRMED");
+        accounting.postPurchaseInvoice(i);
         searchEvents.upsert(i.getOrganizationId(), SearchEntityType.PURCHASE_INVOICE, i.getId());
         return i;
     }
@@ -132,6 +139,10 @@ public class PurchaseInvoiceService {
         if (i.getAmountPaid() != null && i.getAmountPaid().signum() > 0)
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Paid invoice cannot be cancelled");
         i.setStatus("CANCELLED");
+        if (i.getAccountingStatus() == AccountingStatus.POSTED) {
+            accounting.reverseDocumentJournal(i.getOrganizationId(), JournalSource.PURCHASE_INVOICE, i.getId());
+            i.setAccountingStatus(AccountingStatus.REVERSED);
+        }
         searchEvents.upsert(i.getOrganizationId(), SearchEntityType.PURCHASE_INVOICE, i.getId());
         return i;
     }

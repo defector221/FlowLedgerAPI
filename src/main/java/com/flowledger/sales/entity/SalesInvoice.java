@@ -1,5 +1,6 @@
 package com.flowledger.sales.entity;
 
+import com.flowledger.accounting.domain.AccountingStatus;
 import com.flowledger.common.entity.AuditedEntity;
 import jakarta.persistence.*;
 import java.math.*;
@@ -61,6 +62,16 @@ public class SalesInvoice extends AuditedEntity {
             amountPaid = BigDecimal.ZERO,
             outstandingAmount = BigDecimal.ZERO;
     private UUID templateId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "accounting_status", nullable = false)
+    private AccountingStatus accountingStatus = AccountingStatus.NOT_POSTED;
+
+    @Column(name = "posted_journal_entry_id")
+    private UUID postedJournalEntryId;
+
+    @Column(name = "accounting_posted_at")
+    private OffsetDateTime accountingPostedAt;
 
     @Version
     private Long version;

@@ -1,9 +1,11 @@
 package com.flowledger.payment.entity;
 
+import com.flowledger.accounting.domain.AccountingStatus;
 import com.flowledger.common.entity.AuditedEntity;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -53,6 +55,16 @@ public class Payment extends AuditedEntity {
 
     @Column(nullable = false)
     private String status = "ACTIVE";
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "accounting_status", nullable = false)
+    private AccountingStatus accountingStatus = AccountingStatus.NOT_POSTED;
+
+    @Column(name = "posted_journal_entry_id")
+    private UUID postedJournalEntryId;
+
+    @Column(name = "accounting_posted_at")
+    private OffsetDateTime accountingPostedAt;
 
     @Version
     private Long version;

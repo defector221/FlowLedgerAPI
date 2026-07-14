@@ -1,5 +1,6 @@
 package com.flowledger.sales.service;
 
+import com.flowledger.accounting.service.AccountingPostingService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.inventory.dto.InventoryDtos.PostTransaction;
@@ -39,6 +40,7 @@ public class SalesDocumentService {
     private final SalesInvoiceService invoiceService;
     private final GstCalculationService gst;
     private final InventoryService inventory;
+    private final AccountingPostingService accounting;
 
     public SalesDocumentService(
             QuotationRepository quotations,
@@ -51,7 +53,8 @@ public class SalesDocumentService {
             DocumentNumberService numbers,
             SalesInvoiceService invoiceService,
             GstCalculationService gst,
-            InventoryService inventory) {
+            InventoryService inventory,
+            AccountingPostingService accounting) {
         this.quotations = quotations;
         this.orders = orders;
         this.challans = challans;
@@ -63,6 +66,7 @@ public class SalesDocumentService {
         this.invoiceService = invoiceService;
         this.gst = gst;
         this.inventory = inventory;
+        this.accounting = accounting;
     }
 
     // ── Quotations ──────────────────────────────────────────────────────────
@@ -431,7 +435,9 @@ public class SalesDocumentService {
             sr.setInventoryPosted(true);
         }
         sr.setStatus("CONFIRMED");
-        return returns.save(sr);
+        SalesReturn saved = returns.save(sr);
+        accounting.postSalesReturn(saved);
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -471,7 +477,9 @@ public class SalesDocumentService {
         cn.setStatus("ISSUED");
         cn.setCreditNoteNumber(numbers.next(
                 org.getId(), "CREDIT_NOTE", "CN", NUMBER_FORMAT, org.getFinancialYearStart(), cn.getCreditNoteDate()));
-        return creditNotes.save(cn);
+        CreditNote saved = creditNotes.save(cn);
+        accounting.postCreditNote(saved);
+        return saved;
     }
 
     @Transactional(readOnly = true)
