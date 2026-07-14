@@ -41,7 +41,17 @@ public class LeadService extends OrganizationScopedService {
     public Response create(Create dto) {
         Lead lead = new Lead();
         lead.setOrganizationId(orgId());
-        apply(lead, dto.leadName(), dto.companyName(), dto.email(), dto.phone(), dto.source(), dto.status(), dto.assignedTo(), dto.notes(), dto.estimatedValue());
+        apply(
+                lead,
+                dto.leadName(),
+                dto.companyName(),
+                dto.email(),
+                dto.phone(),
+                dto.source(),
+                dto.status(),
+                dto.assignedTo(),
+                dto.notes(),
+                dto.estimatedValue());
         Lead saved = leads.save(lead);
         try {
             marketingSequences.autoEnrollLeadCreated(saved);
@@ -61,7 +71,17 @@ public class LeadService extends OrganizationScopedService {
         if ("CONVERTED".equals(lead.getStatus())) {
             throw new BusinessException("Converted leads cannot be updated");
         }
-        apply(lead, dto.leadName(), dto.companyName(), dto.email(), dto.phone(), dto.source(), dto.status(), dto.assignedTo(), dto.notes(), dto.estimatedValue());
+        apply(
+                lead,
+                dto.leadName(),
+                dto.companyName(),
+                dto.email(),
+                dto.phone(),
+                dto.source(),
+                dto.status(),
+                dto.assignedTo(),
+                dto.notes(),
+                dto.estimatedValue());
         return toResponse(leads.save(lead));
     }
 

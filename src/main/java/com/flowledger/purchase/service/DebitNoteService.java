@@ -57,10 +57,8 @@ public class DebitNoteService {
             if (supplierId == null) supplierId = invoice.getSupplierId();
             if (amount == null) amount = invoice.getGrandTotal();
         }
-        if (supplierId == null)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "supplierId is required");
-        if (amount == null)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "amount is required");
+        if (supplierId == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "supplierId is required");
+        if (amount == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "amount is required");
         LocalDate date = request.debitNoteDate() == null ? LocalDate.now() : request.debitNoteDate();
         DebitNote dn = new DebitNote();
         dn.setOrganizationId(TenantContext.getOrganizationId());
@@ -77,8 +75,7 @@ public class DebitNoteService {
     }
 
     public List<DebitNote> list() {
-        return em.createQuery(
-                        "from DebitNote d where d.organizationId=:org order by d.createdAt desc", DebitNote.class)
+        return em.createQuery("from DebitNote d where d.organizationId=:org order by d.createdAt desc", DebitNote.class)
                 .setParameter("org", TenantContext.getOrganizationId())
                 .getResultList();
     }

@@ -1,11 +1,13 @@
 package com.flowledger.warehouse.service;
 
 import com.flowledger.common.service.OrganizationScopedService;
+import com.flowledger.common.util.EntityCodeGenerator;
 import com.flowledger.warehouse.dto.WarehouseDtos.*;
 import com.flowledger.warehouse.entity.Warehouse;
 import com.flowledger.warehouse.mapper.WarehouseMapper;
 import com.flowledger.warehouse.repository.WarehouseRepository;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,18 +27,28 @@ public class WarehouseService extends OrganizationScopedService {
 
     public Response create(Create dto) {
         UUID org = orgId();
-        if (repo.existsByOrganizationIdAndWarehouseCode(org, dto.warehouseCode())) {
+        String code = resolveCode(org, dto.warehouseCode(), dto.warehouseName());
+        if (repo.existsByOrganizationIdAndWarehouseCode(org, code)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Warehouse code already exists");
         }
         if (Boolean.TRUE.equals(dto.defaultWarehouse())) {
             repo.clearDefault(org);
         }
         Warehouse warehouse = mapper.toEntity(dto);
+        warehouse.setWarehouseCode(code);
         warehouse.setOrganizationId(org);
         if (dto.defaultWarehouse() != null) {
             warehouse.setDefaultWarehouse(dto.defaultWarehouse());
         }
         return mapper.toResponse(repo.save(warehouse));
+    }
+
+    private String resolveCode(UUID org, String provided, String name) {
+        if (provided != null && !provided.isBlank()) {
+            return provided.trim().toUpperCase(Locale.ROOT);
+        }
+        return EntityCodeGenerator.uniqueFromName(
+                name, "WH", candidate -> repo.existsByOrganizationIdAndWarehouseCode(org, candidate));
     }
 
     @Transactional(readOnly = true)

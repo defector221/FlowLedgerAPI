@@ -1,6 +1,8 @@
 package com.flowledger.supplier.service;
 
 import com.flowledger.common.service.OrganizationScopedService;
+import com.flowledger.search.event.SearchIndexEventPublisher;
+import com.flowledger.search.model.SearchEntityType;
 import com.flowledger.supplier.dto.SupplierDtos.*;
 import com.flowledger.supplier.entity.Supplier;
 import com.flowledger.supplier.mapper.SupplierMapper;
@@ -19,10 +21,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class SupplierService extends OrganizationScopedService {
     private final SupplierRepository repo;
     private final SupplierMapper mapper;
+    private final SearchIndexEventPublisher searchEvents;
 
-    public SupplierService(SupplierRepository repo, SupplierMapper mapper) {
+    public SupplierService(SupplierRepository repo, SupplierMapper mapper, SearchIndexEventPublisher searchEvents) {
         this.repo = repo;
         this.mapper = mapper;
+        this.searchEvents = searchEvents;
     }
 
     public Response create(Create dto) {
@@ -38,7 +42,9 @@ public class SupplierService extends OrganizationScopedService {
         if (supplier.getOpeningBalance() == null) {
             supplier.setOpeningBalance(java.math.BigDecimal.ZERO);
         }
-        return mapper.toResponse(repo.save(supplier));
+        Supplier saved = repo.save(supplier);
+        searchEvents.upsert(org, SearchEntityType.SUPPLIER, saved.getId());
+        return mapper.toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -52,7 +58,13 @@ public class SupplierService extends OrganizationScopedService {
         if (dto.archived() != null) {
             supplier.setArchived(dto.archived());
         }
-        return mapper.toResponse(repo.save(supplier));
+        Supplier saved = repo.save(supplier);
+        if (saved.isArchived()) {
+            searchEvents.delete(orgId(), SearchEntityType.SUPPLIER, saved.getId());
+        } else {
+            searchEvents.upsert(orgId(), SearchEntityType.SUPPLIER, saved.getId());
+        }
+        return mapper.toResponse(saved);
     }
 
     @Transactional(readOnly = true)

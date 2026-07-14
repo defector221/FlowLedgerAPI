@@ -8,7 +8,7 @@ public final class CustomerDtos {
     private CustomerDtos() {}
 
     public record Create(
-            @NotBlank String customerCode,
+            String customerCode,
             @NotBlank String customerName,
             String companyName,
             String gstin,

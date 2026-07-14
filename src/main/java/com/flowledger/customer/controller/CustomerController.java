@@ -21,7 +21,7 @@ public class CustomerController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ORGANIZATION_ADMIN', 'SALES_MANAGER')")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_ADMIN', 'SALES_MANAGER', 'ACCOUNTANT')")
     public Response create(@Valid @RequestBody Create dto) {
         return service.create(dto);
     }
@@ -32,12 +32,14 @@ public class CustomerController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ORGANIZATION_ADMIN', 'SALES_MANAGER', 'ACCOUNTANT')")
     public Response update(@PathVariable UUID id, @Valid @RequestBody Update dto) {
         return service.update(id, dto);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ORGANIZATION_ADMIN', 'SALES_MANAGER', 'ACCOUNTANT')")
     public void archive(@PathVariable UUID id) {
         service.archive(id);
     }

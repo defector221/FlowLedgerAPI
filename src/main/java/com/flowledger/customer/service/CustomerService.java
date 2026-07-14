@@ -1,10 +1,13 @@
 package com.flowledger.customer.service;
 
 import com.flowledger.common.service.OrganizationScopedService;
+import com.flowledger.common.util.EntityCodeGenerator;
 import com.flowledger.customer.dto.CustomerDtos.*;
 import com.flowledger.customer.entity.Customer;
 import com.flowledger.customer.mapper.CustomerMapper;
 import com.flowledger.customer.repository.CustomerRepository;
+import com.flowledger.search.event.SearchIndexEventPublisher;
+import com.flowledger.search.model.SearchEntityType;
 import java.math.*;
 import java.util.*;
 import org.springframework.data.domain.*;
@@ -19,20 +22,35 @@ import org.springframework.web.server.ResponseStatusException;
 public class CustomerService extends OrganizationScopedService {
     private final CustomerRepository repo;
     private final CustomerMapper mapper;
+    private final SearchIndexEventPublisher searchEvents;
 
-    public CustomerService(CustomerRepository repo, CustomerMapper mapper) {
+    public CustomerService(CustomerRepository repo, CustomerMapper mapper, SearchIndexEventPublisher searchEvents) {
         this.repo = repo;
         this.mapper = mapper;
+        this.searchEvents = searchEvents;
     }
 
     public Response create(Create dto) {
         UUID org = orgId();
-        if (repo.existsByOrganizationIdAndCustomerCode(org, dto.customerCode()))
+        String code = resolveCode(org, dto.customerCode(), dto.customerName());
+        if (repo.existsByOrganizationIdAndCustomerCode(org, code)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Customer code already exists");
+        }
         Customer c = mapper.toEntity(dto);
+        c.setCustomerCode(code);
         c.setOrganizationId(org);
         applyDefaults(c);
-        return mapper.toResponse(repo.save(c));
+        Customer saved = repo.save(c);
+        searchEvents.upsert(org, SearchEntityType.CUSTOMER, saved.getId());
+        return mapper.toResponse(saved);
+    }
+
+    private String resolveCode(UUID org, String provided, String name) {
+        if (provided != null && !provided.isBlank()) {
+            return provided.trim().toUpperCase(Locale.ROOT);
+        }
+        return EntityCodeGenerator.uniqueFromName(
+                name, "CUST", candidate -> repo.existsByOrganizationIdAndCustomerCode(org, candidate));
     }
 
     private void applyDefaults(Customer c) {
@@ -55,13 +73,16 @@ public class CustomerService extends OrganizationScopedService {
     public Response update(UUID id, Update dto) {
         Customer c = load(id);
         mapper.update(dto, c);
-        return mapper.toResponse(repo.save(c));
+        Customer saved = repo.save(c);
+        searchEvents.upsert(orgId(), SearchEntityType.CUSTOMER, saved.getId());
+        return mapper.toResponse(saved);
     }
 
     public void archive(UUID id) {
         Customer c = load(id);
         c.setArchived(true);
         repo.save(c);
+        searchEvents.delete(orgId(), SearchEntityType.CUSTOMER, id);
     }
 
     @Transactional(readOnly = true)

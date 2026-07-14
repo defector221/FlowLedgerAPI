@@ -1,7 +1,6 @@
 package com.flowledger.pdf.controller;
 
 import com.flowledger.pdf.InvoicePdfService;
-import java.util.Locale;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;

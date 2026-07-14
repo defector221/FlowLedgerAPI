@@ -1,54 +1,47 @@
-version: "3.9"
-
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: flowledger-postgres
+  opensearch:
+    image: opensearchproject/opensearch:3.6.0
+    container_name: flowledger-opensearch
     environment:
-      POSTGRES_DB: flowledger
-      POSTGRES_USER: flowledger
-      POSTGRES_PASSWORD: flowledger
+      - discovery.type=single-node
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Vayupa2024wan
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
-      - "5432:5432"
+      - "19200:9200"
+      - "19600:9600"
     volumes:
-      - flowledger_pg_data:/var/lib/postgresql/data
+      - opensearch-data:/usr/share/opensearch/data
+    networks:
+      - flowledger-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U flowledger -d flowledger"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  minio:
-    image: minio/minio:latest
-    container_name: flowledger-minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - flowledger_minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -k -u admin:Vayupa2024wan -f https://localhost:9200/_cluster/health || exit 1"
+        ]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 20
 
-  minio-init:
-    image: minio/mc:latest
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:3.6.0
+    container_name: flowledger-opensearch-dashboards
+    environment:
+      OPENSEARCH_HOSTS: '["https://opensearch:9200"]'
+      OPENSEARCH_USERNAME: kibanaserver
+      OPENSEARCH_PASSWORD: kibanaserver
+      OPENSEARCH_SSL_VERIFICATIONMODE: none
+    ports:
+      - "15601:5601"
     depends_on:
-      minio:
+      opensearch:
         condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 minioadmin minioadmin;
-      mc mb -p local/flowledger || true;
-      mc anonymous set download local/flowledger/public || true;
-      exit 0;
-      "
+    networks:
+      - flowledger-network
 
 volumes:
-  flowledger_pg_data:
-  flowledger_minio_data:
+  opensearch-data:
+
+networks:
+  flowledger-network:
+    name: flowledger-network

@@ -8,4 +8,6 @@ public interface EmailNotificationService {
     void sendLeadFollowUp(String recipient, String subject, String body);
 
     void sendMarketing(String recipient, String subject, String body);
+
+    void sendMarketingHtml(String recipient, String subject, String html);
 }

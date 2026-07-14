@@ -10,5 +10,6 @@ public final class CategoryDtos {
 
     public record Update(@NotBlank String name, String description, UUID parentId, Boolean active) {}
 
-    public record Response(UUID id, String name, String description, UUID parentId, boolean active) {}
+    public record Response(
+            UUID id, String name, String description, UUID parentId, String parentName, boolean active) {}
 }

@@ -12,10 +12,7 @@ public final class MarketingDtos {
     private MarketingDtos() {}
 
     public record StepCreate(
-            @Min(0) int delayDays,
-            @NotBlank String channel,
-            String subject,
-            @NotBlank String body) {}
+            @Min(0) int delayDays, @NotBlank String channel, String subject, String body, UUID emailTemplateId) {}
 
     public record CreateSequence(
             @NotBlank String name,
@@ -25,7 +22,13 @@ public final class MarketingDtos {
             @NotEmpty @Valid List<StepCreate> steps) {}
 
     public record StepResponse(
-            UUID id, int stepOrder, int delayDays, String channel, String subjectTemplate, String bodyTemplate) {}
+            UUID id,
+            int stepOrder,
+            int delayDays,
+            String channel,
+            String subjectTemplate,
+            String bodyTemplate,
+            UUID emailTemplateId) {}
 
     public record SequenceResponse(
             UUID id,

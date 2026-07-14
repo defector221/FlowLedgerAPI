@@ -10,6 +10,8 @@ import com.flowledger.purchase.entity.GoodsReceipt;
 import com.flowledger.purchase.entity.PurchaseInvoice;
 import com.flowledger.purchase.entity.PurchaseInvoiceItem;
 import com.flowledger.purchase.entity.PurchaseOrder;
+import com.flowledger.search.event.SearchIndexEventPublisher;
+import com.flowledger.search.model.SearchEntityType;
 import com.flowledger.tax.dto.GstCalculationDtos;
 import com.flowledger.tax.service.GstCalculationService;
 import jakarta.persistence.EntityManager;
@@ -35,18 +37,21 @@ public class PurchaseInvoiceService {
     private final DocumentNumberService numbers;
     private final OrganizationRepository organizations;
     private final GstCalculationService gst;
+    private final SearchIndexEventPublisher searchEvents;
 
     public PurchaseInvoiceService(
             GoodsReceiptService g,
             PurchaseOrderService o,
             DocumentNumberService n,
             OrganizationRepository r,
-            GstCalculationService tax) {
+            GstCalculationService tax,
+            SearchIndexEventPublisher searchEvents) {
         grns = g;
         orders = o;
         numbers = n;
         organizations = r;
         gst = tax;
+        this.searchEvents = searchEvents;
     }
 
     public PurchaseInvoice fromGrn(UUID grnId, InvoiceRequest r) {
@@ -75,6 +80,7 @@ public class PurchaseInvoiceService {
                                 x.getQuantity(),
                                 BigDecimal.ZERO,
                                 null,
+                                null,
                                 null))
                         .toList());
     }
@@ -97,7 +103,8 @@ public class PurchaseInvoiceService {
                                         x.getQuantity(),
                                         x.getRate(),
                                         x.getDiscountPercent(),
-                                        x.getTaxRate()))
+                                        x.getTaxRate(),
+                                        x.getTaxType()))
                                 .toList()
                         : r.items());
     }
@@ -108,6 +115,7 @@ public class PurchaseInvoiceService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled invoice cannot be confirmed");
         if (!"DRAFT".equals(i.getStatus())) return i;
         i.setStatus(i.getOutstandingAmount().signum() == 0 ? "PAID" : "CONFIRMED");
+        searchEvents.upsert(i.getOrganizationId(), SearchEntityType.PURCHASE_INVOICE, i.getId());
         return i;
     }
 
@@ -117,6 +125,7 @@ public class PurchaseInvoiceService {
         if (i.getAmountPaid() != null && i.getAmountPaid().signum() > 0)
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Paid invoice cannot be cancelled");
         i.setStatus("CANCELLED");
+        searchEvents.upsert(i.getOrganizationId(), SearchEntityType.PURCHASE_INVOICE, i.getId());
         return i;
     }
 
@@ -163,6 +172,7 @@ public class PurchaseInvoiceService {
             x.setRate(l.rate());
             x.setDiscountPercent(l.discountPercent() == null ? BigDecimal.ZERO : l.discountPercent());
             x.setTaxRate(l.taxRate() == null ? BigDecimal.ZERO : l.taxRate());
+            x.setTaxType(l.taxType() == null || l.taxType().isBlank() ? "GST" : l.taxType().trim().toUpperCase());
             x.setLineOrder(n++);
             BigDecimal discount = l.quantity()
                     .multiply(l.rate())
@@ -176,12 +186,13 @@ public class PurchaseInvoiceService {
                     i.isTaxInclusive(),
                     l.quantity(),
                     l.rate(),
-                    discount));
+                    discount,
+                    x.getTaxType()));
             x.setDiscountAmount(discount);
             x.setTaxableAmount(tax.taxable());
             x.setCgstAmount(tax.cgst());
             x.setSgstAmount(tax.sgst());
-            x.setIgstAmount(tax.igst());
+            x.setIgstAmount(tax.igst().add(tax.otherTax()));
             x.setLineTotal(tax.lineTotal());
             i.getItems().add(x);
         }
@@ -201,6 +212,7 @@ public class PurchaseInvoiceService {
                 i.getItems().stream().map(PurchaseInvoiceItem::getLineTotal).reduce(BigDecimal.ZERO, BigDecimal::add));
         i.setOutstandingAmount(i.getGrandTotal());
         em.persist(i);
+        searchEvents.upsert(i.getOrganizationId(), SearchEntityType.PURCHASE_INVOICE, i.getId());
         return i;
     }
 

@@ -113,6 +113,11 @@ public class PurchaseController {
         return invoices.cancel(id);
     }
 
+    @GetMapping("/invoices/{id}")
+    public PurchaseInvoice invoice(@PathVariable UUID id) {
+        return invoices.get(id);
+    }
+
     @GetMapping("/invoices")
     public List<PurchaseInvoice> invoices() {
         return invoices.list();

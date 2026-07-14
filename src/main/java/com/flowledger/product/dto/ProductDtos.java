@@ -8,7 +8,7 @@ public final class ProductDtos {
     private ProductDtos() {}
 
     public record Create(
-            @NotBlank String sku,
+            String sku,
             @NotBlank String name,
             @NotNull UUID unitId,
             String itemType,
@@ -57,13 +57,17 @@ public final class ProductDtos {
             String name,
             String description,
             UUID categoryId,
+            String categoryName,
             String brand,
             String hsnSacCode,
             UUID unitId,
+            String unitName,
             BigDecimal purchasePrice,
             BigDecimal sellingPrice,
             BigDecimal mrp,
             UUID taxRateId,
+            String taxRateName,
+            String taxType,
             BigDecimal minimumStockLevel,
             BigDecimal reorderLevel,
             boolean active) {}

@@ -14,6 +14,10 @@ public class TaxRate extends AuditedEntity {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "tax_type", nullable = false, length = 16)
+    @Enumerated(EnumType.STRING)
+    private TaxType taxType = TaxType.GST;
+
     @Column(nullable = false)
     private BigDecimal rate;
 

@@ -13,23 +13,60 @@ class GstCalculationServiceTest {
     private final GstCalculationService service = new GstCalculationService();
 
     @Test
-    void intraStateSplitsCgstAndSgst() {
+    void gstIntraStateSplitsCgstAndSgst() {
         Response response = service.calculate(new Request(
-                "27", "27", new BigDecimal("18"), false, BigDecimal.ONE, new BigDecimal("100"), BigDecimal.ZERO));
+                "27", "27", new BigDecimal("18"), false, BigDecimal.ONE, new BigDecimal("100"), BigDecimal.ZERO, "GST"));
         assertEquals(new BigDecimal("100.00"), response.taxable());
         assertEquals(new BigDecimal("9.00"), response.cgst());
         assertEquals(new BigDecimal("9.00"), response.sgst());
         assertEquals(new BigDecimal("0"), response.igst());
+        assertEquals(new BigDecimal("0"), response.otherTax());
         assertEquals(new BigDecimal("118.00"), response.lineTotal());
     }
 
     @Test
-    void interStateAppliesIgst() {
+    void gstInterStateAppliesIgst() {
         Response response = service.calculate(new Request(
-                "27", "29", new BigDecimal("18"), false, BigDecimal.ONE, new BigDecimal("100"), BigDecimal.ZERO));
+                "27", "29", new BigDecimal("18"), false, BigDecimal.ONE, new BigDecimal("100"), BigDecimal.ZERO, "GST"));
         assertEquals(new BigDecimal("0"), response.cgst());
         assertEquals(new BigDecimal("0"), response.sgst());
         assertEquals(new BigDecimal("18.00"), response.igst());
+        assertEquals(new BigDecimal("0"), response.otherTax());
+        assertEquals(new BigDecimal("118.00"), response.lineTotal());
+    }
+
+    @Test
+    void igstNeverSplitsEvenIntraState() {
+        Response response = service.calculate(new Request(
+                "27",
+                "27",
+                new BigDecimal("18"),
+                false,
+                BigDecimal.ONE,
+                new BigDecimal("100"),
+                BigDecimal.ZERO,
+                "IGST"));
+        assertEquals(new BigDecimal("0"), response.cgst());
+        assertEquals(new BigDecimal("0"), response.sgst());
+        assertEquals(new BigDecimal("18.00"), response.igst());
+        assertEquals(new BigDecimal("0"), response.otherTax());
+    }
+
+    @Test
+    void otherTaxAppliedAsMarkedWithoutGstSplit() {
+        Response response = service.calculate(new Request(
+                "27",
+                "29",
+                new BigDecimal("18"),
+                false,
+                BigDecimal.ONE,
+                new BigDecimal("100"),
+                BigDecimal.ZERO,
+                "OTHER"));
+        assertEquals(new BigDecimal("0"), response.cgst());
+        assertEquals(new BigDecimal("0"), response.sgst());
+        assertEquals(new BigDecimal("0"), response.igst());
+        assertEquals(new BigDecimal("18.00"), response.otherTax());
         assertEquals(new BigDecimal("118.00"), response.lineTotal());
     }
 

@@ -39,5 +39,9 @@ public class SalesInvoiceItem {
             igstAmount = BigDecimal.ZERO,
             cessAmount = BigDecimal.ZERO,
             lineTotal = BigDecimal.ZERO;
+
+    @Column(name = "tax_type", nullable = false, length = 16)
+    private String taxType = "GST";
+
     private int lineOrder;
 }

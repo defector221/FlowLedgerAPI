@@ -47,8 +47,8 @@ public class PaymentReminderService {
         String email = row[3] == null ? null : row[3].toString();
         String customerName = row[4] == null ? "Customer" : row[4].toString();
         String subject = "Payment reminder for invoice " + invoiceNumber;
-        String body = "Dear " + customerName + ", outstanding amount for invoice " + invoiceNumber + " is " + outstanding
-                + ".";
+        String body = "Dear " + customerName + ", outstanding amount for invoice " + invoiceNumber + " is "
+                + outstanding + ".";
 
         UUID reminderId = UUID.randomUUID();
         em.createNativeQuery(
@@ -77,10 +77,9 @@ public class PaymentReminderService {
     @Scheduled(cron = "0 0 9 * * *")
     public void processDailyReminders() {
         log.info("Payment reminder daily job stub started");
-        Number count = (Number) em.createNativeQuery(
-                        "select count(*) from sales_invoices "
-                                + "where outstanding_amount > 0 and due_date is not null and due_date <= CURRENT_DATE "
-                                + "and status not in ('CANCELLED','DRAFT')")
+        Number count = (Number) em.createNativeQuery("select count(*) from sales_invoices "
+                        + "where outstanding_amount > 0 and due_date is not null and due_date <= CURRENT_DATE "
+                        + "and status not in ('CANCELLED','DRAFT')")
                 .getSingleResult();
         log.info("Payment reminder daily job stub found {} overdue invoices", count.longValue());
     }

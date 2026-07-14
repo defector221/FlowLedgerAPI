@@ -120,6 +120,10 @@ public class PurchaseOrderService {
             item.setRate(line.rate());
             item.setDiscountPercent(z(line.discountPercent()));
             item.setTaxRate(z(line.taxRate()));
+            item.setTaxType(
+                    line.taxType() == null || line.taxType().isBlank()
+                            ? "GST"
+                            : line.taxType().trim().toUpperCase());
             item.setLineOrder(i++);
             calculate(item);
             po.getItems().add(item);
@@ -134,9 +138,25 @@ public class PurchaseOrderService {
         x.setTaxableAmount(gross.subtract(x.getDiscountAmount()));
         BigDecimal tax =
                 x.getTaxableAmount().multiply(x.getTaxRate()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-        x.setCgstAmount(tax.divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP));
-        x.setSgstAmount(tax.subtract(x.getCgstAmount()));
-        x.setIgstAmount(BigDecimal.ZERO);
+        String type = x.getTaxType() == null ? "GST" : x.getTaxType().trim().toUpperCase();
+        switch (type) {
+            case "IGST" -> {
+                x.setCgstAmount(BigDecimal.ZERO);
+                x.setSgstAmount(BigDecimal.ZERO);
+                x.setIgstAmount(tax);
+            }
+            case "OTHER" -> {
+                // Flat tax stored on IGST amount column for document totals compatibility
+                x.setCgstAmount(BigDecimal.ZERO);
+                x.setSgstAmount(BigDecimal.ZERO);
+                x.setIgstAmount(tax);
+            }
+            default -> {
+                x.setCgstAmount(tax.divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP));
+                x.setSgstAmount(tax.subtract(x.getCgstAmount()));
+                x.setIgstAmount(BigDecimal.ZERO);
+            }
+        }
         x.setLineTotal(x.getTaxableAmount().add(tax));
     }
 

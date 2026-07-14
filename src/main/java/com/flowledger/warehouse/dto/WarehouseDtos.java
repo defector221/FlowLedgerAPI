@@ -7,7 +7,7 @@ public final class WarehouseDtos {
     private WarehouseDtos() {}
 
     public record Create(
-            @NotBlank String warehouseCode,
+            String warehouseCode,
             @NotBlank String warehouseName,
             String address,
             String contactPerson,

@@ -29,4 +29,13 @@ public class MockEmailNotificationService implements EmailNotificationService {
     public void sendMarketing(String recipient, String subject, String body) {
         log.info("Mock email marketing to {}: {} — {}", recipient, subject, body);
     }
+
+    @Override
+    public void sendMarketingHtml(String recipient, String subject, String html) {
+        log.info(
+                "Mock HTML email marketing to {}: {} ({} chars html)",
+                recipient,
+                subject,
+                html == null ? 0 : html.length());
+    }
 }

@@ -20,7 +20,8 @@ public final class PurchaseDtos {
             @NotNull @DecimalMin("0.0001") BigDecimal quantity,
             @NotNull @DecimalMin("0") BigDecimal rate,
             BigDecimal discountPercent,
-            BigDecimal taxRate) {}
+            BigDecimal taxRate,
+            String taxType) {}
 
     public record OrderRequest(
             @NotNull UUID supplierId,

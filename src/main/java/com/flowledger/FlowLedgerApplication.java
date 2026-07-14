@@ -8,7 +8,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableScheduling
-@EnableConfigurationProperties({JwtProperties.class, com.flowledger.storage.MinioStorageProperties.class})
+@EnableConfigurationProperties({
+    JwtProperties.class,
+    com.flowledger.storage.MinioStorageProperties.class,
+    com.flowledger.search.config.SearchProperties.class
+})
 public class FlowLedgerApplication {
     public static void main(String[] args) {
         SpringApplication.run(FlowLedgerApplication.class, args);

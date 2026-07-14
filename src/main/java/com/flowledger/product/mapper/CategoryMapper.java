@@ -8,6 +8,7 @@ import org.mapstruct.*;
 public interface CategoryMapper {
     Category toEntity(Create d);
 
+    @Mapping(target = "parentName", ignore = true)
     Response toResponse(Category e);
 
     void update(Update d, @MappingTarget Category e);

@@ -32,7 +32,6 @@ public class PurchaseOrder extends AuditedEntity {
             discountTotal = BigDecimal.ZERO,
             taxTotal = BigDecimal.ZERO,
             grandTotal = BigDecimal.ZERO;
-
     @Column(columnDefinition = "text")
     private String termsAndConditions, notes;
 

@@ -31,7 +31,7 @@ spring:
       mail.smtp.starttls.enable: false
 
 server:
-  port: 8080
+  port: 7070
   error:
     include-message: always
 
@@ -53,7 +53,7 @@ flowledger:
     access-token-expiry-minutes: 30
     refresh-token-expiry-days: 14
   cors:
-    allowed-origins: http://localhost:5173,http://localhost:3000
+    allowed-origins: http://localhost:5173,http://localhost:3000,https://flowledger.valiantxgroup.com
   storage:
     minio:
       endpoint: ${MINIO_ENDPOINT:http://localhost:19000}
@@ -63,6 +63,13 @@ flowledger:
   app:
     frontend-url: ${FRONTEND_URL:http://localhost:5173}
     allow-negative-stock-default: false
+  search:
+    enabled: ${FLOWLEDGER_SEARCH_ENABLED:true}
+    url: ${FLOWLEDGER_SEARCH_URL:https://localhost:19200}
+    index: ${FLOWLEDGER_SEARCH_INDEX:flowledger-global-search-v1}
+    username: ${FLOWLEDGER_SEARCH_USERNAME:admin}
+    password: ${FLOWLEDGER_SEARCH_PASSWORD:Vayupa2024wan}
+    ssl-verify: ${FLOWLEDGER_SEARCH_SSL_VERIFY:false}
   # Notification channels (email SMTP vs mock; WhatsApp is always mock until a provider is wired)
   notifications:
     email:

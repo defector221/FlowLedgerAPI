@@ -15,6 +15,10 @@ public interface ProductMapper {
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateFromCreate(Create d, @MappingTarget Product entity);
 
+    @Mapping(target = "categoryName", ignore = true)
+    @Mapping(target = "unitName", ignore = true)
+    @Mapping(target = "taxRateName", ignore = true)
+    @Mapping(target = "taxType", ignore = true)
     Response toResponse(Product e);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)

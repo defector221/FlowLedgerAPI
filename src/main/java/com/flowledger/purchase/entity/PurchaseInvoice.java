@@ -38,7 +38,6 @@ public class PurchaseInvoice extends AuditedEntity {
             grandTotal = BigDecimal.ZERO,
             amountPaid = BigDecimal.ZERO,
             outstandingAmount = BigDecimal.ZERO;
-
     @Column(columnDefinition = "text")
     private String notes, termsAndConditions;
 

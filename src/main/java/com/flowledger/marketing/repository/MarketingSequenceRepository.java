@@ -18,6 +18,7 @@ public interface MarketingSequenceRepository extends JpaRepository<MarketingSequ
     List<MarketingSequence> findByOrganizationIdAndTriggerTypeAndStatus(
             UUID organizationId, String triggerType, String status);
 
-    @Query("select distinct s from MarketingSequence s left join fetch s.steps where s.id = :id and s.organizationId = :orgId")
+    @Query(
+            "select distinct s from MarketingSequence s left join fetch s.steps where s.id = :id and s.organizationId = :orgId")
     Optional<MarketingSequence> findDetailedByIdAndOrganizationId(@Param("id") UUID id, @Param("orgId") UUID orgId);
 }

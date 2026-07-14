@@ -28,6 +28,7 @@ import java.io.*;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -43,11 +44,17 @@ public class InvoicePdfService {
     private final OrganizationRepository organizations;
     private final StorageService storage;
     private final ObjectMapper json;
+    private final HtmlDocumentPdfRenderer htmlRenderer;
 
-    public InvoicePdfService(OrganizationRepository organizations, StorageService storage, ObjectMapper json) {
+    public InvoicePdfService(
+            OrganizationRepository organizations,
+            StorageService storage,
+            ObjectMapper json,
+            HtmlDocumentPdfRenderer htmlRenderer) {
         this.organizations = organizations;
         this.storage = storage;
         this.json = json;
+        this.htmlRenderer = htmlRenderer;
     }
 
     public byte[] render(UUID invoiceId) {
@@ -76,6 +83,17 @@ public class InvoicePdfService {
         return renderSample(type, configJson);
     }
 
+    public byte[] renderPreview(
+            String documentType, UUID sampleInvoiceId, JsonNode configJson, String editorMode, String html) {
+        if ("UNLAYER".equalsIgnoreCase(editorMode) && html != null && !html.isBlank()) {
+            if (sampleInvoiceId != null) {
+                return renderDocumentWithHtml(documentType, sampleInvoiceId, html);
+            }
+            return htmlRenderer.render(html, sampleDocumentTags(org(), documentType));
+        }
+        return renderWithConfig(configJson, documentType, sampleInvoiceId);
+    }
+
     private byte[] renderSalesInvoice(UUID invoiceId, JsonNode overrideConfig) {
         Organization org = org();
         @SuppressWarnings("unchecked")
@@ -95,6 +113,10 @@ public class InvoicePdfService {
         if (rows.isEmpty()) throw new IllegalArgumentException("Invoice not found");
         Object[] inv = rows.get(0);
         UUID templateId = inv[8] instanceof UUID u ? u : null;
+        String html = resolveHtml(null, templateId, "SALES_INVOICE");
+        if (html != null) {
+            return htmlRenderer.render(html, salesInvoiceHtmlTags(org, invoiceId));
+        }
         TemplateConfig cfg = resolveConfig(overrideConfig, templateId, "SALES_INVOICE");
 
         @SuppressWarnings("unchecked")
@@ -151,6 +173,10 @@ public class InvoicePdfService {
                 .getResultList();
         if (rows.isEmpty()) throw new IllegalArgumentException("Quotation not found");
         Object[] q = rows.get(0);
+        String html = resolveHtml(null, null, "QUOTATION");
+        if (html != null) {
+            return htmlRenderer.render(html, quotationHtmlTags(org, quotationId));
+        }
         TemplateConfig cfg = resolveConfig(overrideConfig, null, "QUOTATION");
 
         @SuppressWarnings("unchecked")
@@ -245,8 +271,12 @@ public class InvoicePdfService {
         Organization org = org();
         TemplateConfig cfg = TemplateConfig.from(configJson != null ? configJson : defaultConfig(documentType));
         List<Object[]> lines = List.of(
-                new Object[] {"Sample product A", BigDecimal.ONE, new BigDecimal("100.00"), new BigDecimal("100.00"), "9983"},
-                new Object[] {"Sample product B", new BigDecimal("2"), new BigDecimal("50.00"), new BigDecimal("100.00"), "9984"});
+                new Object[] {
+                    "Sample product A", BigDecimal.ONE, new BigDecimal("100.00"), new BigDecimal("100.00"), "9983"
+                },
+                new Object[] {
+                    "Sample product B", new BigDecimal("2"), new BigDecimal("50.00"), new BigDecimal("100.00"), "9984"
+                });
         DocumentModel model = new DocumentModel(
                 cfg.titleOr(defaultTitle(documentType)),
                 "Doc No",
@@ -289,7 +319,8 @@ public class InvoicePdfService {
             title.setSpacingAfter(8);
             doc.add(title);
 
-            doc.add(new Paragraph(org.getLegalName() == null ? org.getName() : org.getLegalName(),
+            doc.add(new Paragraph(
+                    org.getLegalName() == null ? org.getName() : org.getLegalName(),
                     FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11)));
             if (org.getBillingAddress() != null && !org.getBillingAddress().isBlank()) {
                 doc.add(new Paragraph(org.getBillingAddress(), FontFactory.getFont(FontFactory.HELVETICA, 9)));
@@ -311,22 +342,27 @@ public class InvoicePdfService {
                 billTo.addElement(new Paragraph(model.partyAddress, FontFactory.getFont(FontFactory.HELVETICA, 9)));
             }
             if (cfg.showGstin && model.partyGstin != null && !model.partyGstin.isBlank()) {
-                billTo.addElement(new Paragraph("GSTIN: " + model.partyGstin, FontFactory.getFont(FontFactory.HELVETICA, 9)));
+                billTo.addElement(
+                        new Paragraph("GSTIN: " + model.partyGstin, FontFactory.getFont(FontFactory.HELVETICA, 9)));
             }
             parties.addCell(billTo);
 
             PdfPCell meta = new PdfPCell();
             meta.setBorder(Rectangle.BOX);
             meta.setPadding(6);
-            meta.addElement(new Paragraph(model.numberLabel + ": " + model.number, FontFactory.getFont(FontFactory.HELVETICA, 9)));
-            meta.addElement(new Paragraph(model.dateLabel + ": " + model.date, FontFactory.getFont(FontFactory.HELVETICA, 9)));
+            meta.addElement(new Paragraph(
+                    model.numberLabel + ": " + model.number, FontFactory.getFont(FontFactory.HELVETICA, 9)));
+            meta.addElement(
+                    new Paragraph(model.dateLabel + ": " + model.date, FontFactory.getFont(FontFactory.HELVETICA, 9)));
             parties.addCell(meta);
             doc.add(parties);
 
             List<String> headers = new ArrayList<>(List.of("#", "Description"));
             if (cfg.showHsn) headers.add("HSN/SAC");
             headers.addAll(List.of("Qty", "Rate", "Amount"));
-            float[] widths = cfg.showHsn ? new float[] {0.6f, 3.2f, 1.2f, 1f, 1.2f, 1.4f} : new float[] {0.6f, 4f, 1f, 1.2f, 1.4f};
+            float[] widths = cfg.showHsn
+                    ? new float[] {0.6f, 3.2f, 1.2f, 1f, 1.2f, 1.4f}
+                    : new float[] {0.6f, 4f, 1f, 1.2f, 1.4f};
             PdfPTable table = new PdfPTable(widths);
             table.setWidthPercentage(100);
             table.setSpacingBefore(6);
@@ -355,7 +391,8 @@ public class InvoicePdfService {
             BigDecimal total = model.grandTotal == null ? BigDecimal.ZERO : model.grandTotal;
             doc.add(new Paragraph(
                     "Grand Total: INR " + total, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, cfg.accentColor)));
-            doc.add(new Paragraph("Amount in words: " + AmountInWords.inr(total), FontFactory.getFont(FontFactory.HELVETICA, 9)));
+            doc.add(new Paragraph(
+                    "Amount in words: " + AmountInWords.inr(total), FontFactory.getFont(FontFactory.HELVETICA, 9)));
 
             if (cfg.showBankDetails) {
                 doc.add(Chunk.NEWLINE);
@@ -443,17 +480,292 @@ public class InvoicePdfService {
         return TemplateConfig.from(defaultConfig(documentType));
     }
 
+    private byte[] renderDocumentWithHtml(String documentType, UUID documentId, String html) {
+        String type =
+                documentType == null ? "SALES_INVOICE" : documentType.trim().toUpperCase(Locale.ROOT);
+        Organization org = org();
+        return switch (type) {
+            case "SALES_INVOICE", "INVOICE" -> htmlRenderer.render(html, salesInvoiceHtmlTags(org, documentId));
+            case "QUOTATION" -> htmlRenderer.render(html, quotationHtmlTags(org, documentId));
+            default -> htmlRenderer.render(html, sampleDocumentTags(org, type));
+        };
+    }
+
+    private byte[] renderSalesInvoiceHtml(UUID invoiceId, String html) {
+        return htmlRenderer.render(html, salesInvoiceHtmlTags(org(), invoiceId));
+    }
+
+    private Map<String, String> salesInvoiceHtmlTags(Organization org, UUID invoiceId) {
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery(
+                        """
+                        select si.invoice_number, si.invoice_date, si.grand_total, si.cgst_total, si.sgst_total, si.igst_total,
+                               si.notes, si.terms_and_conditions, si.billing_address, si.customer_gstin,
+                               c.customer_name, c.company_name, c.customer_code, c.billing_address as customer_billing,
+                               c.shipping_address, c.gstin as customer_gstin_master, c.pan, c.email, c.phone,
+                               c.city, c.state, c.state_code, c.country
+                        from sales_invoices si
+                        join customers c on c.id = si.customer_id
+                        where si.id = :id and si.organization_id = :org
+                        """)
+                .setParameter("id", invoiceId)
+                .setParameter("org", org.getId())
+                .getResultList();
+        if (rows.isEmpty()) {
+            throw new IllegalArgumentException("Invoice not found");
+        }
+        Object[] inv = rows.get(0);
+        @SuppressWarnings("unchecked")
+        List<Object[]> lineRows = em.createNativeQuery(
+                        """
+                        select description, quantity, rate, line_total, coalesce(hsn_sac_code, '')
+                        from sales_invoice_items
+                        where sales_invoice_id = :id
+                        order by line_order
+                        """)
+                .setParameter("id", invoiceId)
+                .getResultList();
+        return documentTags(
+                org,
+                "TAX INVOICE",
+                str(inv[0]),
+                str(inv[1]),
+                (BigDecimal) inv[2],
+                (BigDecimal) inv[3],
+                (BigDecimal) inv[4],
+                (BigDecimal) inv[5],
+                str(inv[6]),
+                str(inv[7]),
+                firstNonBlank(str(inv[8]), str(inv[13])),
+                firstNonBlank(str(inv[9]), str(inv[15])),
+                str(inv[10]),
+                str(inv[11]),
+                str(inv[12]),
+                str(inv[14]),
+                str(inv[16]),
+                str(inv[17]),
+                str(inv[18]),
+                str(inv[19]),
+                str(inv[20]),
+                str(inv[21]),
+                str(inv[22]),
+                lineRows,
+                true);
+    }
+
+    private Map<String, String> quotationHtmlTags(Organization org, UUID quotationId) {
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery(
+                        """
+                        select q.quotation_number, q.quotation_date, q.grand_total, q.tax_total, q.notes, q.terms_and_conditions,
+                               q.billing_address, c.customer_name, c.company_name, c.customer_code,
+                               c.billing_address as customer_billing, c.shipping_address, c.gstin, c.pan, c.email, c.phone,
+                               c.city, c.state, c.state_code, c.country
+                        from quotations q
+                        join customers c on c.id = q.customer_id
+                        where q.id = :id and q.organization_id = :org
+                        """)
+                .setParameter("id", quotationId)
+                .setParameter("org", org.getId())
+                .getResultList();
+        if (rows.isEmpty()) {
+            throw new IllegalArgumentException("Quotation not found");
+        }
+        Object[] q = rows.get(0);
+        @SuppressWarnings("unchecked")
+        List<Object[]> lineRows = em.createNativeQuery(
+                        """
+                        select description, quantity, rate, line_total, coalesce(hsn_sac_code, '')
+                        from quotation_items
+                        where quotation_id = :id
+                        order by line_order
+                        """)
+                .setParameter("id", quotationId)
+                .getResultList();
+        BigDecimal grand = (BigDecimal) q[2];
+        BigDecimal tax = q[3] instanceof BigDecimal t ? t : BigDecimal.ZERO;
+        return documentTags(
+                org,
+                "QUOTATION",
+                str(q[0]),
+                str(q[1]),
+                grand,
+                tax,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                str(q[4]),
+                str(q[5]),
+                firstNonBlank(str(q[6]), str(q[10])),
+                str(q[12]),
+                str(q[7]),
+                str(q[8]),
+                str(q[9]),
+                str(q[11]),
+                str(q[13]),
+                str(q[14]),
+                str(q[15]),
+                str(q[16]),
+                str(q[17]),
+                str(q[18]),
+                str(q[19]),
+                lineRows,
+                true);
+    }
+
+    private Map<String, String> documentTags(
+            Organization org,
+            String documentTitle,
+            String number,
+            String date,
+            BigDecimal grandTotal,
+            BigDecimal cgst,
+            BigDecimal sgst,
+            BigDecimal igst,
+            String notes,
+            String terms,
+            String billingAddress,
+            String customerGstin,
+            String customerName,
+            String companyName,
+            String customerCode,
+            String shippingAddress,
+            String pan,
+            String email,
+            String phone,
+            String city,
+            String state,
+            String stateCode,
+            String country,
+            List<Object[]> lineRows,
+            boolean showHsn) {
+        Map<String, String> tags = new HashMap<>();
+        tags.put("organizationName", org.getName() == null ? "FlowLedger" : org.getName());
+        tags.put("gstin", nullToEmpty(org.getGstin()));
+        tags.put("organizationEmail", nullToEmpty(org.getEmail()));
+        tags.put("organizationPhone", nullToEmpty(org.getPhone()));
+        tags.put("logoHtml", DocumentHtmlTags.logoHtml(loadOrgLogo(org)));
+        tags.put("documentTitle", documentTitle);
+        tags.put("invoiceNumber", number);
+        tags.put("invoiceDate", date);
+        tags.put("grandTotal", DocumentHtmlTags.fmt(grandTotal));
+        tags.put("cgstTotal", DocumentHtmlTags.fmt(cgst));
+        tags.put("sgstTotal", DocumentHtmlTags.fmt(sgst));
+        tags.put("igstTotal", DocumentHtmlTags.fmt(igst));
+        tags.put("notes", nullToEmpty(notes));
+        tags.put("terms", nullToEmpty(terms));
+        tags.put("customerName", nullToEmpty(customerName));
+        tags.put("company", firstNonBlank(companyName, customerName));
+        tags.put("customerCode", nullToEmpty(customerCode));
+        tags.put("customerEmail", nullToEmpty(email));
+        tags.put("customerPhone", nullToEmpty(phone));
+        tags.put("customerGstin", nullToEmpty(customerGstin));
+        tags.put("customerPan", nullToEmpty(pan));
+        tags.put("customerAddress", firstNonBlank(billingAddress, shippingAddress));
+        tags.put("customerCity", nullToEmpty(city));
+        tags.put("customerState", nullToEmpty(state));
+        tags.put("customerStateCode", nullToEmpty(stateCode));
+        tags.put("customerCountry", nullToEmpty(country));
+        tags.put(
+                "customerDetails",
+                DocumentHtmlTags.customerDetailsHtml(
+                        customerName,
+                        companyName,
+                        customerCode,
+                        firstNonBlank(billingAddress, shippingAddress),
+                        city,
+                        state,
+                        stateCode,
+                        country,
+                        customerGstin,
+                        pan,
+                        email,
+                        phone));
+        List<DocumentHtmlTags.Line> lines = lineRows.stream()
+                .map(row -> new DocumentHtmlTags.Line(
+                        str(row[0]),
+                        str(row[4]),
+                        row[1] instanceof BigDecimal q ? q : BigDecimal.ZERO,
+                        row[2] instanceof BigDecimal r ? r : BigDecimal.ZERO,
+                        row[3] instanceof BigDecimal a ? a : BigDecimal.ZERO))
+                .toList();
+        tags.put("lineItemsHtml", DocumentHtmlTags.lineItemsTableHtml(lines, cgst, sgst, igst, grandTotal, showHsn));
+        return tags;
+    }
+
+    private Map<String, String> sampleDocumentTags(Organization org, String documentType) {
+        Map<String, String> tags = DocumentHtmlTags.sample(
+                loadOrgLogo(org), org.getName() == null ? "FlowLedger" : org.getName(), org.getGstin());
+        if ("QUOTATION".equalsIgnoreCase(documentType)) {
+            tags.put("documentTitle", "QUOTATION");
+        }
+        return tags;
+    }
+
+    private DocumentHtmlTags.OrganizationLogo loadOrgLogo(Organization org) {
+        if (org.getLogoObjectKey() == null || org.getLogoObjectKey().isBlank()) {
+            return null;
+        }
+        try (InputStream in = storage.get(org.getLogoObjectKey())) {
+            byte[] bytes = in.readAllBytes();
+            return new DocumentHtmlTags.OrganizationLogo(bytes, DocumentHtmlTags.mimeFromKey(org.getLogoObjectKey()));
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private String resolveHtml(String overrideHtml, UUID templateId, String documentType) {
+        if (overrideHtml != null && !overrideHtml.isBlank()) {
+            return overrideHtml;
+        }
+        UUID orgId = TenantContext.getOrganizationId();
+        if (templateId != null) {
+            @SuppressWarnings("unchecked")
+            List<Object[]> rows = em.createNativeQuery(
+                            """
+                            select editor_mode, html from invoice_templates
+                            where id = :id and organization_id = :org
+                            """)
+                    .setParameter("id", templateId)
+                    .setParameter("org", orgId)
+                    .getResultList();
+            if (!rows.isEmpty()) {
+                Object[] row = rows.get(0);
+                if ("UNLAYER".equalsIgnoreCase(str(row[0]))
+                        && row[1] != null
+                        && !str(row[1]).isBlank()) {
+                    return str(row[1]);
+                }
+            }
+        }
+        @SuppressWarnings("unchecked")
+        List<Object[]> defaults = em.createNativeQuery(
+                        """
+                        select editor_mode, html from invoice_templates
+                        where organization_id = :org and document_type = :type and is_default = true
+                        limit 1
+                        """)
+                .setParameter("org", orgId)
+                .setParameter("type", documentType)
+                .getResultList();
+        if (!defaults.isEmpty()) {
+            Object[] row = defaults.get(0);
+            if ("UNLAYER".equalsIgnoreCase(str(row[0]))
+                    && row[1] != null
+                    && !str(row[1]).isBlank()) {
+                return str(row[1]);
+            }
+        }
+        return null;
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
     private JsonNode defaultConfig(String documentType) {
         return json.valueToTree(Map.of(
                 "logo", Map.of("visible", true, "position", "left"),
-                "header",
-                        Map.of(
-                                "title",
-                                defaultTitle(documentType),
-                                "accentColor",
-                                "#1F4E78",
-                                "showGstin",
-                                true),
+                "header", Map.of("title", defaultTitle(documentType), "accentColor", "#1F4E78", "showGstin", true),
                 "items",
                         Map.of(
                                 "columns",

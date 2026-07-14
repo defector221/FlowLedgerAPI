@@ -164,6 +164,7 @@ public class SalesDocumentService {
             item.setDiscountPercent(qi.getDiscountPercent());
             item.setDiscountAmount(qi.getDiscountAmount());
             item.setTaxRate(qi.getTaxRate());
+            item.setTaxType(qi.getTaxType() == null || qi.getTaxType().isBlank() ? "GST" : qi.getTaxType());
             item.setTaxableAmount(qi.getTaxableAmount());
             item.setCgstAmount(qi.getCgstAmount());
             item.setSgstAmount(qi.getSgstAmount());
@@ -316,8 +317,7 @@ public class SalesDocumentService {
 
     @Transactional(readOnly = true)
     public DeliveryChallan getChallan(UUID id) {
-        return challans
-                .findByIdAndOrganizationId(id, orgId())
+        return challans.findByIdAndOrganizationId(id, orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Challan not found"));
     }
 
@@ -354,8 +354,7 @@ public class SalesDocumentService {
 
     @Transactional
     public SalesReturn createReturn(ReturnRequest request) {
-        SalesInvoice invoice = invoices
-                .findByIdAndOrganizationId(request.salesInvoiceId(), orgId())
+        SalesInvoice invoice = invoices.findByIdAndOrganizationId(request.salesInvoiceId(), orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
         if (invoice.getStatus() == SalesInvoice.Status.CANCELLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot return a cancelled invoice");
@@ -369,12 +368,7 @@ public class SalesDocumentService {
         sr.setStatus("DRAFT");
         sr.setNotes(request.notes());
         sr.setReturnNumber(numbers.next(
-                org.getId(),
-                "SALES_RETURN",
-                "SR",
-                NUMBER_FORMAT,
-                org.getFinancialYearStart(),
-                sr.getReturnDate()));
+                org.getId(), "SALES_RETURN", "SR", NUMBER_FORMAT, org.getFinancialYearStart(), sr.getReturnDate()));
         BigDecimal total = BigDecimal.ZERO;
         int i = 0;
         for (ReturnItem ri : request.items()) {
@@ -401,8 +395,7 @@ public class SalesDocumentService {
         if ("CONFIRMED".equals(sr.getStatus()) && sr.isInventoryPosted()) {
             return sr;
         }
-        SalesInvoice invoice = invoices
-                .findByIdAndOrganizationId(sr.getSalesInvoiceId(), orgId())
+        SalesInvoice invoice = invoices.findByIdAndOrganizationId(sr.getSalesInvoiceId(), orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
         if (invoice.getWarehouseId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invoice has no warehouse for stock return");
@@ -434,8 +427,7 @@ public class SalesDocumentService {
 
     @Transactional(readOnly = true)
     public SalesReturn getReturn(UUID id) {
-        return returns
-                .findByIdAndOrganizationId(id, orgId())
+        return returns.findByIdAndOrganizationId(id, orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Sales return not found"));
     }
 
@@ -449,15 +441,13 @@ public class SalesDocumentService {
     @Transactional
     public CreditNote createCreditNote(CreditNoteRequest request) {
         if (request.salesReturnId() == null && request.salesInvoiceId() == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "salesReturnId or salesInvoiceId is required");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "salesReturnId or salesInvoiceId is required");
         }
         if (request.salesReturnId() != null) {
             getReturn(request.salesReturnId());
         }
         if (request.salesInvoiceId() != null) {
-            invoices
-                    .findByIdAndOrganizationId(request.salesInvoiceId(), orgId())
+            invoices.findByIdAndOrganizationId(request.salesInvoiceId(), orgId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
         }
         Organization org = organization();
@@ -471,12 +461,7 @@ public class SalesDocumentService {
         cn.setNotes(request.notes());
         cn.setStatus("ISSUED");
         cn.setCreditNoteNumber(numbers.next(
-                org.getId(),
-                "CREDIT_NOTE",
-                "CN",
-                NUMBER_FORMAT,
-                org.getFinancialYearStart(),
-                cn.getCreditNoteDate()));
+                org.getId(), "CREDIT_NOTE", "CN", NUMBER_FORMAT, org.getFinancialYearStart(), cn.getCreditNoteDate()));
         return creditNotes.save(cn);
     }
 
@@ -504,7 +489,8 @@ public class SalesDocumentService {
                         i.getUnitId(),
                         i.getRate(),
                         i.getDiscountPercent(),
-                        i.getTaxRate()))
+                        i.getTaxRate(),
+                        i.getTaxType()))
                 .toList();
         var request = new Invoice(
                 order.getCustomerId(),
@@ -549,6 +535,7 @@ public class SalesDocumentService {
             qi.setDiscountPercent(z(item.discountPercent()));
             qi.setDiscountAmount(line.discount());
             qi.setTaxRate(z(item.taxRate()));
+            qi.setTaxType(item.taxType() == null || item.taxType().isBlank() ? "GST" : item.taxType().trim().toUpperCase());
             qi.setTaxableAmount(line.taxable());
             qi.setCgstAmount(line.cgst());
             qi.setSgstAmount(line.sgst());
@@ -586,6 +573,7 @@ public class SalesDocumentService {
             oi.setDiscountPercent(z(item.discountPercent()));
             oi.setDiscountAmount(line.discount());
             oi.setTaxRate(z(item.taxRate()));
+            oi.setTaxType(item.taxType() == null || item.taxType().isBlank() ? "GST" : item.taxType().trim().toUpperCase());
             oi.setTaxableAmount(line.taxable());
             oi.setCgstAmount(line.cgst());
             oi.setSgstAmount(line.sgst());
@@ -642,15 +630,21 @@ public class SalesDocumentService {
                     false,
                     item.quantity(),
                     item.rate(),
-                    discount));
+                    discount,
+                    item.taxType()));
             consumer.accept(
                     item,
                     new CalculatedLine(
-                            discount, r.taxable(), r.cgst(), r.sgst(), r.igst(), r.lineTotal()),
+                            discount,
+                            r.taxable(),
+                            r.cgst(),
+                            r.sgst(),
+                            r.igst().add(r.otherTax()),
+                            r.lineTotal()),
                     n++);
             sub = sub.add(item.quantity().multiply(item.rate()));
             disc = disc.add(discount);
-            tax = tax.add(r.cgst()).add(r.sgst()).add(r.igst());
+            tax = tax.add(r.cgst()).add(r.sgst()).add(r.igst()).add(r.otherTax());
             grand = grand.add(r.lineTotal());
         }
         return new LineTotals(sub, disc, tax, grand);
@@ -683,5 +677,6 @@ public class SalesDocumentService {
             BigDecimal igst,
             BigDecimal lineTotal) {}
 
-    private record LineTotals(BigDecimal subtotal, BigDecimal discountTotal, BigDecimal taxTotal, BigDecimal grandTotal) {}
+    private record LineTotals(
+            BigDecimal subtotal, BigDecimal discountTotal, BigDecimal taxTotal, BigDecimal grandTotal) {}
 }

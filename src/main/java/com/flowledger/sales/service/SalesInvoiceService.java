@@ -10,6 +10,8 @@ import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.sales.dto.SalesDtos.*;
 import com.flowledger.sales.entity.*;
 import com.flowledger.sales.repository.SalesInvoiceRepository;
+import com.flowledger.search.event.SearchIndexEventPublisher;
+import com.flowledger.search.model.SearchEntityType;
 import com.flowledger.tax.dto.GstCalculationDtos;
 import com.flowledger.tax.service.GstCalculationService;
 import java.math.*;
@@ -27,18 +29,21 @@ public class SalesInvoiceService {
     private final OrganizationRepository orgs;
     private final DocumentNumberService numbers;
     private final GstCalculationService gst;
+    private final SearchIndexEventPublisher searchEvents;
 
     public SalesInvoiceService(
             SalesInvoiceRepository r,
             InventoryService i,
             OrganizationRepository o,
             DocumentNumberService n,
-            GstCalculationService g) {
+            GstCalculationService g,
+            SearchIndexEventPublisher searchEvents) {
         repo = r;
         inventory = i;
         orgs = o;
         numbers = n;
         gst = g;
+        this.searchEvents = searchEvents;
     }
 
     @Transactional
@@ -46,7 +51,9 @@ public class SalesInvoiceService {
         SalesInvoice i = new SalesInvoice();
         i.setOrganizationId(TenantContext.getOrganizationId());
         apply(i, d);
-        return repo.save(i);
+        SalesInvoice saved = repo.save(i);
+        searchEvents.upsert(saved.getOrganizationId(), SearchEntityType.SALES_INVOICE, saved.getId());
+        return saved;
     }
 
     @Transactional
@@ -55,7 +62,9 @@ public class SalesInvoiceService {
         if (i.getStatus() != SalesInvoice.Status.DRAFT)
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only draft invoices can be updated");
         apply(i, d);
-        return repo.save(i);
+        SalesInvoice saved = repo.save(i);
+        searchEvents.upsert(saved.getOrganizationId(), SearchEntityType.SALES_INVOICE, saved.getId());
+        return saved;
     }
 
     @Transactional
@@ -104,7 +113,9 @@ public class SalesInvoiceService {
             i.setInventoryPosted(true);
         }
         i.setStatus(SalesInvoice.Status.CONFIRMED);
-        return repo.save(i);
+        SalesInvoice saved = repo.save(i);
+        searchEvents.upsert(saved.getOrganizationId(), SearchEntityType.SALES_INVOICE, saved.getId());
+        return saved;
     }
 
     @Transactional
@@ -131,7 +142,9 @@ public class SalesInvoiceService {
                         LocalDate.now()));
         i.setInventoryPosted(false);
         i.setStatus(SalesInvoice.Status.CANCELLED);
-        return repo.save(i);
+        SalesInvoice saved = repo.save(i);
+        searchEvents.upsert(saved.getOrganizationId(), SearchEntityType.SALES_INVOICE, saved.getId());
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -177,6 +190,7 @@ public class SalesInvoiceService {
             l.setRate(dline.rate());
             l.setDiscountPercent(z(dline.discountPercent()));
             l.setTaxRate(z(dline.taxRate()));
+            l.setTaxType(dline.taxType() == null || dline.taxType().isBlank() ? "GST" : dline.taxType().trim().toUpperCase());
             l.setLineOrder(n++);
             i.getItems().add(l);
         }
@@ -196,23 +210,27 @@ public class SalesInvoiceService {
                     .multiply(l.getDiscountPercent())
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
             var r = gst.calculate(new GstCalculationDtos.Request(
-                    o.getStateCode(), pos, l.getTaxRate(), i.isTaxInclusive(), l.getQuantity(), l.getRate(), discount));
+                    o.getStateCode(),
+                    pos,
+                    l.getTaxRate(),
+                    i.isTaxInclusive(),
+                    l.getQuantity(),
+                    l.getRate(),
+                    discount,
+                    l.getTaxType()));
             l.setDiscountAmount(discount);
             l.setTaxableAmount(r.taxable());
             l.setCgstAmount(r.cgst());
             l.setSgstAmount(r.sgst());
-            l.setIgstAmount(r.igst());
-            l.setCgstRate(
-                    r.cgst().signum() == 0 ? BigDecimal.ZERO : l.getTaxRate().divide(BigDecimal.valueOf(2)));
-            l.setSgstRate(l.getCgstRate());
-            l.setIgstRate(r.igst().signum() == 0 ? BigDecimal.ZERO : l.getTaxRate());
+            l.setIgstAmount(r.igst().add(r.otherTax()));
+            applyComponentRates(l, r);
             l.setLineTotal(r.lineTotal());
             sub = sub.add(l.getQuantity().multiply(l.getRate()));
             disc = disc.add(discount);
             taxable = taxable.add(r.taxable());
             cgst = cgst.add(r.cgst());
             sgst = sgst.add(r.sgst());
-            igst = igst.add(r.igst());
+            igst = igst.add(r.igst()).add(r.otherTax());
         }
         i.setSubtotal(sub);
         i.setDiscountTotal(disc);
@@ -227,6 +245,23 @@ public class SalesInvoiceService {
                 .add(i.getAdditionalCharges())
                 .add(i.getRoundOff()));
         i.setOutstandingAmount(i.getGrandTotal().subtract(i.getAmountPaid()));
+    }
+
+    private static void applyComponentRates(SalesInvoiceItem line, GstCalculationDtos.Response r) {
+        BigDecimal rate = line.getTaxRate();
+        if (r.cgst().signum() > 0) {
+            line.setCgstRate(rate.divide(BigDecimal.valueOf(2), 4, RoundingMode.HALF_UP));
+            line.setSgstRate(line.getCgstRate());
+            line.setIgstRate(BigDecimal.ZERO);
+        } else if (r.igst().signum() > 0 || r.otherTax().signum() > 0) {
+            line.setCgstRate(BigDecimal.ZERO);
+            line.setSgstRate(BigDecimal.ZERO);
+            line.setIgstRate(rate);
+        } else {
+            line.setCgstRate(BigDecimal.ZERO);
+            line.setSgstRate(BigDecimal.ZERO);
+            line.setIgstRate(BigDecimal.ZERO);
+        }
     }
 
     private static BigDecimal z(BigDecimal x) {

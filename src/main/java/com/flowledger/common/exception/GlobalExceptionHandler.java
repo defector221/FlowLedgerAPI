@@ -1,5 +1,6 @@
 package com.flowledger.common.exception;
 
+import com.flowledger.search.exception.SearchUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.LinkedHashMap;
@@ -16,6 +17,25 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(SearchUnavailableException.class)
+    ProblemDetail searchUnavailable(SearchUnavailableException ex, HttpServletRequest request) {
+        log.error("Search unavailable. method={}, uri={}", request.getMethod(), request.getRequestURI(), ex);
+        ProblemDetail result = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                ex.getMessage() == null || ex.getMessage().isBlank()
+                        ? "Search is temporarily unavailable. Please try again."
+                        : ex.getMessage());
+        result.setTitle("Search Unavailable");
+        result.setType(URI.create("https://flowledger.com/problems/503"));
+        result.setInstance(URI.create(request.getRequestURI()));
+        return result;
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    ProblemDetail badRequest(IllegalArgumentException ex, HttpServletRequest request) {
+        return problem(HttpStatus.BAD_REQUEST, ex.getMessage(), request, null);
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     ProblemDetail notFound(ResourceNotFoundException ex, HttpServletRequest request) {

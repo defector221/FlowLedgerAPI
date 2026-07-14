@@ -53,8 +53,8 @@ public class SubscriptionService {
                 .filter(this::isOrgAdmin)
                 .count();
         if (ownedOrgs >= plan.getMaxOrganizations()) {
-            throw new BusinessException("Organization limit reached for plan " + plan.getCode() + " ("
-                    + plan.getMaxOrganizations() + ")");
+            throw new BusinessException(
+                    "Organization limit reached for plan " + plan.getCode() + " (" + plan.getMaxOrganizations() + ")");
         }
     }
 
@@ -64,8 +64,8 @@ public class SubscriptionService {
                 .filter(m -> !"INACTIVE".equals(m.getStatus()))
                 .count();
         if (members >= plan.getMaxUsersPerOrg()) {
-            throw new BusinessException("User invite limit reached for plan " + plan.getCode() + " ("
-                    + plan.getMaxUsersPerOrg() + ")");
+            throw new BusinessException(
+                    "User invite limit reached for plan " + plan.getCode() + " (" + plan.getMaxUsersPerOrg() + ")");
         }
     }
 
@@ -112,11 +112,8 @@ public class SubscriptionService {
     }
 
     private SubscriptionPlan resolvePlanForUser(UUID userId) {
-        return subscriptions
-                .findByUserId(userId)
-                .map(this::requirePlan)
-                .orElseGet(() -> plans.findByCode("FREE")
-                        .orElseThrow(() -> new BusinessException("Default subscription plan unavailable")));
+        return subscriptions.findByUserId(userId).map(this::requirePlan).orElseGet(() -> plans.findByCode("FREE")
+                .orElseThrow(() -> new BusinessException("Default subscription plan unavailable")));
     }
 
     private SubscriptionPlan requirePlan(UserSubscription subscription) {

@@ -14,9 +14,7 @@ public final class PaymentDtos {
     private PaymentDtos() {}
 
     public record Allocation(
-            @NotBlank String documentType,
-            @NotNull UUID documentId,
-            @NotNull @DecimalMin("0.01") BigDecimal amount) {}
+            @NotBlank String documentType, @NotNull UUID documentId, @NotNull @DecimalMin("0.01") BigDecimal amount) {}
 
     public record PaymentRequest(
             @NotNull LocalDate paymentDate,

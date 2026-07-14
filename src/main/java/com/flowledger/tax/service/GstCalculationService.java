@@ -1,8 +1,10 @@
 package com.flowledger.tax.service;
 
+import com.flowledger.product.entity.TaxType;
 import com.flowledger.tax.dto.GstCalculationDtos.*;
-import java.math.*;
-import org.springframework.stereotype.*;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import org.springframework.stereotype.Service;
 
 @Service
 public class GstCalculationService {
@@ -16,14 +18,23 @@ public class GstCalculationService {
                 ? gross.multiply(hundred).divide(hundred.add(r.taxRate()), SCALE, RoundingMode.HALF_UP)
                 : gross.setScale(SCALE, RoundingMode.HALF_UP);
         BigDecimal tax = taxable.multiply(r.taxRate()).divide(hundred, SCALE, RoundingMode.HALF_UP);
-        boolean intra = r.organizationStateCode()
-                .trim()
-                .equalsIgnoreCase(r.placeOfSupplyStateCode().trim());
-        BigDecimal cgst = intra ? tax.divide(BigDecimal.valueOf(2), SCALE, RoundingMode.HALF_UP) : BigDecimal.ZERO;
-        BigDecimal sgst = intra ? tax.subtract(cgst) : BigDecimal.ZERO;
-        BigDecimal igst = intra ? BigDecimal.ZERO : tax;
         BigDecimal total =
                 Boolean.TRUE.equals(r.taxInclusive()) ? gross.setScale(SCALE, RoundingMode.HALF_UP) : taxable.add(tax);
-        return new Response(taxable, cgst, sgst, igst, total);
+
+        TaxType type = TaxType.from(r.taxType());
+        return switch (type) {
+            case IGST -> new Response(taxable, BigDecimal.ZERO, BigDecimal.ZERO, tax, BigDecimal.ZERO, total);
+            case OTHER -> new Response(taxable, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, tax, total);
+            case GST -> {
+                boolean intra = r.organizationStateCode()
+                        .trim()
+                        .equalsIgnoreCase(r.placeOfSupplyStateCode().trim());
+                BigDecimal cgst =
+                        intra ? tax.divide(BigDecimal.valueOf(2), SCALE, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+                BigDecimal sgst = intra ? tax.subtract(cgst) : BigDecimal.ZERO;
+                BigDecimal igst = intra ? BigDecimal.ZERO : tax;
+                yield new Response(taxable, cgst, sgst, igst, BigDecimal.ZERO, total);
+            }
+        };
     }
 }

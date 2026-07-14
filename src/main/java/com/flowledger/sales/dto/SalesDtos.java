@@ -17,13 +17,11 @@ public final class SalesDtos {
             UUID unitId,
             @NotNull @PositiveOrZero BigDecimal rate,
             BigDecimal discountPercent,
-            BigDecimal taxRate) {}
+            BigDecimal taxRate,
+            String taxType) {}
 
     public record ChallanItem(
-            @NotNull UUID productId,
-            String description,
-            @NotNull @Positive BigDecimal quantity,
-            UUID unitId) {}
+            @NotNull UUID productId, String description, @NotNull @Positive BigDecimal quantity, UUID unitId) {}
 
     public record ReturnItem(
             @NotNull UUID productId,

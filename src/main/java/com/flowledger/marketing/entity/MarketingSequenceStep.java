@@ -33,8 +33,11 @@ public class MarketingSequenceStep {
     @Column(name = "subject_template")
     private String subjectTemplate;
 
-    @Column(name = "body_template", nullable = false, columnDefinition = "text")
-    private String bodyTemplate;
+    @Column(name = "body_template", columnDefinition = "text")
+    private String bodyTemplate = "";
+
+    @Column(name = "email_template_id")
+    private UUID emailTemplateId;
 
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;

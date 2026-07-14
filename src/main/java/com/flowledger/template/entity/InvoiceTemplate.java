@@ -26,6 +26,16 @@ public class InvoiceTemplate extends AuditedEntity {
     @Column(name = "config_json", columnDefinition = "jsonb")
     JsonNode configJson;
 
+    @Column(name = "editor_mode", nullable = false)
+    String editorMode = "SECTION";
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "design_json", columnDefinition = "jsonb")
+    JsonNode designJson;
+
+    @Column(columnDefinition = "text")
+    String html;
+
     @Version
     Long version;
 }

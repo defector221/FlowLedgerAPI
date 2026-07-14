@@ -1,6 +1,7 @@
 package com.flowledger.template.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flowledger.common.exception.BusinessException;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.pdf.InvoicePdfService;
 import com.flowledger.template.dto.TemplateDtos.Preset;
@@ -42,7 +43,8 @@ public class InvoiceTemplateService {
     }
 
     public InvoiceTemplate create(TemplateRequest r) {
-        if (r.configJson() == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "configJson is required");
+        String mode = normalizeMode(r.editorMode());
+        validateContent(mode, r);
         if (!em.createQuery(
                         "from InvoiceTemplate t where t.organizationId=:org and t.templateName=:name",
                         InvoiceTemplate.class)
@@ -55,19 +57,24 @@ public class InvoiceTemplateService {
         t.setTemplateName(r.templateName());
         t.setPresetKey(r.presetKey());
         t.setDocumentType(normalizeType(r.documentType()));
-        t.setConfigJson(r.configJson());
+        t.setEditorMode(mode);
+        applyContent(t, mode, r);
         em.persist(t);
         return t;
     }
 
     public InvoiceTemplate update(UUID id, TemplateRequest r) {
         InvoiceTemplate t = get(id);
+        String mode =
+                r.editorMode() == null || r.editorMode().isBlank() ? t.getEditorMode() : normalizeMode(r.editorMode());
+        validateContent(mode, r);
         t.setTemplateName(r.templateName());
         t.setPresetKey(r.presetKey());
         if (r.documentType() != null && !r.documentType().isBlank()) {
             t.setDocumentType(normalizeType(r.documentType()));
         }
-        if (r.configJson() != null) t.setConfigJson(r.configJson());
+        t.setEditorMode(mode);
+        applyContent(t, mode, r);
         return t;
     }
 
@@ -117,10 +124,50 @@ public class InvoiceTemplateService {
     }
 
     public byte[] preview(TemplatePreviewRequest r) {
-        if (r == null || r.configJson() == null) {
+        if (r == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Preview request is required");
+        }
+        String mode = normalizeMode(r.editorMode());
+        if ("UNLAYER".equals(mode)) {
+            if (r.html() == null || r.html().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "html is required for UNLAYER preview");
+            }
+            return pdf.renderPreview(normalizeType(r.documentType()), r.sampleInvoiceId(), null, mode, r.html());
+        }
+        if (r.configJson() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "configJson is required");
         }
-        return pdf.renderWithConfig(r.configJson(), normalizeType(r.documentType()), r.sampleInvoiceId());
+        return pdf.renderPreview(normalizeType(r.documentType()), r.sampleInvoiceId(), r.configJson(), "SECTION", null);
+    }
+
+    private void validateContent(String mode, TemplateRequest r) {
+        if ("UNLAYER".equals(mode)) {
+            if (r.html() == null || r.html().isBlank()) {
+                throw new BusinessException("Exported HTML is required for design templates");
+            }
+        } else if (r.configJson() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "configJson is required");
+        }
+    }
+
+    private void applyContent(InvoiceTemplate t, String mode, TemplateRequest r) {
+        if ("UNLAYER".equals(mode)) {
+            t.setDesignJson(r.designJson());
+            t.setHtml(r.html());
+            if (r.configJson() != null) {
+                t.setConfigJson(r.configJson());
+            } else if (t.getConfigJson() == null) {
+                t.setConfigJson(json.valueToTree(Map.of("header", Map.of("title", "INVOICE"))));
+            }
+        } else {
+            t.setConfigJson(r.configJson());
+            if (r.designJson() != null) {
+                t.setDesignJson(r.designJson());
+            }
+            if (r.html() != null) {
+                t.setHtml(r.html());
+            }
+        }
     }
 
     private Preset preset(
@@ -167,5 +214,10 @@ public class InvoiceTemplateService {
     private static String normalizeType(String documentType) {
         if (documentType == null || documentType.isBlank()) return "SALES_INVOICE";
         return documentType.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static String normalizeMode(String editorMode) {
+        if (editorMode == null || editorMode.isBlank()) return "SECTION";
+        return editorMode.trim().toUpperCase(Locale.ROOT);
     }
 }

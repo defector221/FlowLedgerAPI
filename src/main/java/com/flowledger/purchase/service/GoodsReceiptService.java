@@ -68,6 +68,7 @@ public class GoodsReceiptService {
                                 x.getQuantity(),
                                 x.getRate(),
                                 null,
+                                null,
                                 null))
                         .toList()
                 : r.items();

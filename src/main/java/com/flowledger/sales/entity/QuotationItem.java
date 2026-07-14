@@ -35,5 +35,9 @@ public class QuotationItem {
             sgstAmount = BigDecimal.ZERO,
             igstAmount = BigDecimal.ZERO,
             lineTotal = BigDecimal.ZERO;
+
+    @Column(name = "tax_type", nullable = false, length = 16)
+    private String taxType = "GST";
+
     private int lineOrder;
 }

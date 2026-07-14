@@ -2,6 +2,9 @@ package com.flowledger.marketing.service;
 
 import com.flowledger.common.exception.BusinessException;
 import com.flowledger.common.service.OrganizationScopedService;
+import com.flowledger.common.util.MergeTags;
+import com.flowledger.emailtemplate.entity.EmailTemplate;
+import com.flowledger.emailtemplate.repository.EmailTemplateRepository;
 import com.flowledger.lead.entity.Lead;
 import com.flowledger.lead.repository.LeadRepository;
 import com.flowledger.marketing.dto.MarketingDtos.*;
@@ -17,8 +20,10 @@ import com.flowledger.notification.WhatsAppNotificationService;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -33,6 +38,7 @@ public class MarketingSequenceService extends OrganizationScopedService {
     private final MarketingEnrollmentRepository enrollments;
     private final MarketingSendRepository sends;
     private final LeadRepository leads;
+    private final EmailTemplateRepository emailTemplates;
     private final EmailNotificationService emailNotifications;
     private final WhatsAppNotificationService whatsAppNotifications;
 
@@ -41,12 +47,14 @@ public class MarketingSequenceService extends OrganizationScopedService {
             MarketingEnrollmentRepository enrollments,
             MarketingSendRepository sends,
             LeadRepository leads,
+            EmailTemplateRepository emailTemplates,
             EmailNotificationService emailNotifications,
             WhatsAppNotificationService whatsAppNotifications) {
         this.sequences = sequences;
         this.enrollments = enrollments;
         this.sends = sends;
         this.leads = leads;
+        this.emailTemplates = emailTemplates;
         this.emailNotifications = emailNotifications;
         this.whatsAppNotifications = whatsAppNotifications;
     }
@@ -71,7 +79,9 @@ public class MarketingSequenceService extends OrganizationScopedService {
         sequence.setDescription(dto.description());
         sequence.setTriggerType(dto.triggerType().toUpperCase(Locale.ROOT));
         sequence.setStatus(
-                dto.status() == null || dto.status().isBlank() ? "DRAFT" : dto.status().toUpperCase(Locale.ROOT));
+                dto.status() == null || dto.status().isBlank()
+                        ? "DRAFT"
+                        : dto.status().toUpperCase(Locale.ROOT));
 
         List<MarketingSequenceStep> steps = new ArrayList<>();
         int order = 1;
@@ -80,9 +90,24 @@ public class MarketingSequenceService extends OrganizationScopedService {
             step.setSequence(sequence);
             step.setStepOrder(order++);
             step.setDelayDays(stepDto.delayDays());
-            step.setChannel(stepDto.channel().toUpperCase(Locale.ROOT));
+            String channel = stepDto.channel().toUpperCase(Locale.ROOT);
+            step.setChannel(channel);
             step.setSubjectTemplate(stepDto.subject());
-            step.setBodyTemplate(stepDto.body());
+            step.setEmailTemplateId(stepDto.emailTemplateId());
+            if ("EMAIL".equals(channel) && stepDto.emailTemplateId() != null) {
+                EmailTemplate template = required(
+                        emailTemplates.findByIdAndOrganizationId(stepDto.emailTemplateId(), orgId()), "Email template");
+                if (step.getSubjectTemplate() == null
+                        || step.getSubjectTemplate().isBlank()) {
+                    step.setSubjectTemplate(template.getSubject());
+                }
+                step.setBodyTemplate(template.getHtml() == null ? "" : template.getHtml());
+            } else {
+                if (stepDto.body() == null || stepDto.body().isBlank()) {
+                    throw new BusinessException("Step body is required when no email template is selected");
+                }
+                step.setBodyTemplate(stepDto.body());
+            }
             steps.add(step);
         }
         sequence.getSteps().clear();
@@ -202,8 +227,10 @@ public class MarketingSequenceService extends OrganizationScopedService {
 
     private void dispatchStep(MarketingEnrollment enrollment, MarketingSequenceStep step, OffsetDateTime now) {
         String channel = step.getChannel() == null ? "EMAIL" : step.getChannel().toUpperCase(Locale.ROOT);
-        String subject = step.getSubjectTemplate() == null ? "FlowLedger update" : step.getSubjectTemplate();
-        String body = step.getBodyTemplate() == null ? "" : step.getBodyTemplate();
+        Map<String, String> tags = mergeTagsForEnrollment(enrollment);
+        String subject = MergeTags.apply(
+                step.getSubjectTemplate() == null ? "FlowLedger update" : step.getSubjectTemplate(), tags);
+        String body = MergeTags.apply(step.getBodyTemplate() == null ? "" : step.getBodyTemplate(), tags);
         MarketingSend send = new MarketingSend();
         send.setOrganizationId(enrollment.getOrganizationId());
         send.setEnrollmentId(enrollment.getId());
@@ -221,6 +248,26 @@ public class MarketingSequenceService extends OrganizationScopedService {
                     if (recipient == null || recipient.isBlank()) {
                         send.setStatus("SKIPPED");
                         send.setErrorMessage("No email on enrollment");
+                    } else if (step.getEmailTemplateId() != null || looksLikeHtml(body)) {
+                        String html = body;
+                        if (step.getEmailTemplateId() != null) {
+                            EmailTemplate template = emailTemplates
+                                    .findByIdAndOrganizationId(
+                                            step.getEmailTemplateId(), enrollment.getOrganizationId())
+                                    .orElse(null);
+                            if (template != null && template.getHtml() != null) {
+                                html = MergeTags.apply(template.getHtml(), tags);
+                                if (step.getSubjectTemplate() == null
+                                        || step.getSubjectTemplate().isBlank()) {
+                                    subject = MergeTags.apply(template.getSubject(), tags);
+                                    send.setSubject(subject);
+                                }
+                            }
+                        }
+                        emailNotifications.sendMarketingHtml(recipient, subject, html);
+                        send.setBody(html);
+                        send.setStatus("SENT");
+                        send.setSentAt(now);
                     } else {
                         emailNotifications.sendMarketing(recipient, subject, body);
                         send.setStatus("SENT");
@@ -253,6 +300,38 @@ public class MarketingSequenceService extends OrganizationScopedService {
         sends.save(send);
     }
 
+    private Map<String, String> mergeTagsForEnrollment(MarketingEnrollment enrollment) {
+        Map<String, String> tags = new HashMap<>();
+        if ("LEAD".equalsIgnoreCase(enrollment.getRecipientType())) {
+            leads.findByIdAndOrganizationId(enrollment.getRecipientId(), enrollment.getOrganizationId())
+                    .ifPresent(lead -> {
+                        tags.put("leadName", nullToEmpty(lead.getLeadName()));
+                        tags.put("firstName", firstName(lead.getLeadName()));
+                        tags.put("company", nullToEmpty(lead.getCompanyName()));
+                        tags.put("email", nullToEmpty(lead.getEmail()));
+                        tags.put("phone", nullToEmpty(lead.getPhone()));
+                    });
+        }
+        tags.putIfAbsent("email", nullToEmpty(enrollment.getEmail()));
+        tags.putIfAbsent("phone", nullToEmpty(enrollment.getPhone()));
+        return tags;
+    }
+
+    private static boolean looksLikeHtml(String body) {
+        return body != null && body.contains("<") && body.contains(">");
+    }
+
+    private static String firstName(String fullName) {
+        if (fullName == null || fullName.isBlank()) {
+            return "";
+        }
+        return fullName.trim().split("\\s+")[0];
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
     private SequenceResponse toSequenceResponse(MarketingSequence sequence) {
         List<StepResponse> steps = sequence.getSteps() == null
                 ? List.of()
@@ -264,7 +343,8 @@ public class MarketingSequenceService extends OrganizationScopedService {
                                 step.getDelayDays(),
                                 step.getChannel(),
                                 step.getSubjectTemplate(),
-                                step.getBodyTemplate()))
+                                step.getBodyTemplate(),
+                                step.getEmailTemplateId()))
                         .toList();
         return new SequenceResponse(
                 sequence.getId(),
