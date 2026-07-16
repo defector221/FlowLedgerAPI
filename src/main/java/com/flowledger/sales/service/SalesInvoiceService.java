@@ -1,5 +1,8 @@
 package com.flowledger.sales.service;
 
+import com.flowledger.accounting.domain.AccountingStatus;
+import com.flowledger.accounting.domain.JournalSource;
+import com.flowledger.accounting.service.AccountingPostingService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.customer.repository.CustomerRepository;
@@ -49,6 +52,7 @@ public class SalesInvoiceService {
     private final DocumentNumberService numbers;
     private final GstCalculationService gst;
     private final SearchIndexEventPublisher searchEvents;
+    private final AccountingPostingService accounting;
 
     public SalesInvoiceService(
             SalesInvoiceRepository r,
@@ -61,7 +65,8 @@ public class SalesInvoiceService {
             CustomerRepository customers,
             DocumentNumberService n,
             GstCalculationService g,
-            SearchIndexEventPublisher searchEvents) {
+            SearchIndexEventPublisher searchEvents,
+            AccountingPostingService accounting) {
         repo = r;
         inventory = i;
         this.products = products;
@@ -73,6 +78,7 @@ public class SalesInvoiceService {
         numbers = n;
         gst = g;
         this.searchEvents = searchEvents;
+        this.accounting = accounting;
     }
 
     @Transactional
@@ -181,6 +187,7 @@ public class SalesInvoiceService {
         }
         i.setStatus(SalesInvoice.Status.CONFIRMED);
         SalesInvoice saved = repo.save(i);
+        accounting.postSalesInvoice(saved);
         searchEvents.upsert(saved.getOrganizationId(), SearchEntityType.SALES_INVOICE, saved.getId());
         return toDetail(saved);
     }
@@ -212,6 +219,10 @@ public class SalesInvoiceService {
         }
         i.setInventoryPosted(false);
         i.setStatus(SalesInvoice.Status.CANCELLED);
+        if (i.getAccountingStatus() == AccountingStatus.POSTED) {
+            accounting.reverseDocumentJournal(i.getOrganizationId(), JournalSource.SALES_INVOICE, i.getId());
+            i.setAccountingStatus(AccountingStatus.REVERSED);
+        }
         SalesInvoice saved = repo.save(i);
         searchEvents.upsert(saved.getOrganizationId(), SearchEntityType.SALES_INVOICE, saved.getId());
         return toDetail(saved);

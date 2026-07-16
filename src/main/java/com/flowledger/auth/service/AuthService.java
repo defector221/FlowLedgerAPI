@@ -12,10 +12,12 @@ import com.flowledger.notification.NotificationService;
 import com.flowledger.notification.NotificationType;
 import com.flowledger.organization.entity.*;
 import com.flowledger.organization.repository.*;
+import com.flowledger.accounting.service.ChartOfAccountsBootstrap;
 import com.flowledger.subscription.service.SubscriptionService;
 import java.time.*;
 import java.util.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ public class AuthService {
     private final OrganizationMembershipService membershipService;
     private final SubscriptionService subscriptions;
     private final NotificationService notifications;
+    private final ObjectProvider<ChartOfAccountsBootstrap> accountingBootstrap;
 
     @Value("${flowledger.app.frontend-url}")
     private String frontendUrl;
@@ -50,7 +53,8 @@ public class AuthService {
             CustomUserDetailsService details,
             OrganizationMembershipService membershipService,
             SubscriptionService subscriptions,
-            NotificationService notifications) {
+            NotificationService notifications,
+            ObjectProvider<ChartOfAccountsBootstrap> accountingBootstrap) {
         this.users = users;
         this.roles = roles;
         this.refreshTokens = refreshTokens;
@@ -62,6 +66,7 @@ public class AuthService {
         this.membershipService = membershipService;
         this.subscriptions = subscriptions;
         this.notifications = notifications;
+        this.accountingBootstrap = accountingBootstrap;
     }
 
     @Transactional
@@ -131,6 +136,7 @@ public class AuthService {
         Role role = roles.findByCode("ORGANIZATION_ADMIN")
                 .orElseThrow(() -> new BusinessException("Organization admin role is unavailable"));
         membershipService.createAdminMembership(user, organization, role);
+        bootstrapAccounting(organization);
         return tokens(user, organization.getId());
     }
 
@@ -264,7 +270,15 @@ public class AuthService {
         users.save(user);
         membershipService.createAdminMembership(user, organization, role);
         subscriptions.ensureDefaultSubscription(user.getId(), "FREE");
+        bootstrapAccounting(organization);
         return tokens(user, organization.getId());
+    }
+
+    private void bootstrapAccounting(Organization organization) {
+        ChartOfAccountsBootstrap bootstrap = accountingBootstrap.getIfAvailable();
+        if (bootstrap != null) {
+            bootstrap.initializeOrganization(organization.getId(), organization.getFinancialYearStart());
+        }
     }
 
     private LoginResponse tokens(User user, UUID organizationId) {

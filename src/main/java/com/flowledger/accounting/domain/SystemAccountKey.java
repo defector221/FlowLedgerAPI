@@ -1,0 +1,26 @@
+package com.flowledger.accounting.domain;
+
+public enum SystemAccountKey {
+    CASH,
+    BANK,
+    ACCOUNTS_RECEIVABLE,
+    ACCOUNTS_PAYABLE,
+    INVENTORY,
+    SALES,
+    PURCHASE,
+    INPUT_CGST,
+    INPUT_SGST,
+    INPUT_IGST,
+    OUTPUT_CGST,
+    OUTPUT_SGST,
+    OUTPUT_IGST,
+    COGS,
+    DISCOUNT_ALLOWED,
+    DISCOUNT_RECEIVED,
+    ROUND_OFF_INCOME,
+    ROUND_OFF_EXPENSE,
+    RETAINED_EARNINGS,
+    CAPITAL,
+    OPERATING_EXPENSES,
+    OTHER_INCOME
+}
