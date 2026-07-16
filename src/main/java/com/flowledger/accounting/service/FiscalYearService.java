@@ -53,7 +53,8 @@ public class FiscalYearService {
         fiscalYear.setStartDate(request.startDate());
         fiscalYear.setEndDate(request.endDate());
         fiscalYear.setStatus(FiscalYearStatus.OPEN);
-        fiscalYear.setCurrent(fiscalYears.findByOrganizationIdAndCurrentTrue(org).isEmpty());
+        fiscalYear.setCurrent(
+                fiscalYears.findByOrganizationIdAndCurrentTrue(org).isEmpty());
         FiscalYear saved = fiscalYears.save(fiscalYear);
         createMonthlyPeriods(org, saved);
         return toResponse(saved);
@@ -97,6 +98,12 @@ public class FiscalYearService {
 
     private static PeriodResponse toResponse(AccountingPeriod p) {
         return new PeriodResponse(
-                p.getId(), p.getFiscalYearId(), p.getPeriodNumber(), p.getName(), p.getStartDate(), p.getEndDate(), p.getStatus());
+                p.getId(),
+                p.getFiscalYearId(),
+                p.getPeriodNumber(),
+                p.getName(),
+                p.getStartDate(),
+                p.getEndDate(),
+                p.getStatus());
     }
 }

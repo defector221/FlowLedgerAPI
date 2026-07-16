@@ -91,7 +91,8 @@ class JournalValidationServiceTest {
                         List.of(
                                 new JournalValidationService.LineInput(
                                         a1, new BigDecimal("50.00"), new BigDecimal("50.00")),
-                                new JournalValidationService.LineInput(a2, BigDecimal.ZERO, new BigDecimal("100.00")))));
+                                new JournalValidationService.LineInput(
+                                        a2, BigDecimal.ZERO, new BigDecimal("100.00")))));
     }
 
     private static Account account(UUID id, boolean active) {

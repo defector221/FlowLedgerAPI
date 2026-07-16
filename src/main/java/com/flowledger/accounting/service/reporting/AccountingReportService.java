@@ -202,7 +202,10 @@ public class AccountingReportService {
         UUID org = TenantContext.getOrganizationId();
         List<GlLineResponse> result = new ArrayList<>();
         List<JournalEntry> entries = journals.findByOrganizationIdAndStatusAndEntryDateBetween(
-                org, JournalStatus.POSTED, from != null ? from : LocalDate.of(1970, 1, 1), to != null ? to : LocalDate.of(2999, 12, 31));
+                org,
+                JournalStatus.POSTED,
+                from != null ? from : LocalDate.of(1970, 1, 1),
+                to != null ? to : LocalDate.of(2999, 12, 31));
         Map<UUID, Account> accountMap = new HashMap<>();
         for (Account a : accounts.findByOrganizationIdOrderByAccountCodeAsc(org)) {
             accountMap.put(a.getId(), a);
@@ -233,9 +236,7 @@ public class AccountingReportService {
                 org, JournalStatus.POSTED, LocalDate.of(1970, 1, 1), LocalDate.of(2999, 12, 31))) {
             if (entry.getTotalDebit().compareTo(entry.getTotalCredit()) != 0) {
                 issues.add(new IntegrityIssue(
-                        "UNBALANCED",
-                        "Posted journal " + entry.getEntryNumber() + " is unbalanced",
-                        entry.getId()));
+                        "UNBALANCED", "Posted journal " + entry.getEntryNumber() + " is unbalanced", entry.getId()));
             }
             List<JournalEntryLine> journalLines = lines.findByJournalEntryIdOrderByLineNumberAsc(entry.getId());
             BigDecimal lineDebit = AccountingMoney.zero();
@@ -281,24 +282,19 @@ public class AccountingReportService {
             }
         }
         ProfitAndLossResponse pl = profitAndLoss(fyStart, today);
-        long journalCount = journals
-                .findByOrganizationIdAndStatusAndEntryDateBetween(org, JournalStatus.POSTED, fyStart, today)
+        long journalCount = journals.findByOrganizationIdAndStatusAndEntryDateBetween(
+                        org, JournalStatus.POSTED, fyStart, today)
                 .size();
         return new DashboardSummaryResponse(
-                receivables,
-                payables,
-                cashBank,
-                pl.netProfit(),
-                journalCount,
-                journals.countUnbalancedPosted(org));
+                receivables, payables, cashBank, pl.netProfit(), journalCount, journals.countUnbalancedPosted(org));
     }
 
     private Map<UUID, MutableTotals> accumulate(UUID org, LocalDate from, LocalDate to) {
         LocalDate fromDate = from != null ? from : LocalDate.of(1970, 1, 1);
         LocalDate toDate = to != null ? to : LocalDate.of(2999, 12, 31);
         Map<UUID, MutableTotals> totals = new HashMap<>();
-        for (JournalEntry entry :
-                journals.findByOrganizationIdAndStatusAndEntryDateBetween(org, JournalStatus.POSTED, fromDate, toDate)) {
+        for (JournalEntry entry : journals.findByOrganizationIdAndStatusAndEntryDateBetween(
+                org, JournalStatus.POSTED, fromDate, toDate)) {
             // include REVERSED originals and their compensating SYSTEM posts (both POSTED historically —
             // reversed originals flip to REVERSED status so they drop out; compensating remains POSTED)
             for (JournalEntryLine line : lines.findByJournalEntryIdOrderByLineNumberAsc(entry.getId())) {

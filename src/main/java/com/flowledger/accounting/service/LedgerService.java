@@ -34,8 +34,7 @@ public class LedgerService {
     @Transactional(readOnly = true)
     public List<LedgerLineResponse> accountLedger(UUID accountId, LocalDate from, LocalDate to) {
         UUID org = TenantContext.getOrganizationId();
-        Account account = accounts
-                .findByIdAndOrganizationId(accountId, org)
+        Account account = accounts.findByIdAndOrganizationId(accountId, org)
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
         return build(lines.findPostedForAccount(org, accountId, from, to), account);
     }
@@ -63,8 +62,7 @@ public class LedgerService {
             Account account = forcedAccount != null
                     ? forcedAccount
                     : accounts.findById(line.getAccountId()).orElse(null);
-            running = running
-                    .add(AccountingMoney.normalize(line.getDebitAmount()))
+            running = running.add(AccountingMoney.normalize(line.getDebitAmount()))
                     .subtract(AccountingMoney.normalize(line.getCreditAmount()));
             result.add(new LedgerLineResponse(
                     entry.getId(),

@@ -71,7 +71,9 @@ public class AccountingPostingService {
     @Transactional
     public InitializeResponse initialize() {
         UUID orgId = TenantContext.getOrganizationId();
-        Organization org = organizations.findById(orgId).orElseThrow(() -> new ResourceNotFoundException("Organization not found"));
+        Organization org = organizations
+                .findById(orgId)
+                .orElseThrow(() -> new ResourceNotFoundException("Organization not found"));
         bootstrap.initializeOrganization(orgId, org.getFinancialYearStart());
         int count = accounts.findByOrganizationIdOrderByAccountCodeAsc(orgId).size();
         var fy = fiscalYears
@@ -150,7 +152,8 @@ public class AccountingPostingService {
                 entry.getEntryDate(),
                 entry.getSource(),
                 existing.stream()
-                        .map(l -> new JournalValidationService.LineInput(l.getAccountId(), l.getDebitAmount(), l.getCreditAmount()))
+                        .map(l -> new JournalValidationService.LineInput(
+                                l.getAccountId(), l.getDebitAmount(), l.getCreditAmount()))
                         .toList());
         entry.setAccountingPeriodId(result.period().getId());
         entry.setFiscalYearId(result.period().getFiscalYearId());
@@ -213,7 +216,8 @@ public class AccountingPostingService {
         }
         UUID org = invoice.getOrganizationId();
         ensureInitialized(org);
-        var existing = journals.findByOrganizationIdAndSourceAndReferenceId(org, JournalSource.SALES_INVOICE, invoice.getId());
+        var existing =
+                journals.findByOrganizationIdAndSourceAndReferenceId(org, JournalSource.SALES_INVOICE, invoice.getId());
         if (existing.isPresent()) {
             linkDocument(invoice, existing.get());
             return existing.get();
@@ -225,11 +229,17 @@ public class AccountingPostingService {
                 "AR " + invoice.getInvoiceNumber(),
                 invoice.getCustomerId(),
                 null));
-        BigDecimal salesAmount = AccountingMoney.normalize(invoice.getTaxableAmount() != null && invoice.getTaxableAmount().signum() > 0
-                ? invoice.getTaxableAmount()
-                : invoice.getSubtotal());
+        BigDecimal salesAmount = AccountingMoney.normalize(
+                invoice.getTaxableAmount() != null && invoice.getTaxableAmount().signum() > 0
+                        ? invoice.getTaxableAmount()
+                        : invoice.getSubtotal());
         if (AccountingMoney.isPositive(salesAmount)) {
-            built.add(credit(system(org, SystemAccountKey.SALES), salesAmount, "Sales " + invoice.getInvoiceNumber(), null, null));
+            built.add(credit(
+                    system(org, SystemAccountKey.SALES),
+                    salesAmount,
+                    "Sales " + invoice.getInvoiceNumber(),
+                    null,
+                    null));
         }
         addTaxCredit(built, org, SystemAccountKey.OUTPUT_CGST, invoice.getCgstTotal(), invoice.getInvoiceNumber());
         addTaxCredit(built, org, SystemAccountKey.OUTPUT_SGST, invoice.getSgstTotal(), invoice.getInvoiceNumber());
@@ -258,18 +268,24 @@ public class AccountingPostingService {
         }
         UUID org = invoice.getOrganizationId();
         ensureInitialized(org);
-        var existing =
-                journals.findByOrganizationIdAndSourceAndReferenceId(org, JournalSource.PURCHASE_INVOICE, invoice.getId());
+        var existing = journals.findByOrganizationIdAndSourceAndReferenceId(
+                org, JournalSource.PURCHASE_INVOICE, invoice.getId());
         if (existing.isPresent()) {
             linkPurchase(invoice, existing.get());
             return existing.get();
         }
         List<JournalLineRequest> built = new ArrayList<>();
-        BigDecimal purchaseAmount = AccountingMoney.normalize(invoice.getTaxableAmount() != null && invoice.getTaxableAmount().signum() > 0
-                ? invoice.getTaxableAmount()
-                : invoice.getSubtotal());
+        BigDecimal purchaseAmount = AccountingMoney.normalize(
+                invoice.getTaxableAmount() != null && invoice.getTaxableAmount().signum() > 0
+                        ? invoice.getTaxableAmount()
+                        : invoice.getSubtotal());
         if (AccountingMoney.isPositive(purchaseAmount)) {
-            built.add(debit(system(org, SystemAccountKey.PURCHASE), purchaseAmount, "Purchase " + invoice.getInvoiceNumber(), null, null));
+            built.add(debit(
+                    system(org, SystemAccountKey.PURCHASE),
+                    purchaseAmount,
+                    "Purchase " + invoice.getInvoiceNumber(),
+                    null,
+                    null));
         }
         addTaxDebit(built, org, SystemAccountKey.INPUT_CGST, invoice.getCgstTotal(), invoice.getInvoiceNumber());
         addTaxDebit(built, org, SystemAccountKey.INPUT_SGST, invoice.getSgstTotal(), invoice.getInvoiceNumber());
@@ -338,7 +354,8 @@ public class AccountingPostingService {
                 source,
                 source.name(),
                 payment.getId(),
-                (payment.getPaymentType() == Payment.Type.RECEIPT ? "Receipt " : "Payment ") + payment.getPaymentNumber(),
+                (payment.getPaymentType() == Payment.Type.RECEIPT ? "Receipt " : "Payment ")
+                        + payment.getPaymentNumber(),
                 payment.getPaymentNumber(),
                 built);
         linkPayment(payment, entry);
@@ -349,8 +366,8 @@ public class AccountingPostingService {
     public JournalEntry postSalesReturn(SalesReturn salesReturn) {
         UUID org = salesReturn.getOrganizationId();
         ensureInitialized(org);
-        var existing =
-                journals.findByOrganizationIdAndSourceAndReferenceId(org, JournalSource.SALES_RETURN, salesReturn.getId());
+        var existing = journals.findByOrganizationIdAndSourceAndReferenceId(
+                org, JournalSource.SALES_RETURN, salesReturn.getId());
         if (existing.isPresent()) {
             return existing.get();
         }
@@ -383,8 +400,8 @@ public class AccountingPostingService {
     public JournalEntry postCreditNote(CreditNote creditNote) {
         UUID org = creditNote.getOrganizationId();
         ensureInitialized(org);
-        var existing =
-                journals.findByOrganizationIdAndSourceAndReferenceId(org, JournalSource.CREDIT_NOTE, creditNote.getId());
+        var existing = journals.findByOrganizationIdAndSourceAndReferenceId(
+                org, JournalSource.CREDIT_NOTE, creditNote.getId());
         if (existing.isPresent()) {
             return existing.get();
         }
@@ -449,11 +466,12 @@ public class AccountingPostingService {
 
     @Transactional
     public void reverseDocumentJournal(UUID organizationId, JournalSource source, UUID referenceId) {
-        journals.findByOrganizationIdAndSourceAndReferenceId(organizationId, source, referenceId).ifPresent(entry -> {
-            if (entry.getStatus() == JournalStatus.POSTED) {
-                reverseJournalEntry(entry.getId());
-            }
-        });
+        journals.findByOrganizationIdAndSourceAndReferenceId(organizationId, source, referenceId)
+                .ifPresent(entry -> {
+                    if (entry.getStatus() == JournalStatus.POSTED) {
+                        reverseJournalEntry(entry.getId());
+                    }
+                });
     }
 
     private JournalEntry postAuto(
@@ -468,7 +486,16 @@ public class AccountingPostingService {
             List<JournalLineRequest> built) {
         var result = validation.validate(org, entryDate, source, toLineInputs(built));
         JournalEntry entry = newJournal(
-                org, entryDate, result, voucherType, source, referenceType, referenceId, description, voucherNumber, JournalStatus.POSTED);
+                org,
+                entryDate,
+                result,
+                voucherType,
+                source,
+                referenceType,
+                referenceId,
+                description,
+                voucherNumber,
+                JournalStatus.POSTED);
         persistLines(org, entry, built);
         entry.setTotalDebit(result.totalDebit());
         entry.setTotalCredit(result.totalCredit());
@@ -489,12 +516,7 @@ public class AccountingPostingService {
             JournalStatus status) {
         Organization organization = organizations.findById(org).orElseThrow();
         String entryNumber = numbers.next(
-                org,
-                "JOURNAL",
-                "JV",
-                "{PREFIX}/{FY}/{SEQ:6}",
-                organization.getFinancialYearStart(),
-                entryDate);
+                org, "JOURNAL", "JV", "{PREFIX}/{FY}/{SEQ:6}", organization.getFinancialYearStart(), entryDate);
         JournalEntry entry = new JournalEntry();
         entry.setOrganizationId(org);
         entry.setFiscalYearId(result.period().getFiscalYearId());
@@ -557,24 +579,43 @@ public class AccountingPostingService {
     private UUID system(UUID org, SystemAccountKey key) {
         return accounts.findByOrganizationIdAndSystemAccountKey(org, key)
                 .map(Account::getId)
-                .orElseThrow(() -> new BusinessException("System account missing: " + key + ". Initialize accounting first."));
+                .orElseThrow(() ->
+                        new BusinessException("System account missing: " + key + ". Initialize accounting first."));
     }
 
-    private static JournalLineRequest debit(UUID accountId, BigDecimal amount, String desc, UUID customerId, UUID supplierId) {
-        return new JournalLineRequest(accountId, desc, AccountingMoney.normalize(amount), AccountingMoney.zero(), customerId, supplierId, null);
+    private static JournalLineRequest debit(
+            UUID accountId, BigDecimal amount, String desc, UUID customerId, UUID supplierId) {
+        return new JournalLineRequest(
+                accountId,
+                desc,
+                AccountingMoney.normalize(amount),
+                AccountingMoney.zero(),
+                customerId,
+                supplierId,
+                null);
     }
 
-    private static JournalLineRequest credit(UUID accountId, BigDecimal amount, String desc, UUID customerId, UUID supplierId) {
-        return new JournalLineRequest(accountId, desc, AccountingMoney.zero(), AccountingMoney.normalize(amount), customerId, supplierId, null);
+    private static JournalLineRequest credit(
+            UUID accountId, BigDecimal amount, String desc, UUID customerId, UUID supplierId) {
+        return new JournalLineRequest(
+                accountId,
+                desc,
+                AccountingMoney.zero(),
+                AccountingMoney.normalize(amount),
+                customerId,
+                supplierId,
+                null);
     }
 
-    private void addTaxCredit(List<JournalLineRequest> built, UUID org, SystemAccountKey key, BigDecimal amount, String number) {
+    private void addTaxCredit(
+            List<JournalLineRequest> built, UUID org, SystemAccountKey key, BigDecimal amount, String number) {
         if (AccountingMoney.isPositive(amount)) {
             built.add(credit(system(org, key), amount, key.name() + " " + number, null, null));
         }
     }
 
-    private void addTaxDebit(List<JournalLineRequest> built, UUID org, SystemAccountKey key, BigDecimal amount, String number) {
+    private void addTaxDebit(
+            List<JournalLineRequest> built, UUID org, SystemAccountKey key, BigDecimal amount, String number) {
         if (AccountingMoney.isPositive(amount)) {
             built.add(debit(system(org, key), amount, key.name() + " " + number, null, null));
         }
@@ -585,7 +626,8 @@ public class AccountingPostingService {
         if (ro.signum() > 0) {
             built.add(credit(system(org, SystemAccountKey.ROUND_OFF_INCOME), ro, "Round off " + number, null, null));
         } else if (ro.signum() < 0) {
-            built.add(debit(system(org, SystemAccountKey.ROUND_OFF_EXPENSE), ro.abs(), "Round off " + number, null, null));
+            built.add(debit(
+                    system(org, SystemAccountKey.ROUND_OFF_EXPENSE), ro.abs(), "Round off " + number, null, null));
         }
     }
 
@@ -600,7 +642,8 @@ public class AccountingPostingService {
         if (diff.signum() > 0) {
             built.add(credit(system(org, SystemAccountKey.ROUND_OFF_INCOME), diff, "Balancing", null, null));
         } else if (diff.signum() < 0) {
-            built.add(debit(system(org, SystemAccountKey.ACCOUNTS_RECEIVABLE), diff.abs(), "AR balancing", customerId, null));
+            built.add(debit(
+                    system(org, SystemAccountKey.ACCOUNTS_RECEIVABLE), diff.abs(), "AR balancing", customerId, null));
         }
     }
 
@@ -638,8 +681,7 @@ public class AccountingPostingService {
     }
 
     private JournalEntry loadJournal(UUID id) {
-        return journals
-                .findByIdAndOrganizationId(id, TenantContext.getOrganizationId())
+        return journals.findByIdAndOrganizationId(id, TenantContext.getOrganizationId())
                 .orElseThrow(() -> new ResourceNotFoundException("Journal entry not found: " + id));
     }
 

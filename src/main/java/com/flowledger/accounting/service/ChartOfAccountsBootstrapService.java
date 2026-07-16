@@ -57,7 +57,8 @@ public class ChartOfAccountsBootstrapService {
         Map<String, UUID> idByCode = new HashMap<>();
         for (ChartOfAccountsTemplate.Node node : ChartOfAccountsTemplate.NODES) {
             if (accounts.findByOrganizationIdAndAccountCode(orgId, node.code()).isPresent()) {
-                accounts.findByOrganizationIdAndAccountCode(orgId, node.code()).ifPresent(a -> idByCode.put(node.code(), a.getId()));
+                accounts.findByOrganizationIdAndAccountCode(orgId, node.code())
+                        .ifPresent(a -> idByCode.put(node.code(), a.getId()));
                 continue;
             }
             Account account = new Account();

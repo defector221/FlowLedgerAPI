@@ -65,7 +65,8 @@ public final class AccountingMapper {
                 line.getReference());
     }
 
-    public static JournalResponse toJournal(JournalEntry entry, List<JournalEntryLine> lines, Map<UUID, Account> accounts) {
+    public static JournalResponse toJournal(
+            JournalEntry entry, List<JournalEntryLine> lines, Map<UUID, Account> accounts) {
         List<JournalLineResponse> lineResponses = lines.stream()
                 .map(l -> toLine(l, accounts.get(l.getAccountId())))
                 .toList();

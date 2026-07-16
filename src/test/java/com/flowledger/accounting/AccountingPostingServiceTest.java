@@ -75,7 +75,8 @@ class AccountingPostingServiceTest {
         org.setFinancialYearStart("04-01");
         when(organizations.findById(orgId)).thenReturn(Optional.of(org));
         when(accounts.existsByOrganizationIdAndSystemAccountKeyIsNotNull(orgId)).thenReturn(true);
-        when(journals.findByOrganizationIdAndSourceAndReferenceId(any(), any(), any())).thenReturn(Optional.empty());
+        when(journals.findByOrganizationIdAndSourceAndReferenceId(any(), any(), any()))
+                .thenReturn(Optional.empty());
         when(numbers.next(any(), any(), any(), any(), any(), any())).thenReturn("JV/2026-27/000001");
         AccountingPeriod period = new AccountingPeriod();
         period.setId(UUID.randomUUID());
@@ -120,8 +121,7 @@ class AccountingPostingServiceTest {
         assertDoesNotThrow(() -> posting.postSalesInvoice(invoice));
         JournalEntry existing = new JournalEntry();
         existing.setId(UUID.randomUUID());
-        when(journals.findByOrganizationIdAndSourceAndReferenceId(
-                        orgId, JournalSource.SALES_INVOICE, invoice.getId()))
+        when(journals.findByOrganizationIdAndSourceAndReferenceId(orgId, JournalSource.SALES_INVOICE, invoice.getId()))
                 .thenReturn(Optional.of(existing));
         invoice.setAccountingStatus(AccountingStatus.NOT_POSTED);
         invoice.setPostedJournalEntryId(null);

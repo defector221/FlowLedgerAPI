@@ -27,25 +27,24 @@ Multi-tenant ERP backend for invoicing, inventory, sales, purchases, payments, a
 
 ```mermaid
 flowchart TB
-  subgraph clients [Clients]
-    UI[FlowLedger UI]
-    Swagger[Swagger / Integrations]
+  subgraph clients ["Clients"]
+    UI["FlowLedger UI"]
+    Swagger["Swagger and Integrations"]
   end
 
-  subgraph api [FlowLedger API - Spring Boot Monolith]
-  direction TB
-    Filter[JwtAuthenticationFilter]
-    Controllers[REST Controllers]
-    Services[Domain Services]
-    Repos[JPA Repositories]
+  subgraph api ["FlowLedger API"]
+    Filter["JwtAuthenticationFilter"]
+    Controllers["REST Controllers"]
+    Services["Domain Services"]
+    Repos["JPA Repositories"]
     Filter --> Controllers --> Services --> Repos
   end
 
-  subgraph data [Data & Integrations]
-    PG[(PostgreSQL)]
-    MinIO[(MinIO)]
-    OS[(OpenSearch)]
-    SMTP[SMTP / MailHog]
+  subgraph data ["Data and Integrations"]
+    PG[("PostgreSQL")]
+    MinIO[("MinIO")]
+    OS[("OpenSearch")]
+    SMTP["SMTP MailHog"]
   end
 
   UI --> Filter
@@ -63,7 +62,7 @@ sequenceDiagram
   participant C as Client
   participant F as JwtAuthenticationFilter
   participant TC as TenantContext
-  participant S as Controller / Service
+  participant S as Controller Service
   participant DB as PostgreSQL
 
   C->>F: HTTP + Bearer JWT
@@ -119,13 +118,13 @@ dto/        mapper/     domain/ (enums)
 
 ```mermaid
 flowchart LR
-  A[POST /auth/register] --> B[Create Organization]
-  B --> C[Create User + ORGANIZATION_ADMIN]
-  C --> D[FREE subscription]
-  D --> E[COA bootstrap]
-  E --> F[Return JWT tokens]
-  F --> G[PUT /organizations/current]
-  G --> H[POST /complete-onboarding]
+  A["POST auth register"] --> B["Create Organization"]
+  B --> C["Create admin user"]
+  C --> D["FREE subscription"]
+  D --> E["COA bootstrap"]
+  E --> F["Return JWT tokens"]
+  F --> G["PUT organizations current"]
+  G --> H["POST complete onboarding"]
   H --> E
 ```
 
@@ -141,11 +140,11 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-  Login[POST /auth/login] --> Tokens[accessToken + refreshToken]
-  Tokens --> Request[Authenticated requests]
-  Request --> Switch[POST /auth/switch-organization]
-  Switch --> NewContext[New active org in JWT]
-  Request --> Refresh[POST /auth/refresh on 401]
+  Login["POST auth login"] --> Tokens["access and refresh tokens"]
+  Tokens --> Request["Authenticated requests"]
+  Request --> Switch["POST switch organization"]
+  Switch --> NewContext["New active org in JWT"]
+  Request --> Refresh["POST auth refresh"]
   Refresh --> Tokens
 ```
 
@@ -157,12 +156,12 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  Draft[Create draft invoice] --> Confirm[POST /sales/invoices/id/confirm]
-  Confirm --> Num[Assign invoice number]
-  Num --> Inv[Post SALE inventory transactions]
-  Inv --> GL[AccountingPostingService.postSalesInvoice]
-  GL --> JE[Journal entry: DR AR, CR Sales + GST]
-  JE --> Search[OpenSearch index upsert]
+  Draft["Create draft invoice"] --> Confirm["Confirm sales invoice"]
+  Confirm --> Num["Assign invoice number"]
+  Num --> Inv["Post SALE inventory"]
+  Inv --> GL["Post sales invoice GL"]
+  GL --> JE["Journal entry AR Sales GST"]
+  JE --> Search["OpenSearch index upsert"]
 ```
 
 **Journal lines (simplified):**
@@ -187,10 +186,10 @@ Triggered idempotently from:
 
 ```mermaid
 flowchart LR
-  T[ChartOfAccountsTemplate.NODES] --> S[ChartOfAccountsBootstrapService]
-  S --> A[5 group headers GRP-*]
-  S --> L[22 system posting accounts]
-  S --> FY[Current fiscal year + 12 periods]
+  T["ChartOfAccountsTemplate"] --> S["BootstrapService"]
+  S --> A["Group headers"]
+  S --> L["Posting accounts"]
+  S --> FY["Fiscal year and periods"]
 ```
 
 - **Template:** `accounting/bootstrap/ChartOfAccountsTemplate.java` — single source of truth.

@@ -1,7 +1,6 @@
 package com.flowledger.accounting.service;
 
 import com.flowledger.accounting.domain.AccountStatus;
-import com.flowledger.accounting.domain.AccountType;
 import com.flowledger.accounting.dto.AccountingDtos.AccountRequest;
 import com.flowledger.accounting.dto.AccountingDtos.AccountResponse;
 import com.flowledger.accounting.dto.AccountingDtos.AccountTreeNode;
@@ -135,12 +134,10 @@ public class AccountService {
         if (request.accountType() != account.getAccountType()) {
             throw new BusinessException("System account type cannot be changed");
         }
-        if (request.accountCode() != null
-                && !request.accountCode().trim().equals(account.getAccountCode())) {
+        if (request.accountCode() != null && !request.accountCode().trim().equals(account.getAccountCode())) {
             throw new BusinessException("System account code cannot be changed");
         }
-        if (request.parentAccountId() != null
-                && !request.parentAccountId().equals(account.getParentAccountId())) {
+        if (request.parentAccountId() != null && !request.parentAccountId().equals(account.getParentAccountId())) {
             throw new BusinessException("System account parent cannot be changed");
         }
         if (request.openingDebit() != null || request.openingCredit() != null) {
@@ -270,7 +267,9 @@ public class AccountService {
                 account.getStatus(),
                 account.isActive(),
                 account.isAllowManualPosting(),
-                children.stream().map(child -> toTreeNode(child, childrenByParent)).toList());
+                children.stream()
+                        .map(child -> toTreeNode(child, childrenByParent))
+                        .toList());
     }
 
     private static AccountResponse toResponse(Account a) {

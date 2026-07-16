@@ -154,7 +154,12 @@ public final class AccountingDtos {
             BigDecimal closingCredit) {}
 
     public record TrialBalanceResponse(
-            LocalDate fromDate, LocalDate toDate, List<TrialBalanceRow> rows, BigDecimal totalDebit, BigDecimal totalCredit, boolean balanced) {}
+            LocalDate fromDate,
+            LocalDate toDate,
+            List<TrialBalanceRow> rows,
+            BigDecimal totalDebit,
+            BigDecimal totalCredit,
+            boolean balanced) {}
 
     public record NamedAmount(String name, BigDecimal amount) {}
 

@@ -3,11 +3,8 @@ package com.flowledger.accounting.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.flowledger.accounting.bootstrap.ChartOfAccountsTemplate;
 import com.flowledger.accounting.domain.AccountStatus;
 import com.flowledger.accounting.domain.AccountType;
 import com.flowledger.accounting.domain.SystemAccountKey;
@@ -26,7 +23,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -119,17 +115,7 @@ class AccountServiceTest {
         Account account = systemAccount(id, SystemAccountKey.SALES);
         when(accounts.findByIdAndOrganizationId(id, orgId)).thenReturn(Optional.of(account));
         AccountRequest request = new AccountRequest(
-                "4000",
-                "Sales",
-                null,
-                AccountType.EXPENSE,
-                null,
-                null,
-                true,
-                AccountStatus.ACTIVE,
-                true,
-                null,
-                null);
+                "4000", "Sales", null, AccountType.EXPENSE, null, null, true, AccountStatus.ACTIVE, true, null, null);
         assertThrows(BusinessException.class, () -> service.update(id, request));
     }
 

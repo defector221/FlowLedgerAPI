@@ -104,9 +104,8 @@ public class UserService extends OrganizationScopedService {
             throw new BusinessException("You cannot change your own role");
         }
         Role role = requireRole(request.role());
-        boolean currentlyAdmin = membership.getRoles().stream()
-                .map(Role::getCode)
-                .anyMatch("ORGANIZATION_ADMIN"::equals);
+        boolean currentlyAdmin =
+                membership.getRoles().stream().map(Role::getCode).anyMatch("ORGANIZATION_ADMIN"::equals);
         if (currentlyAdmin && !"ORGANIZATION_ADMIN".equals(role.getCode()) && countActiveAdmins(orgId()) <= 1) {
             throw new BusinessException("Cannot remove the last organization admin");
         }

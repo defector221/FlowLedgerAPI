@@ -1,5 +1,6 @@
 package com.flowledger.auth.service;
 
+import com.flowledger.accounting.service.ChartOfAccountsBootstrap;
 import com.flowledger.auth.dto.*;
 import com.flowledger.auth.entity.*;
 import com.flowledger.auth.repository.*;
@@ -12,7 +13,6 @@ import com.flowledger.notification.NotificationService;
 import com.flowledger.notification.NotificationType;
 import com.flowledger.organization.entity.*;
 import com.flowledger.organization.repository.*;
-import com.flowledger.accounting.service.ChartOfAccountsBootstrap;
 import com.flowledger.subscription.service.SubscriptionService;
 import java.time.*;
 import java.util.*;

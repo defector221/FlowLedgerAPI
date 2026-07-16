@@ -23,8 +23,24 @@ public final class ChartOfAccountsTemplate {
 
     public static final java.util.List<Node> NODES = java.util.List.of(
             new Node("GRP-ASSET", "Assets", AccountType.ASSET, null, null, null, true, false),
-            new Node("1000", "Cash", AccountType.ASSET, AccountSubType.CASH, SystemAccountKey.CASH, "GRP-ASSET", false, true),
-            new Node("1010", "Bank", AccountType.ASSET, AccountSubType.BANK, SystemAccountKey.BANK, "GRP-ASSET", false, true),
+            new Node(
+                    "1000",
+                    "Cash",
+                    AccountType.ASSET,
+                    AccountSubType.CASH,
+                    SystemAccountKey.CASH,
+                    "GRP-ASSET",
+                    false,
+                    true),
+            new Node(
+                    "1010",
+                    "Bank",
+                    AccountType.ASSET,
+                    AccountSubType.BANK,
+                    SystemAccountKey.BANK,
+                    "GRP-ASSET",
+                    false,
+                    true),
             new Node(
                     "1100",
                     "Accounts Receivable",

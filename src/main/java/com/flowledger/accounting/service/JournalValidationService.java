@@ -39,7 +39,8 @@ public class JournalValidationService {
      * period and normalized totals. Throws BusinessException/ConflictException/ResourceNotFoundException
      * on any violation.
      */
-    public ValidationResult validate(UUID organizationId, LocalDate entryDate, JournalSource source, List<LineInput> lines) {
+    public ValidationResult validate(
+            UUID organizationId, LocalDate entryDate, JournalSource source, List<LineInput> lines) {
         if (entryDate == null) {
             throw new BusinessException("Entry date is required");
         }
@@ -57,13 +58,13 @@ public class JournalValidationService {
             boolean hasDebit = debit.signum() > 0;
             boolean hasCredit = credit.signum() > 0;
             if (hasDebit == hasCredit) {
-                throw new BusinessException("Each journal line must have either a debit or a credit amount, not both or neither");
+                throw new BusinessException(
+                        "Each journal line must have either a debit or a credit amount, not both or neither");
             }
             if (debit.signum() < 0 || credit.signum() < 0) {
                 throw new BusinessException("Journal line amounts cannot be negative");
             }
-            Account account = accounts
-                    .findByIdAndOrganizationId(line.accountId(), organizationId)
+            Account account = accounts.findByIdAndOrganizationId(line.accountId(), organizationId)
                     .orElseThrow(() -> new ResourceNotFoundException("Account not found: " + line.accountId()));
             if (!account.isActive()) {
                 throw new BusinessException("Account is inactive: " + account.getAccountName());
@@ -75,11 +76,10 @@ public class JournalValidationService {
             totalCredit = totalCredit.add(credit);
         }
         if (totalDebit.compareTo(totalCredit) != 0) {
-            throw new BusinessException(
-                    "Journal entry is not balanced: total debit " + totalDebit + " does not equal total credit " + totalCredit);
+            throw new BusinessException("Journal entry is not balanced: total debit " + totalDebit
+                    + " does not equal total credit " + totalCredit);
         }
-        AccountingPeriod period = periods
-                .findCovering(organizationId, entryDate)
+        AccountingPeriod period = periods.findCovering(organizationId, entryDate)
                 .orElseThrow(() -> new BusinessException("No accounting period covers date " + entryDate));
         if (period.getStatus() != PeriodStatus.OPEN) {
             throw new ConflictException("Accounting period \"" + period.getName() + "\" is not open");
