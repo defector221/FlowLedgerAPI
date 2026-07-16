@@ -1,141 +1,324 @@
 # FlowLedger API
 
-Multi-tenant Invoice, Inventory, Sales, and Purchase Management System backend.
+Multi-tenant ERP backend for invoicing, inventory, sales, purchases, payments, and double-entry accounting. Every business record is scoped to an **organization**; the API enforces tenant isolation via JWT + `TenantContext`.
 
 ## Stack
 
-- Java 17+ (compatible with Java 21; local builds use Java 17)
-- Spring Boot 3.4
-- Spring Security + JWT (access + refresh tokens)
-- Spring Data JPA / Hibernate
-- PostgreSQL + Flyway
-- MapStruct, Lombok
-- MinIO object storage
-- OpenSearch (derived global search index; PostgreSQL remains source of truth)
-- OpenPDF invoice generation
-- springdoc OpenAPI
-- Testcontainers-ready test dependencies
+| Layer | Technology |
+|-------|------------|
+| Runtime | Java 17+ |
+| Framework | Spring Boot 3.4 |
+| Security | Spring Security + JWT (access + refresh tokens) |
+| Persistence | Spring Data JPA / Hibernate 6 |
+| Database | PostgreSQL |
+| Migrations | Flyway |
+| Mapping | MapStruct, Lombok |
+| Object storage | MinIO |
+| Search | OpenSearch (derived index; PostgreSQL is source of truth) |
+| PDF | OpenPDF, openhtmltopdf |
+| API docs | springdoc OpenAPI |
+| Tests | JUnit 5, Mockito (Testcontainers deps available) |
+
+---
+
+## Architecture
+
+### High-level view
+
+```mermaid
+flowchart TB
+  subgraph clients [Clients]
+    UI[FlowLedger UI]
+    Swagger[Swagger / Integrations]
+  end
+
+  subgraph api [FlowLedger API - Spring Boot Monolith]
+  direction TB
+    Filter[JwtAuthenticationFilter]
+    Controllers[REST Controllers]
+    Services[Domain Services]
+    Repos[JPA Repositories]
+    Filter --> Controllers --> Services --> Repos
+  end
+
+  subgraph data [Data & Integrations]
+    PG[(PostgreSQL)]
+    MinIO[(MinIO)]
+    OS[(OpenSearch)]
+    SMTP[SMTP / MailHog]
+  end
+
+  UI --> Filter
+  Swagger --> Filter
+  Repos --> PG
+  Services --> MinIO
+  Services --> OS
+  Services --> SMTP
+```
+
+### Request pipeline
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant F as JwtAuthenticationFilter
+  participant TC as TenantContext
+  participant S as Controller / Service
+  participant DB as PostgreSQL
+
+  C->>F: HTTP + Bearer JWT
+  F->>F: Validate token, load UserPrincipal
+  F->>TC: set organizationId, userId
+  F->>S: @PreAuthorize check
+  S->>TC: getOrganizationId()
+  S->>DB: Query scoped by organization_id
+  DB-->>S: Result
+  S-->>C: ApiResponse JSON
+```
+
+### Package layout
+
+Domain-driven packages under `com.flowledger.*`. Each domain typically follows:
+
+```
+controller/ → service/ → repository/ → entity/
+dto/        mapper/     domain/ (enums)
+```
+
+| Package | Responsibility |
+|---------|----------------|
+| `auth` | Login, register, refresh, password reset, invitations |
+| `organization` | Org profile, onboarding, memberships, settings |
+| `customer`, `supplier`, `product` | Master data |
+| `warehouse`, `inventory` | Warehouses, stock ledger (append-only) |
+| `sales` | Quotations, SO, challans, invoices, returns, credit notes |
+| `purchase` | PO, GRN, purchase invoices, returns, debit notes |
+| `payment` | Receipts, supplier payments, reminder rules |
+| `accounting` | Chart of accounts, journals, ledgers, GST summary, reports |
+| `tax` | GST calculation (intra/inter-state) |
+| `template`, `pdf` | Invoice templates, PDF generation |
+| `report`, `dashboard` | Business reports, KPIs |
+| `lead`, `marketing`, `emailtemplate` | CRM, sequences, campaigns |
+| `subscription` | Plans, billing limits |
+| `search` | OpenSearch indexing & global search |
+| `notification`, `audit`, `storage` | Notifications, audit log, MinIO files |
+| `common` | Security, tenant context, exceptions, utilities |
+
+**Cross-cutting (`common`):**
+
+- `security/` — `SecurityConfig`, `JwtService`, `JwtAuthenticationFilter`
+- `tenant/` — `TenantContext` (ThreadLocal org + user)
+- `exception/` — `GlobalExceptionHandler`
+- `util/` — `DocumentNumberService`, `FinancialYearUtil`
+
+---
+
+## Core flows
+
+### 1. Registration & onboarding
+
+```mermaid
+flowchart LR
+  A[POST /auth/register] --> B[Create Organization]
+  B --> C[Create User + ORGANIZATION_ADMIN]
+  C --> D[FREE subscription]
+  D --> E[COA bootstrap]
+  E --> F[Return JWT tokens]
+  F --> G[PUT /organizations/current]
+  G --> H[POST /complete-onboarding]
+  H --> E
+```
+
+| Step | Endpoint | What happens |
+|------|----------|--------------|
+| Register | `POST /api/v1/auth/register` | New org + admin user; `onboardingCompleted=false` |
+| Update profile | `PUT /api/v1/organizations/current` | GSTIN, address, invoice prefixes, etc. |
+| Complete onboarding | `POST /api/v1/organizations/current/complete-onboarding` | Validates required fields; sets `onboardingCompleted=true`; re-runs COA bootstrap (idempotent) |
+
+**Key files:** `AuthService.java`, `OrganizationService.java`, `ChartOfAccountsBootstrapService.java`
+
+### 2. Authentication & multi-org
+
+```mermaid
+flowchart TD
+  Login[POST /auth/login] --> Tokens[accessToken + refreshToken]
+  Tokens --> Request[Authenticated requests]
+  Request --> Switch[POST /auth/switch-organization]
+  Switch --> NewContext[New active org in JWT]
+  Request --> Refresh[POST /auth/refresh on 401]
+  Refresh --> Tokens
+```
+
+- JWT carries **active organization**; never accept `organizationId` from request body for scoping.
+- **Team invites:** `POST /users/invite` → email with token → `POST /auth/accept-invitation`.
+- Roles: `ORGANIZATION_ADMIN`, `ACCOUNTANT`, `SALES_MANAGER`, etc. (seeded in V7).
+
+### 3. Sales invoice → inventory → GL
+
+```mermaid
+flowchart TD
+  Draft[Create draft invoice] --> Confirm[POST /sales/invoices/id/confirm]
+  Confirm --> Num[Assign invoice number]
+  Num --> Inv[Post SALE inventory transactions]
+  Inv --> GL[AccountingPostingService.postSalesInvoice]
+  GL --> JE[Journal entry: DR AR, CR Sales + GST]
+  JE --> Search[OpenSearch index upsert]
+```
+
+**Journal lines (simplified):**
+
+| Account | Debit | Credit |
+|---------|-------|--------|
+| Accounts Receivable | Grand total | |
+| Sales | | Taxable amount |
+| Output CGST / SGST / IGST | | Tax amounts |
+
+Similar auto-posting exists for purchase invoices, payments, returns, and credit/debit notes.
+
+**Key files:** `SalesInvoiceService.java`, `InventoryService.java`, `AccountingPostingService.java`
+
+### 4. Chart of accounts bootstrap
+
+Triggered idempotently from:
+
+1. Org registration (`AuthService.bootstrapAccounting`)
+2. Onboarding complete (`OrganizationService`)
+3. Lazy init on first GL posting (`AccountingPostingService.ensureInitialized`)
+
+```mermaid
+flowchart LR
+  T[ChartOfAccountsTemplate.NODES] --> S[ChartOfAccountsBootstrapService]
+  S --> A[5 group headers GRP-*]
+  S --> L[22 system posting accounts]
+  S --> FY[Current fiscal year + 12 periods]
+```
+
+- **Template:** `accounting/bootstrap/ChartOfAccountsTemplate.java` — single source of truth.
+- **Hierarchy:** V25 adds `description`, `status`, `is_editable`, `is_deletable`, parent links.
+- **Demo seed:** V22–V24 (YRV Solutions), V26 (COA descriptions + custom accounts).
+
+### 5. Inventory model
+
+- **Append-only** `inventory_transactions` with idempotency keys.
+- Stock is derived from movements; draft invoices may **reserve** quantity without reducing on-hand until confirm.
+- Events: `OPENING_STOCK`, `PURCHASE`, `SALE`, `ADJUSTMENT`, `TRANSFER`.
+
+### 6. Document numbering
+
+- Pessimistic lock on `document_sequences` per org + document type + financial year.
+- Format configurable per org (e.g. `{PREFIX}/{FY}/{SEQ:6}` → `INV/2026-27/000001`).
+
+### 7. Global search
+
+- PostgreSQL = source of truth; OpenSearch = rebuildable derived index.
+- Indexed after commit: products, customers, suppliers, sales/purchase invoices.
+- Reindex: `POST /api/v1/search/reindex` (admin, org from JWT).
+
+---
+
+## Database migrations (Flyway)
+
+Location: `src/main/resources/db/migration/`  
+JPA: `ddl-auto: validate` (schema owned by Flyway)
+
+| Version | Purpose |
+|---------|---------|
+| V1 | Auth, organizations, users, roles, permissions |
+| V2 | Master data (customers, suppliers, products, tax) |
+| V3 | Inventory (warehouses, transactions) |
+| V4 | Sales documents |
+| V5 | Purchase documents |
+| V6 | Payments, templates, audit |
+| V7 | Seed roles, permissions, units |
+| V8–V18 | Audit fixes, onboarding, memberships, marketing, notifications |
+| V19 | Accounting core (accounts, fiscal years, journals) |
+| V20–V21 | Document accounting hooks, journal line audit |
+| V22–V24 | YRV Solutions demo seed |
+| V25 | COA enhancements (hierarchy, status, flags) |
+| V26 | YRV COA demo enrichment |
+
+> **Never edit an already-applied migration.** Add new `V27+` files instead; Flyway validates checksums on startup.
+
+---
 
 ## Quick start
 
+### Prerequisites
+
+- Java 17+
+- PostgreSQL (`localhost:5432`, database `flowledger`, user/pass `flowledger`/`flowledger`)
+- MinIO (`localhost:19000`) for logos and file storage
+- Docker (optional) for MailHog + OpenSearch
+
+### Run
+
 ```bash
-# Start local OpenSearch + Dashboards (requires Docker)
+# Optional: MailHog + OpenSearch
 docker compose up -d
 
-# Run API (expects Postgres + MinIO running separately for full app use)
-export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+# Start API
 mvn spring-boot:run
 ```
 
-- API: http://localhost:8080
-- Swagger UI: http://localhost:8080/swagger-ui.html
-- OpenSearch: https://localhost:19200 (`admin` / see `FLOWLEDGER_SEARCH_PASSWORD`)
-- OpenSearch Dashboards: http://localhost:15601
+| Service | URL |
+|---------|-----|
+| API | http://localhost:7070 |
+| Swagger UI | http://localhost:7070/swagger-ui.html |
+| Actuator health | http://localhost:7070/actuator/health |
+| MailHog UI | http://localhost:8025 |
+| OpenSearch | https://localhost:19200 |
 
-> Local OpenSearch may run with security enabled and a self-signed certificate. That setup is for development only — **not production-ready**.
+### Demo login (YRV seed)
 
-## Local OpenSearch
+If V22 seed ran: `kashyap221@gmail.com` / `passwor123d`
 
-PostgreSQL is the **source of truth**. OpenSearch is a **rebuildable derived index** for global search.
+---
 
-### Start / stop
+## Configuration
 
-```bash
-# Start OpenSearch + Dashboards
-docker compose up -d
-
-# Stop
-docker compose down
-
-# Stop and remove the search data volume
-docker compose down -v
-```
-
-### Health and Dashboards
-
-```bash
-# Cluster health (security enabled)
-curl -k -u admin:Vayupa2024wan https://localhost:19200/_cluster/health?pretty
-
-# Open Dashboards in a browser
-open http://localhost:15601
-```
-
-### Search configuration
+Environment variables (see `src/main/resources/application.yml`):
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `FLOWLEDGER_SEARCH_ENABLED` | `true` | Enable OpenSearch integration |
-| `FLOWLEDGER_SEARCH_URL` | `https://localhost:19200` | OpenSearch URL (HTTPS when security is enabled) |
+| `JWT_SECRET` | (in yml) | HS256 signing key |
+| `FRONTEND_URL` | production URL | Password reset & invite links |
+| `PUBLIC_API_URL` | production URL | Public API base |
+| `MINIO_ENDPOINT` | `http://localhost:19000` | Object storage |
+| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | | MinIO credentials |
+| `MINIO_BUCKET` | `flowledger` | Storage bucket |
+| `FLOWLEDGER_SEARCH_ENABLED` | `true` | Toggle OpenSearch |
+| `FLOWLEDGER_SEARCH_URL` | `https://localhost:19200` | OpenSearch endpoint |
 | `FLOWLEDGER_SEARCH_INDEX` | `flowledger-global-search-v1` | Index name |
-| `FLOWLEDGER_SEARCH_USERNAME` | `admin` | OpenSearch basic-auth username |
-| `FLOWLEDGER_SEARCH_PASSWORD` | _(set in application.yml)_ | OpenSearch basic-auth password |
-| `FLOWLEDGER_SEARCH_SSL_VERIFY` | `false` | Verify TLS certificates (`false` for local self-signed) |
+| `FLOWLEDGER_SEARCH_USERNAME` / `PASSWORD` | | OpenSearch auth |
+| `FLOWLEDGER_SEARCH_SSL_VERIFY` | `false` | TLS verify (local dev) |
+| `FLOWLEDGER_EMAIL_ENABLED` | `true` | SMTP vs mock |
+| `FLOWLEDGER_EMAIL_FROM` | | From address |
 
-When search is disabled (`FLOWLEDGER_SEARCH_ENABLED=false`), the API still starts; search endpoints return a controlled error.
+**Datasource (default):** `jdbc:postgresql://localhost:5432/flowledger`  
+**Server port:** `7070`  
+**CORS:** `localhost:5173`, `localhost:3000`, production domains
 
-When OpenSearch is temporarily unreachable, `GET /api/v1/search` returns **503** (`Search Unavailable`) without leaking host details.
+---
 
-Local Compose currently runs OpenSearch **with security enabled**. Cluster health:
+## API surface (summary)
 
-```bash
-curl -k -u admin:Vayupa2024wan https://localhost:19200/_cluster/health?pretty
-```
+| Prefix | Domain |
+|--------|--------|
+| `/api/v1/auth` | Login, register, refresh, invitations |
+| `/api/v1/organizations` | Org profile, onboarding |
+| `/api/v1/users`, `/roles` | Team, RBAC |
+| `/api/v1/customers`, `suppliers`, `products`, `categories`, `units`, `tax-rates` | Masters |
+| `/api/v1/warehouses`, `/inventory` | Inventory |
+| `/api/v1/sales`, `/purchases` | Sales & purchase documents |
+| `/api/v1/payments` | Receipts & supplier payments |
+| `/api/v1/accounting` | COA, journals, ledgers, reports |
+| `/api/v1/dashboard`, `/reports` | KPIs & reports |
+| `/api/v1/leads`, `/marketing` | CRM & campaigns |
+| `/api/v1/billing` | Subscription & usage |
+| `/api/v1/search` | Global search |
+| `/api/v1/audit-logs` | Audit trail |
 
-> Do not use local self-signed TLS + disabled certificate verification in production.
-
-### Reindex current organization
-
-Requires `ORGANIZATION_ADMIN` and a Bearer token. Organization is taken from the JWT / `TenantContext` (never from the request body).
-
-```bash
-curl -X POST http://localhost:8080/api/v1/search/reindex \
-  -H "Authorization: Bearer $ACCESS_TOKEN"
-```
-
-### Troubleshoot local connection
-
-1. Confirm containers: `docker compose ps`
-2. Confirm health: `curl -k -u admin:$FLOWLEDGER_SEARCH_PASSWORD https://localhost:19200/_cluster/health`
-3. Confirm API config uses `https://localhost:19200` with matching username/password
-4. Check API logs for OpenSearch connection warnings on startup
-5. If the index is empty after upgrading search, run reindex
-
-## Register & login
-
-```http
-POST /api/v1/auth/register
-{
-  "organizationName": "Acme Traders",
-  "email": "admin@acme.test",
-  "password": "Password@123",
-  "firstName": "Admin",
-  "lastName": "User"
-}
-```
-
-Then update organization state / GSTIN via `PUT /api/v1/organizations/current` before creating GST invoices.
-
-Use `Authorization: Bearer <accessToken>` on subsequent calls.
-
-## Module layout
-
-```
-com.flowledger
-  auth / organization / customer / supplier / product
-  warehouse / inventory / sales / purchase / payment
-  tax / template / pdf / report / dashboard / audit / storage / search
-```
-
-## Key behaviors
-
-- Every business row is scoped by `organization_id`
-- Inventory is append-only via `inventory_transactions` (idempotent keys)
-- Sales invoice confirmation posts `SALE` stock movements once
-- GRN confirmation posts `PURCHASE` stock movements once
-- GST: intra-state CGST+SGST, inter-state IGST; tax snapshots stored on lines
-- Document numbers use pessimistic locking on `document_sequences`
-- Global search indexes products, customers, suppliers, sales invoices, and purchase invoices after PostgreSQL commit
+---
 
 ## Tests
 
@@ -143,6 +326,10 @@ com.flowledger
 mvn test
 ```
 
-## Configuration
+Unit tests under `src/test/java/com/flowledger/` — Mockito-based; focus on accounting, GST, search, PDF, utilities.
 
-See `src/main/resources/application.yml` for JWT, MinIO, datasource, search, and CORS settings.
+---
+
+## Related project
+
+**FlowLedger UI** — React SPA at `../FlowLedgerUI`. Point `VITE_API_BASE_URL` to `http://localhost:7070/api/v1`.

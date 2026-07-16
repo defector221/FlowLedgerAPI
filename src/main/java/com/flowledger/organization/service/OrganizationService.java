@@ -1,5 +1,6 @@
 package com.flowledger.organization.service;
 
+import com.flowledger.accounting.service.ChartOfAccountsBootstrap;
 import com.flowledger.common.exception.ResourceNotFoundException;
 import com.flowledger.common.security.SecurityUtils;
 import com.flowledger.organization.dto.*;
@@ -13,6 +14,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,16 +25,19 @@ public class OrganizationService {
     private final OrganizationSettingsRepository settingsRepo;
     private final OrganizationMapper mapper;
     private final StorageService storage;
+    private final ObjectProvider<ChartOfAccountsBootstrap> accountingBootstrap;
 
     public OrganizationService(
             OrganizationRepository repo,
             OrganizationSettingsRepository settingsRepo,
             OrganizationMapper mapper,
-            StorageService storage) {
+            StorageService storage,
+            ObjectProvider<ChartOfAccountsBootstrap> accountingBootstrap) {
         this.repo = repo;
         this.settingsRepo = settingsRepo;
         this.mapper = mapper;
         this.storage = storage;
+        this.accountingBootstrap = accountingBootstrap;
     }
 
     public OrganizationResponse current() {
@@ -63,7 +68,12 @@ public class OrganizationService {
         validateRequiredFields(organization);
         organization.setOnboardingCompleted(true);
         organization.setOnboardingCompletedAt(Instant.now());
-        return mapper.toResponse(repo.save(organization));
+        Organization saved = repo.save(organization);
+        ChartOfAccountsBootstrap bootstrap = accountingBootstrap.getIfAvailable();
+        if (bootstrap != null) {
+            bootstrap.initializeOrganization(saved.getId(), saved.getFinancialYearStart());
+        }
+        return mapper.toResponse(saved);
     }
 
     @Transactional(readOnly = true)
