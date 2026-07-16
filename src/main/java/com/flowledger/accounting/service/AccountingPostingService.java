@@ -47,7 +47,7 @@ public class AccountingPostingService {
     private final JournalValidationService validation;
     private final DocumentNumberService numbers;
     private final OrganizationRepository organizations;
-    private final ChartOfAccountsBootstrap bootstrap;
+    private final ChartOfAccountsBootstrapService bootstrap;
 
     public AccountingPostingService(
             JournalEntryRepository journals,
@@ -57,7 +57,7 @@ public class AccountingPostingService {
             JournalValidationService validation,
             DocumentNumberService numbers,
             OrganizationRepository organizations,
-            ChartOfAccountsBootstrap bootstrap) {
+            ChartOfAccountsBootstrapService bootstrap) {
         this.journals = journals;
         this.lines = lines;
         this.accounts = accounts;
@@ -74,7 +74,7 @@ public class AccountingPostingService {
         Organization org = organizations
                 .findById(orgId)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization not found"));
-        bootstrap.initializeOrganization(orgId, org.getFinancialYearStart());
+        bootstrap.bootstrapOrganization(orgId, org.getFinancialYearStart());
         int count = accounts.findByOrganizationIdOrderByAccountCodeAsc(orgId).size();
         var fy = fiscalYears
                 .findByOrganizationIdAndCurrentTrue(orgId)
@@ -572,7 +572,7 @@ public class AccountingPostingService {
     private void ensureInitialized(UUID orgId) {
         if (!accounts.existsByOrganizationIdAndSystemAccountKeyIsNotNull(orgId)) {
             Organization org = organizations.findById(orgId).orElseThrow();
-            bootstrap.initializeOrganization(orgId, org.getFinancialYearStart());
+            bootstrap.bootstrapOrganization(orgId, org.getFinancialYearStart());
         }
     }
 

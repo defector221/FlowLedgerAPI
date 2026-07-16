@@ -59,7 +59,7 @@ class AccountingPostingServiceTest {
     OrganizationRepository organizations;
 
     @Mock
-    ChartOfAccountsBootstrap bootstrap;
+    ChartOfAccountsBootstrapService bootstrap;
 
     JournalValidationService validation;
     AccountingPostingService posting;

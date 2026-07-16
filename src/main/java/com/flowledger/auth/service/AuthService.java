@@ -1,6 +1,6 @@
 package com.flowledger.auth.service;
 
-import com.flowledger.accounting.service.ChartOfAccountsBootstrap;
+import com.flowledger.accounting.service.ChartOfAccountsBootstrapService;
 import com.flowledger.auth.dto.*;
 import com.flowledger.auth.entity.*;
 import com.flowledger.auth.repository.*;
@@ -17,7 +17,6 @@ import com.flowledger.subscription.service.SubscriptionService;
 import java.time.*;
 import java.util.*;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -37,7 +36,7 @@ public class AuthService {
     private final OrganizationMembershipService membershipService;
     private final SubscriptionService subscriptions;
     private final NotificationService notifications;
-    private final ObjectProvider<ChartOfAccountsBootstrap> accountingBootstrap;
+    private final ChartOfAccountsBootstrapService accountingBootstrap;
 
     @Value("${flowledger.app.frontend-url}")
     private String frontendUrl;
@@ -54,7 +53,7 @@ public class AuthService {
             OrganizationMembershipService membershipService,
             SubscriptionService subscriptions,
             NotificationService notifications,
-            ObjectProvider<ChartOfAccountsBootstrap> accountingBootstrap) {
+            ChartOfAccountsBootstrapService accountingBootstrap) {
         this.users = users;
         this.roles = roles;
         this.refreshTokens = refreshTokens;
@@ -275,10 +274,8 @@ public class AuthService {
     }
 
     private void bootstrapAccounting(Organization organization) {
-        ChartOfAccountsBootstrap bootstrap = accountingBootstrap.getIfAvailable();
-        if (bootstrap != null) {
-            bootstrap.initializeOrganization(organization.getId(), organization.getFinancialYearStart());
-        }
+        accountingBootstrap.bootstrapOrganization(
+                organization.getId(), organization.getFinancialYearStart());
     }
 
     private LoginResponse tokens(User user, UUID organizationId) {
