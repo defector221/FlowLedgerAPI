@@ -121,10 +121,9 @@ public class DashboardService {
 
     private List<?> trend(String table, UUID org) {
         String statusFilter = postedStatusFilter(table);
-        return em.createNativeQuery(
-                        "select to_char(invoice_date,'YYYY-MM'),sum(grand_total) from " + table
-                                + " where organization_id=:org and " + statusFilter
-                                + " and invoice_date>=current_date-interval '6 months' group by 1 order by 1")
+        return em.createNativeQuery("select to_char(invoice_date,'YYYY-MM'),sum(grand_total) from " + table
+                        + " where organization_id=:org and " + statusFilter
+                        + " and invoice_date>=current_date-interval '6 months' group by 1 order by 1")
                 .setParameter("org", org)
                 .getResultList();
     }

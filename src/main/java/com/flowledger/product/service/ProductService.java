@@ -120,8 +120,8 @@ public class ProductService extends OrganizationScopedService {
                 })
                 .map(Unit::getId)
                 .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Create a unit before adding services"));
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.BAD_REQUEST, "Create a unit before adding services"));
     }
 
     private UUID resolveWarehouseId(UUID requested) {
@@ -243,7 +243,9 @@ public class ProductService extends OrganizationScopedService {
             var tax = taxRates.findByIdAndOrganizationId(product.getTaxRateId(), org);
             if (tax.isPresent()) {
                 taxRateName = tax.get().getName();
-                taxType = tax.get().getTaxType() == null ? "GST" : tax.get().getTaxType().name();
+                taxType = tax.get().getTaxType() == null
+                        ? "GST"
+                        : tax.get().getTaxType().name();
             }
         }
         return new Response(

@@ -10,8 +10,7 @@ public final class TenantContext {
     private TenantContext() {}
 
     public static UUID getOrganizationId() {
-        return organizationId()
-                .orElseThrow(() -> new IllegalStateException("Organization context is not set"));
+        return organizationId().orElseThrow(() -> new IllegalStateException("Organization context is not set"));
     }
 
     public static Optional<UUID> organizationId() {

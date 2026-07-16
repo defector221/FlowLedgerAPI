@@ -72,7 +72,12 @@ public final class GstCalculationDtos {
     }
 
     public record Response(
-            BigDecimal taxable, BigDecimal cgst, BigDecimal sgst, BigDecimal igst, BigDecimal otherTax, BigDecimal lineTotal) {
+            BigDecimal taxable,
+            BigDecimal cgst,
+            BigDecimal sgst,
+            BigDecimal igst,
+            BigDecimal otherTax,
+            BigDecimal lineTotal) {
         public Response(BigDecimal taxable, BigDecimal cgst, BigDecimal sgst, BigDecimal igst, BigDecimal lineTotal) {
             this(taxable, cgst, sgst, igst, BigDecimal.ZERO, lineTotal);
         }

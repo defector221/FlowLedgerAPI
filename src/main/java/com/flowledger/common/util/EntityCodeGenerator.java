@@ -44,8 +44,8 @@ public final class EntityCodeGenerator {
             }
         }
         // Extremely unlikely; append epoch fragment for uniqueness
-        String fallback = fromName(name, prefix) + Long.toString(System.currentTimeMillis() % 100000, 36)
-                .toUpperCase(Locale.ROOT);
+        String fallback = fromName(name, prefix)
+                + Long.toString(System.currentTimeMillis() % 100000, 36).toUpperCase(Locale.ROOT);
         if (exists.test(fallback)) {
             throw new IllegalStateException("Unable to generate a unique code for: " + name);
         }

@@ -178,8 +178,8 @@ public class SearchIndexService {
                                                 .type(TextQueryType.BoolPrefix)
                                                 .operator(Operator.Or)
                                                 .boost(6.0f)));
-                                        b.should(sh -> sh.matchPhrasePrefix(
-                                                mpp -> mpp.field("title").query(q).boost(5.0f)));
+                                        b.should(sh -> sh.matchPhrasePrefix(mpp ->
+                                                mpp.field("title").query(q).boost(5.0f)));
                                         b.should(sh -> sh.prefix(p -> p.field("title.keyword")
                                                 .value(q)
                                                 .caseInsensitive(true)

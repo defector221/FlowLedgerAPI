@@ -89,7 +89,8 @@ public class PaymentReminderService {
     @Scheduled(cron = "0 0 9 * * *")
     public void processDailyReminders() {
         log.info("Payment reminder daily job started");
-        List<UUID> orgIds = organizations.findAll().stream().map(org -> org.getId()).toList();
+        List<UUID> orgIds =
+                organizations.findAll().stream().map(org -> org.getId()).toList();
         int sent = 0;
         for (UUID orgId : orgIds) {
             try {
@@ -109,11 +110,12 @@ public class PaymentReminderService {
         int count = 0;
         LocalDate today = LocalDate.now();
         for (PaymentReminderRule rule : active) {
-            LocalDate targetDue = switch (rule.getOffsetType() == null ? "AFTER_DUE" : rule.getOffsetType()) {
-                case "BEFORE_DUE" -> today.plusDays(rule.getDaysOffset());
-                case "ON_DUE" -> today;
-                default -> today.minusDays(rule.getDaysOffset());
-            };
+            LocalDate targetDue =
+                    switch (rule.getOffsetType() == null ? "AFTER_DUE" : rule.getOffsetType()) {
+                        case "BEFORE_DUE" -> today.plusDays(rule.getDaysOffset());
+                        case "ON_DUE" -> today;
+                        default -> today.minusDays(rule.getDaysOffset());
+                    };
             List<InvoiceSnapshot> invoices = findDueInvoices(orgId, targetDue);
             NotificationChannel channel = parseChannel(rule.getChannel());
             for (InvoiceSnapshot invoice : invoices) {
@@ -149,18 +151,16 @@ public class PaymentReminderService {
         if (channels.isEmpty()) {
             throw new BusinessException("Select at least one reminder channel");
         }
-        String subject = applyTemplate(
-                subjectTemplate,
-                "Payment reminder for invoice " + invoice.invoiceNumber(),
-                invoice);
+        String subject =
+                applyTemplate(subjectTemplate, "Payment reminder for invoice " + invoice.invoiceNumber(), invoice);
         String body = applyTemplate(
                 bodyTemplate,
                 "Dear " + invoice.customerName() + ", outstanding amount for invoice " + invoice.invoiceNumber()
                         + " is " + invoice.outstanding() + ".",
                 invoice);
 
-        NotificationRecipient recipient = new NotificationRecipient(
-                null, invoice.email(), invoice.phone(), invoice.customerName());
+        NotificationRecipient recipient =
+                new NotificationRecipient(null, invoice.email(), invoice.phone(), invoice.customerName());
 
         NotificationRequest notification = NotificationRequest.of(
                         NotificationType.PAYMENT_REMINDER, recipient, subject, body)
@@ -235,14 +235,15 @@ public class PaymentReminderService {
             throw new BusinessException(error == null ? "Unable to send payment reminder" : error);
         }
 
-        TenantContext.userId().ifPresent(userId -> notifications.send(NotificationRequest.of(
-                        NotificationType.SYSTEM,
-                        NotificationRecipient.user(userId, null, null),
-                        "Payment reminder sent",
-                        "Reminder for invoice " + invoice.invoiceNumber() + " was sent.")
-                .channel(NotificationChannel.IN_APP)
-                .organizationId(invoice.organizationId())
-                .related("SalesInvoice", invoice.id())));
+        TenantContext.userId()
+                .ifPresent(userId -> notifications.send(NotificationRequest.of(
+                                NotificationType.SYSTEM,
+                                NotificationRecipient.user(userId, null, null),
+                                "Payment reminder sent",
+                                "Reminder for invoice " + invoice.invoiceNumber() + " was sent.")
+                        .channel(NotificationChannel.IN_APP)
+                        .organizationId(invoice.organizationId())
+                        .related("SalesInvoice", invoice.id())));
 
         return new SendReminderResponse(reminderId, true, "Reminder sent");
     }
@@ -311,7 +312,8 @@ public class PaymentReminderService {
         UUID id = (UUID) row[0];
         UUID orgId = (UUID) row[1];
         String invoiceNumber = row[2] == null ? id.toString() : row[2].toString();
-        String outstanding = row[3] == null ? "0" : ((row[3] instanceof BigDecimal bd) ? bd.toPlainString() : row[3].toString());
+        String outstanding =
+                row[3] == null ? "0" : ((row[3] instanceof BigDecimal bd) ? bd.toPlainString() : row[3].toString());
         String email = row[4] == null ? null : row[4].toString();
         String phone = row[5] == null ? null : row[5].toString();
         String customerName = row[6] == null ? "Customer" : row[6].toString();
@@ -333,7 +335,8 @@ public class PaymentReminderService {
 
     private NotificationChannel parseChannel(String value) {
         try {
-            NotificationChannel channel = NotificationChannel.valueOf(value.trim().toUpperCase(Locale.ROOT));
+            NotificationChannel channel =
+                    NotificationChannel.valueOf(value.trim().toUpperCase(Locale.ROOT));
             if (channel == NotificationChannel.SMS) {
                 throw new BusinessException("SMS reminders are not supported yet");
             }
@@ -379,8 +382,7 @@ public class PaymentReminderService {
 
     private String applyTemplate(String template, String fallback, InvoiceSnapshot invoice) {
         if (template == null || template.isBlank()) return fallback;
-        return template
-                .replace("{{invoiceNumber}}", invoice.invoiceNumber())
+        return template.replace("{{invoiceNumber}}", invoice.invoiceNumber())
                 .replace("{{outstanding}}", invoice.outstanding())
                 .replace("{{customerName}}", invoice.customerName());
     }

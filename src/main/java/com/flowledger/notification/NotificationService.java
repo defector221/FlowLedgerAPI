@@ -1,12 +1,12 @@
 package com.flowledger.notification;
 
+import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.notification.config.NotificationProperties;
 import com.flowledger.notification.entity.InAppNotification;
 import com.flowledger.notification.entity.NotificationDelivery;
 import com.flowledger.notification.repository.InAppNotificationRepository;
 import com.flowledger.notification.repository.NotificationDeliveryRepository;
 import com.flowledger.notification.whatsapp.WhatsAppProvider;
-import com.flowledger.common.tenant.TenantContext;
 import java.time.OffsetDateTime;
 import java.util.EnumSet;
 import java.util.Set;
@@ -54,9 +54,10 @@ public class NotificationService {
         if (request == null || request.getRecipient() == null) {
             return result;
         }
-        Set<NotificationChannel> channels = request.getChannels() == null || request.getChannels().isEmpty()
-                ? EnumSet.of(NotificationChannel.EMAIL)
-                : request.getChannels();
+        Set<NotificationChannel> channels =
+                request.getChannels() == null || request.getChannels().isEmpty()
+                        ? EnumSet.of(NotificationChannel.EMAIL)
+                        : request.getChannels();
 
         UUID orgId = request.getOrganizationId() != null
                 ? request.getOrganizationId()
@@ -68,14 +69,21 @@ public class NotificationService {
                     case EMAIL -> result.add(sendEmail(request, orgId));
                     case WHATSAPP -> result.add(sendWhatsApp(request, orgId));
                     case IN_APP -> result.add(sendInApp(request, orgId));
-                    case SMS -> result.add(NotificationResult.ChannelResult.skipped(
-                            channel, "SMS channel is not implemented"));
+                    case SMS ->
+                        result.add(NotificationResult.ChannelResult.skipped(channel, "SMS channel is not implemented"));
                 }
             } catch (Exception ex) {
                 log.warn("Notification channel {} failed: {}", channel, ex.getMessage());
                 result.add(NotificationResult.ChannelResult.failed(
                         channel, recipientFor(channel, request.getRecipient()), ex.getMessage()));
-                recordDelivery(request, orgId, channel, recipientFor(channel, request.getRecipient()), "FAILED", null, ex.getMessage());
+                recordDelivery(
+                        request,
+                        orgId,
+                        channel,
+                        recipientFor(channel, request.getRecipient()),
+                        "FAILED",
+                        null,
+                        ex.getMessage());
             }
         }
         return result;
@@ -149,7 +157,8 @@ public class NotificationService {
         InAppNotification notification = new InAppNotification();
         notification.setOrganizationId(orgId);
         notification.setUserId(userId);
-        notification.setTitle(firstNonBlank(request.getSubject(), request.getType().name()));
+        notification.setTitle(
+                firstNonBlank(request.getSubject(), request.getType().name()));
         notification.setBody(request.getBody());
         notification.setNotificationType(request.getType().name());
         notification.setEntityType(request.getRelatedEntityType());
@@ -170,7 +179,10 @@ public class NotificationService {
             String error) {
         NotificationDelivery delivery = new NotificationDelivery();
         delivery.setOrganizationId(orgId);
-        delivery.setNotificationType(request.getType() == null ? NotificationType.SYSTEM.name() : request.getType().name());
+        delivery.setNotificationType(
+                request.getType() == null
+                        ? NotificationType.SYSTEM.name()
+                        : request.getType().name());
         delivery.setChannel(channel.name());
         delivery.setRecipient(truncate(recipient, 255));
         delivery.setSubject(truncate(request.getSubject(), 255));
@@ -188,7 +200,8 @@ public class NotificationService {
         return switch (channel) {
             case EMAIL -> recipient.email();
             case WHATSAPP, SMS -> recipient.phone();
-            case IN_APP -> recipient.userId() == null ? null : recipient.userId().toString();
+            case IN_APP ->
+                recipient.userId() == null ? null : recipient.userId().toString();
         };
     }
 

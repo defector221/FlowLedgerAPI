@@ -25,7 +25,8 @@ public class HtmlDocumentPdfRenderer {
         } catch (Exception ex) {
             String msg = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
             throw new IllegalArgumentException(
-                    "Unable to render HTML PDF (" + msg + "). Check template CSS for quoted fonts or unsupported styles.",
+                    "Unable to render HTML PDF (" + msg
+                            + "). Check template CSS for quoted fonts or unsupported styles.",
                     ex);
         }
     }
@@ -34,7 +35,9 @@ public class HtmlDocumentPdfRenderer {
     static String sanitizeCss(String html) {
         if (html == null || html.isBlank()) return "";
         // Multi-word font families with quotes → Georgia/Helvetica only
-        String out = html.replaceAll("(?i)font-family\\s*:\\s*[^;\"']*['\"][^;\"']*['\"][^;]*;", "font-family: Helvetica, Arial, sans-serif;");
+        String out = html.replaceAll(
+                "(?i)font-family\\s*:\\s*[^;\"']*['\"][^;\"']*['\"][^;]*;",
+                "font-family: Helvetica, Arial, sans-serif;");
         // 8-digit hex (#RRGGBBAA) is not reliably supported
         out = out.replaceAll("(?i)#([0-9a-f]{6})[0-9a-f]{2}\\b", "#$1");
         out = out.replace("font-variant-numeric:tabular-nums;", "");

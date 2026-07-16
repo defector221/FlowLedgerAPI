@@ -50,8 +50,7 @@ public class InAppNotificationService {
     }
 
     private UUID requireUser() {
-        return TenantContext.userId()
-                .orElseThrow(() -> new IllegalStateException("User context is not set"));
+        return TenantContext.userId().orElseThrow(() -> new IllegalStateException("User context is not set"));
     }
 
     private InAppNotificationResponse toResponse(InAppNotification n) {

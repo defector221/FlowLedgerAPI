@@ -8,7 +8,10 @@ import lombok.*;
 @Entity
 @Table(
         name = "categories",
-        uniqueConstraints = @UniqueConstraint(name = "uq_categories_org_name", columnNames = {"organization_id", "name"}))
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uq_categories_org_name",
+                        columnNames = {"organization_id", "name"}))
 @Getter
 @Setter
 @NoArgsConstructor

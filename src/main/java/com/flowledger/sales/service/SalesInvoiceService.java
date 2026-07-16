@@ -144,8 +144,7 @@ public class SalesInvoiceService {
                             .getStock(line.getProductId(), i.getWarehouseId())
                             .available();
                     if (!o.isAllowNegativeStock() && available.compareTo(line.getQuantity()) < 0) {
-                        String productLabel = products
-                                .findById(line.getProductId())
+                        String productLabel = products.findById(line.getProductId())
                                 .map(Product::getName)
                                 .filter(name -> name != null && !name.isBlank())
                                 .orElse(line.getProductId().toString());
@@ -156,7 +155,9 @@ public class SalesInvoiceService {
                                         + "\". Available: "
                                         + available.stripTrailingZeros().toPlainString()
                                         + ", required: "
-                                        + line.getQuantity().stripTrailingZeros().toPlainString());
+                                        + line.getQuantity()
+                                                .stripTrailingZeros()
+                                                .toPlainString());
                     }
                     inventory.postTransaction(new PostTransaction(
                             Type.SALE,
@@ -334,8 +335,12 @@ public class SalesInvoiceService {
                 cgst = BigDecimal.ZERO,
                 sgst = BigDecimal.ZERO,
                 igst = BigDecimal.ZERO;
-        String orgState = o.getStateCode() == null || o.getStateCode().isBlank() ? "00" : o.getStateCode().trim();
-        String pos = i.getPlaceOfSupply() == null || i.getPlaceOfSupply().isBlank() ? orgState : i.getPlaceOfSupply().trim();
+        String orgState = o.getStateCode() == null || o.getStateCode().isBlank()
+                ? "00"
+                : o.getStateCode().trim();
+        String pos = i.getPlaceOfSupply() == null || i.getPlaceOfSupply().isBlank()
+                ? orgState
+                : i.getPlaceOfSupply().trim();
         for (var l : i.getItems()) {
             BigDecimal discount = l.getQuantity()
                     .multiply(l.getRate())
@@ -398,7 +403,8 @@ public class SalesInvoiceService {
                     boolean stocked = isStockedProduct(product);
                     String itemType = product == null
                             ? "PRODUCT"
-                            : (product.getItemType() == null || product.getItemType().isBlank()
+                            : (product.getItemType() == null
+                                            || product.getItemType().isBlank()
                                     ? "PRODUCT"
                                     : product.getItemType());
                     UUID unitId = line.getUnitId() != null
@@ -466,8 +472,7 @@ public class SalesInvoiceService {
         return byId;
     }
 
-    private Map<UUID, String> loadUnitNames(
-            List<SalesInvoiceItem> lines, Map<UUID, Product> productById, UUID org) {
+    private Map<UUID, String> loadUnitNames(List<SalesInvoiceItem> lines, Map<UUID, Product> productById, UUID org) {
         Set<UUID> unitIds = new HashSet<>();
         for (SalesInvoiceItem line : lines) {
             if (line.getUnitId() != null) unitIds.add(line.getUnitId());
@@ -509,7 +514,9 @@ public class SalesInvoiceService {
         if (lines == null || lines.isEmpty()) return List.of();
         UUID org = TenantContext.getOrganizationId();
         Map<UUID, Product> byId = loadProducts(lines, org);
-        return lines.stream().filter(line -> isStockedProduct(byId.get(line.getProductId()))).toList();
+        return lines.stream()
+                .filter(line -> isStockedProduct(byId.get(line.getProductId())))
+                .toList();
     }
 
     private static boolean isStockedProduct(Product product) {

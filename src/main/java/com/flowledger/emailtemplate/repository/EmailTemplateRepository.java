@@ -13,6 +13,5 @@ public interface EmailTemplateRepository extends JpaRepository<EmailTemplate, UU
 
     boolean existsByOrganizationIdAndNameIgnoreCaseAndActiveTrue(UUID organizationId, String name);
 
-    boolean existsByOrganizationIdAndNameIgnoreCaseAndActiveTrueAndIdNot(
-            UUID organizationId, String name, UUID id);
+    boolean existsByOrganizationIdAndNameIgnoreCaseAndActiveTrueAndIdNot(UUID organizationId, String name, UUID id);
 }

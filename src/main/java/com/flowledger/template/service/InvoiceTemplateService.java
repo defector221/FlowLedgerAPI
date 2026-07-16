@@ -103,7 +103,8 @@ public class InvoiceTemplateService {
             existing.setDocumentType("SALES_INVOICE");
             existing.setEditorMode("SECTION");
             existing.setActive(true);
-            existing.setConfigJson(mergeLayoutConfig(existing.getConfigJson(), key, meta.accent(), meta.defaultTerms()));
+            existing.setConfigJson(
+                    mergeLayoutConfig(existing.getConfigJson(), key, meta.accent(), meta.defaultTerms()));
         }
 
         long defaults = em.createQuery(
@@ -190,14 +191,14 @@ public class InvoiceTemplateService {
     }
 
     private JsonNode mergeLayoutConfig(JsonNode existing, String layoutKey, String accent, String defaultTerms) {
-        ObjectNode root = existing != null && existing.isObject()
-                ? ((ObjectNode) existing).deepCopy()
-                : json.createObjectNode();
+        ObjectNode root =
+                existing != null && existing.isObject() ? ((ObjectNode) existing).deepCopy() : json.createObjectNode();
         root.put("layoutKey", layoutKey);
         ObjectNode header = root.has("header") && root.get("header").isObject()
                 ? (ObjectNode) root.get("header")
                 : root.putObject("header");
-        if (!header.hasNonNull("accentColor") || header.get("accentColor").asText().isBlank()) {
+        if (!header.hasNonNull("accentColor")
+                || header.get("accentColor").asText().isBlank()) {
             header.put("accentColor", accent);
         }
         if (!header.hasNonNull("title") || header.get("title").asText().isBlank()) {
@@ -206,11 +207,11 @@ public class InvoiceTemplateService {
         ObjectNode footer = root.has("footer") && root.get("footer").isObject()
                 ? (ObjectNode) root.get("footer")
                 : root.putObject("footer");
-        if (!footer.hasNonNull("defaultTerms") || footer.get("defaultTerms").asText().isBlank()) {
+        if (!footer.hasNonNull("defaultTerms")
+                || footer.get("defaultTerms").asText().isBlank()) {
             String note = footer.hasNonNull("note") ? footer.get("note").asText() : "";
             footer.put(
-                    "defaultTerms",
-                    note == null || note.isBlank() ? (defaultTerms == null ? "" : defaultTerms) : note);
+                    "defaultTerms", note == null || note.isBlank() ? (defaultTerms == null ? "" : defaultTerms) : note);
         }
         return root;
     }
@@ -371,7 +372,8 @@ public class InvoiceTemplateService {
     }
 
     private String resolvePresetKey(TemplateRequest r) {
-        if (r.presetKey() != null && !r.presetKey().isBlank()) return r.presetKey().trim();
+        if (r.presetKey() != null && !r.presetKey().isBlank())
+            return r.presetKey().trim();
         if (r.configJson() != null && r.configJson().hasNonNull("layoutKey")) {
             return r.configJson().get("layoutKey").asText();
         }

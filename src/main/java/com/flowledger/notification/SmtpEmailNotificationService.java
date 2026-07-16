@@ -33,8 +33,7 @@ public class SmtpEmailNotificationService implements EmailNotificationService {
             helper.setTo(recipient);
             helper.setSubject(subject);
             helper.setText("Please find your invoice attached.", false);
-            helper.addAttachment(
-                    "invoice.pdf", new ByteArrayResource(pdf == null ? new byte[0] : pdf));
+            helper.addAttachment("invoice.pdf", new ByteArrayResource(pdf == null ? new byte[0] : pdf));
             mailSender.send(message);
             log.info("SMTP invoice email sent to {}: {}", recipient, subject);
         } catch (Exception ex) {

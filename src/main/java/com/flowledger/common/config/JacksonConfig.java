@@ -16,8 +16,7 @@ public class JacksonConfig {
         // open-in-view is false — never force lazy loads during JSON write
         hibernateModule.disable(Hibernate6Module.Feature.FORCE_LAZY_LOADING);
         hibernateModule.enable(Hibernate6Module.Feature.SERIALIZE_IDENTIFIER_FOR_LAZY_NOT_LOADED_OBJECTS);
-        return builder
-                .modules(new JavaTimeModule(), hibernateModule)
+        return builder.modules(new JavaTimeModule(), hibernateModule)
                 .featuresToDisable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .build();
     }

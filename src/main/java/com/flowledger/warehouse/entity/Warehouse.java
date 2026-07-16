@@ -8,7 +8,9 @@ import lombok.*;
 @Table(
         name = "warehouses",
         uniqueConstraints =
-                @UniqueConstraint(name = "uq_warehouses_org_code", columnNames = {"organization_id", "warehouse_code"}))
+                @UniqueConstraint(
+                        name = "uq_warehouses_org_code",
+                        columnNames = {"organization_id", "warehouse_code"}))
 @Getter
 @Setter
 @NoArgsConstructor

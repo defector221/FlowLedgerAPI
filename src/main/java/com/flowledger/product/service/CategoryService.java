@@ -67,8 +67,8 @@ public class CategoryService extends OrganizationScopedService {
     public List<Response> list() {
         Specification<Category> spec = (root, query, builder) -> builder.equal(root.get("organizationId"), orgId());
         List<Category> rows = repo.findAll(spec);
-        Map<UUID, String> namesById = rows.stream()
-                .collect(Collectors.toMap(Category::getId, Category::getName, (left, right) -> left));
+        Map<UUID, String> namesById =
+                rows.stream().collect(Collectors.toMap(Category::getId, Category::getName, (left, right) -> left));
         return rows.stream().map(category -> toResponse(category, namesById)).toList();
     }
 
@@ -94,8 +94,7 @@ public class CategoryService extends OrganizationScopedService {
                 ? repo.existsByOrganizationIdAndNameIgnoreCase(org, name)
                 : repo.existsByOrganizationIdAndNameIgnoreCaseAndIdNot(org, name, excludeId);
         if (exists) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "Category name already exists in this organization");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Category name already exists in this organization");
         }
     }
 

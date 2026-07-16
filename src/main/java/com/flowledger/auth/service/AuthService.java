@@ -174,7 +174,8 @@ public class AuthService {
                 + ",\n\nUse this link to reset your password (valid for 1 hour):\n"
                 + link
                 + "\n\nIf you did not request this, you can ignore this email.";
-        String html = """
+        String html =
+                """
                 <div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a;max-width:560px">
                   <h2 style="margin:0 0 12px;font-size:20px">Reset your password</h2>
                   <p style="margin:0 0 16px">Hi %s,</p>
@@ -189,7 +190,7 @@ public class AuthService {
                   <p style="margin:20px 0 0;font-size:13px;color:#64748b">If you did not request this, you can ignore this email.</p>
                 </div>
                 """
-                .formatted(name, link, link, link);
+                        .formatted(name, link, link, link);
         UUID orgId = user.getLastActiveOrganizationId() != null
                 ? user.getLastActiveOrganizationId()
                 : user.getOrganizationId();

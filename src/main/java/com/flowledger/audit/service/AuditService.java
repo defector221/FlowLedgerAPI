@@ -41,7 +41,11 @@ public class AuditService {
             String ipAddress,
             String userAgent) {
         UUID organizationId = TenantContext.organizationId().orElse(null);
-        if (organizationId == null || action == null || action.isBlank() || entityType == null || entityType.isBlank()) {
+        if (organizationId == null
+                || action == null
+                || action.isBlank()
+                || entityType == null
+                || entityType.isBlank()) {
             return;
         }
         AuditLog log = new AuditLog();
@@ -71,15 +75,14 @@ public class AuditService {
         AuditLog log = repository
                 .findByIdAndOrganizationId(id, org)
                 .orElseThrow(() -> new ResourceNotFoundException("Audit log not found"));
-        User user = log.getUserId() == null ? null : users.findById(log.getUserId()).orElse(null);
+        User user =
+                log.getUserId() == null ? null : users.findById(log.getUserId()).orElse(null);
         return toResponse(log, user);
     }
 
     private Map<UUID, User> loadUsers(List<AuditLog> logs) {
-        Set<UUID> ids = logs.stream()
-                .map(AuditLog::getUserId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+        Set<UUID> ids =
+                logs.stream().map(AuditLog::getUserId).filter(Objects::nonNull).collect(Collectors.toSet());
         if (ids.isEmpty()) return Map.of();
         return users.findAllById(ids).stream().collect(Collectors.toMap(User::getId, Function.identity()));
     }
@@ -89,7 +92,8 @@ public class AuditService {
         String userEmail = null;
         if (user != null) {
             userEmail = user.getEmail();
-            String first = user.getFirstName() == null ? "" : user.getFirstName().trim();
+            String first =
+                    user.getFirstName() == null ? "" : user.getFirstName().trim();
             String last = user.getLastName() == null ? "" : user.getLastName().trim();
             userName = (first + " " + last).trim();
             if (userName.isBlank()) userName = userEmail;

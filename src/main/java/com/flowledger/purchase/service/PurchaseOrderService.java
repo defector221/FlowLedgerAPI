@@ -149,8 +149,7 @@ public class PurchaseOrderService {
                 x.setIgstAmount(tax);
             }
             default -> {
-                BigDecimal cgstShare =
-                        x.getCgstSharePercent() == null ? new BigDecimal("50") : x.getCgstSharePercent();
+                BigDecimal cgstShare = x.getCgstSharePercent() == null ? new BigDecimal("50") : x.getCgstSharePercent();
                 x.setCgstAmount(tax.multiply(cgstShare).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
                 x.setSgstAmount(tax.subtract(x.getCgstAmount()));
                 x.setIgstAmount(BigDecimal.ZERO);

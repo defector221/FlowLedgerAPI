@@ -14,7 +14,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
     @Bean
-    OpenAPI openAPI(@Value("${flowledger.app.public-api-url:https://apiflowledger.valiantxgroup.com}") String publicApiUrl) {
+    OpenAPI openAPI(
+            @Value("${flowledger.app.public-api-url:https://apiflowledger.valiantxgroup.com}") String publicApiUrl) {
         return new OpenAPI()
                 .info(new Info().title("FlowLedger API").version("v1"))
                 .servers(List.of(

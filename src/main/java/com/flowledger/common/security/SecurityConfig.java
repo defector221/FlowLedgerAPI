@@ -29,7 +29,10 @@ public class SecurityConfig {
                 .cors(c -> {})
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(e -> e.authenticationEntryPoint((request, response, authException) -> writeProblem(
-                                response, HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized", "Authentication required"))
+                                response,
+                                HttpServletResponse.SC_UNAUTHORIZED,
+                                "Unauthorized",
+                                "Authentication required"))
                         .accessDeniedHandler((request, response, accessDeniedException) -> writeProblem(
                                 response,
                                 HttpServletResponse.SC_FORBIDDEN,

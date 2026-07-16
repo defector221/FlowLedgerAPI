@@ -676,7 +676,11 @@ public class InvoicePdfService {
             BigDecimal outstandingAmount) {
         Map<String, String> tags = new HashMap<>();
         String currencyPrefix = DocumentHtmlTags.pdfCurrencyPrefix(org.getCurrency());
-        tags.put("currency", org.getCurrency() == null || org.getCurrency().isBlank() ? "INR" : org.getCurrency().trim().toUpperCase(Locale.ROOT));
+        tags.put(
+                "currency",
+                org.getCurrency() == null || org.getCurrency().isBlank()
+                        ? "INR"
+                        : org.getCurrency().trim().toUpperCase(Locale.ROOT));
         tags.put("currencyPrefix", currencyPrefix);
         tags.put("organizationName", org.getName() == null ? "FlowLedger" : org.getName());
         tags.put("gstin", nullToEmpty(org.getGstin()));
@@ -684,9 +688,7 @@ public class InvoicePdfService {
         tags.put("organizationPhone", nullToEmpty(org.getPhone()));
         tags.put(
                 "organizationAddress",
-                firstNonBlank(
-                        org.getBillingAddress(),
-                        joinAddress(org.getCity(), org.getState(), org.getCountry())));
+                firstNonBlank(org.getBillingAddress(), joinAddress(org.getCity(), org.getState(), org.getCountry())));
         tags.put("logoHtml", DocumentHtmlTags.logoHtml(loadOrgLogo(org)));
         tags.put("documentTitle", documentTitle);
         tags.put("invoiceNumber", number);

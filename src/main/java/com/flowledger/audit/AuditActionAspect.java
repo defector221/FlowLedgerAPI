@@ -33,8 +33,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Component
 @Slf4j
 public class AuditActionAspect {
-    private static final Pattern UUID_PATTERN = Pattern.compile(
-            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+    private static final Pattern UUID_PATTERN =
+            Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
     private static final Set<String> SKIP_CONTROLLERS = Set.of(
             "AuditController",
             "AuthController",
@@ -81,7 +81,9 @@ public class AuditActionAspect {
 
         String entityType = toEntityType(controller);
         String action = toAction(method);
-        UUID entityId = extractEntityId(pjp.getArgs()).or(() -> extractIdFromResult(result)).orElse(null);
+        UUID entityId = extractEntityId(pjp.getArgs())
+                .or(() -> extractIdFromResult(result))
+                .orElse(null);
 
         ObjectNode detail = objectMapper.createObjectNode();
         detail.put("controller", controller);
@@ -132,7 +134,8 @@ public class AuditActionAspect {
             if (node == null || node.isNull()) return null;
             if (node.isObject()) {
                 ObjectNode summary = objectMapper.createObjectNode();
-                for (String key : List.of("id", "status", "invoiceNumber", "documentNumber", "name", "email", "templateName")) {
+                for (String key :
+                        List.of("id", "status", "invoiceNumber", "documentNumber", "name", "email", "templateName")) {
                     if (node.has(key)) summary.set(key, node.get(key));
                 }
                 return summary.isEmpty() ? null : summary;

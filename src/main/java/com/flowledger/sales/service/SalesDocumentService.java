@@ -524,8 +524,7 @@ public class SalesDocumentService {
                 requestItems);
         InvoiceDetail draft = invoiceService.createDraft(request);
         invoiceService.confirm(draft.id());
-        return invoices
-                .findDetailedByIdAndOrganizationId(draft.id(), orgId())
+        return invoices.findDetailedByIdAndOrganizationId(draft.id(), orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
     }
 
@@ -641,9 +640,13 @@ public class SalesDocumentService {
         BigDecimal tax = BigDecimal.ZERO;
         BigDecimal grand = BigDecimal.ZERO;
         String pos = placeOfSupply == null || placeOfSupply.isBlank()
-                ? (org.getStateCode() == null || org.getStateCode().isBlank() ? "00" : org.getStateCode().trim())
+                ? (org.getStateCode() == null || org.getStateCode().isBlank()
+                        ? "00"
+                        : org.getStateCode().trim())
                 : placeOfSupply.trim();
-        String state = org.getStateCode() == null || org.getStateCode().isBlank() ? "00" : org.getStateCode().trim();
+        String state = org.getStateCode() == null || org.getStateCode().isBlank()
+                ? "00"
+                : org.getStateCode().trim();
         String supply = pos.isBlank() ? state : pos;
         int n = 0;
         for (Item item : items) {
@@ -666,12 +669,7 @@ public class SalesDocumentService {
             consumer.accept(
                     item,
                     new CalculatedLine(
-                            discount,
-                            r.taxable(),
-                            r.cgst(),
-                            r.sgst(),
-                            r.igst().add(r.otherTax()),
-                            r.lineTotal()),
+                            discount, r.taxable(), r.cgst(), r.sgst(), r.igst().add(r.otherTax()), r.lineTotal()),
                     n++);
             sub = sub.add(item.quantity().multiply(item.rate()));
             disc = disc.add(discount);

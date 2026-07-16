@@ -81,7 +81,11 @@ final class DocumentHtmlTags {
                         bd("35.00"),
                         bd("11800.00"),
                         currencyPrefix));
-        tags.put("currency", currencyCode == null || currencyCode.isBlank() ? "INR" : currencyCode.trim().toUpperCase(Locale.ROOT));
+        tags.put(
+                "currency",
+                currencyCode == null || currencyCode.isBlank()
+                        ? "INR"
+                        : currencyCode.trim().toUpperCase(Locale.ROOT));
         tags.put("currencyPrefix", currencyPrefix);
         tags.put("cgstTotal", "900.00");
         tags.put("sgstTotal", "900.00");
@@ -318,13 +322,14 @@ final class DocumentHtmlTags {
                 "<th align=\"right\" style=\"padding:12px 10px;font-weight:600;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;\">Total</th>");
         sb.append("</tr></thead><tbody>");
         if (lines == null || lines.isEmpty()) {
-            sb.append(
-                    "<tr><td colspan=\"5\" style=\"padding:14px;color:#9CA3AF;\">No line items</td></tr>");
+            sb.append("<tr><td colspan=\"5\" style=\"padding:14px;color:#9CA3AF;\">No line items</td></tr>");
         } else {
             for (Line line : lines) {
                 sb.append("<tr style=\"border-bottom:1px solid #E5E7EB;\">");
                 sb.append("<td style=\"padding:14px 10px;color:#111827;\">");
-                sb.append("<div style=\"font-weight:600;\">").append(esc(line.description())).append("</div>");
+                sb.append("<div style=\"font-weight:600;\">")
+                        .append(esc(line.description()))
+                        .append("</div>");
                 if (notBlank(line.hsn())) {
                     sb.append("<div style=\"margin-top:2px;font-size:12px;color:#9CA3AF;\">HSN/SAC ")
                             .append(esc(line.hsn()))
@@ -354,15 +359,13 @@ final class DocumentHtmlTags {
         }
         sb.append("</tbody><tfoot>");
         if (subtotal != null && subtotal.signum() != 0) {
-            sb.append(
-                    "<tr><td colspan=\"4\" align=\"right\" style=\"padding:8px 10px;color:#6B7280;\">Subtotal</td>");
+            sb.append("<tr><td colspan=\"4\" align=\"right\" style=\"padding:8px 10px;color:#6B7280;\">Subtotal</td>");
             sb.append("<td align=\"right\" style=\"padding:8px 10px;\">")
                     .append(esc(money(cur, subtotal)))
                     .append("</td></tr>");
         }
         if (discountTotal != null && discountTotal.signum() != 0) {
-            sb.append(
-                    "<tr><td colspan=\"4\" align=\"right\" style=\"padding:8px 10px;color:#6B7280;\">Discount</td>");
+            sb.append("<tr><td colspan=\"4\" align=\"right\" style=\"padding:8px 10px;color:#6B7280;\">Discount</td>");
             sb.append("<td align=\"right\" style=\"padding:8px 10px;\">- ")
                     .append(esc(money(cur, discountTotal)))
                     .append("</td></tr>");
@@ -372,8 +375,7 @@ final class DocumentHtmlTags {
         appendIvonneTaxRow(sb, "IGST", igst, cur);
         sb.append(
                 "<tr><td colspan=\"4\" align=\"right\" style=\"padding:14px 10px;font-weight:700;font-size:14px;color:#111827;\">Total Amount</td>");
-        sb.append(
-                        "<td align=\"right\" style=\"padding:14px 10px;font-weight:700;font-size:16px;color:#111827;\">")
+        sb.append("<td align=\"right\" style=\"padding:14px 10px;font-weight:700;font-size:16px;color:#111827;\">")
                 .append(esc(money(cur, grandTotal)))
                 .append("</td></tr>");
         sb.append("</tfoot></table>");

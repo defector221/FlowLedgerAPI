@@ -70,11 +70,7 @@ public class TaxRateService extends OrganizationScopedService {
     }
 
     private void applyTypeAndSplit(
-            TaxRate e,
-            TaxType taxType,
-            SplitStrategy splitStrategy,
-            BigDecimal cgstShare,
-            BigDecimal sgstShare) {
+            TaxRate e, TaxType taxType, SplitStrategy splitStrategy, BigDecimal cgstShare, BigDecimal sgstShare) {
         TaxType type = taxType == null ? (e.getTaxType() == null ? TaxType.GST : e.getTaxType()) : taxType;
         e.setTaxType(type);
 
@@ -112,8 +108,7 @@ public class TaxRateService extends OrganizationScopedService {
         }
         BigDecimal sum = cgst.add(sgst);
         if (sum.subtract(HUNDRED).abs().compareTo(SHARE_TOLERANCE) > 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "CGST and SGST share percents must sum to 100");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CGST and SGST share percents must sum to 100");
         }
     }
 
@@ -133,10 +128,8 @@ public class TaxRateService extends OrganizationScopedService {
                 e.setIgstRate(BigDecimal.ZERO);
             }
             case PLACE_OF_SUPPLY, CUSTOM_PERCENT -> {
-                BigDecimal cgstShare =
-                        e.getCgstSharePercent() == null ? new BigDecimal("50") : e.getCgstSharePercent();
-                BigDecimal sgstShare =
-                        e.getSgstSharePercent() == null ? new BigDecimal("50") : e.getSgstSharePercent();
+                BigDecimal cgstShare = e.getCgstSharePercent() == null ? new BigDecimal("50") : e.getCgstSharePercent();
+                BigDecimal sgstShare = e.getSgstSharePercent() == null ? new BigDecimal("50") : e.getSgstSharePercent();
                 e.setCgstRate(rate.multiply(cgstShare).divide(HUNDRED, 4, RoundingMode.HALF_UP));
                 e.setSgstRate(rate.multiply(sgstShare).divide(HUNDRED, 4, RoundingMode.HALF_UP));
                 e.setIgstRate(rate);

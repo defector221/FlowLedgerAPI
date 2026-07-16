@@ -13,13 +13,8 @@ public final class FixedInvoiceLayouts {
 
     public static final String DEFAULT_KEY = "classic-sage";
 
-    public static final Set<String> KEYS = Set.of(
-            "classic-sage",
-            "botanical",
-            "mint-gradient",
-            "coral-accent",
-            "elegant-classic",
-            "ivonne-hosting");
+    public static final Set<String> KEYS =
+            Set.of("classic-sage", "botanical", "mint-gradient", "coral-accent", "elegant-classic", "ivonne-hosting");
 
     public static boolean supports(String layoutKey) {
         return layoutKey != null && KEYS.contains(layoutKey.trim().toLowerCase());
@@ -48,7 +43,9 @@ public final class FixedInvoiceLayouts {
                 new PresetMeta("Classic Sage", "#9CAF88", "Payment due within 15 days of invoice date."));
         map.put("botanical", new PresetMeta("Botanical Minimal", "#6B7280", "Thank you for your business."));
         map.put("mint-gradient", new PresetMeta("Mint Gradient", "#14B8A6", "Goods once sold will not be taken back."));
-        map.put("coral-accent", new PresetMeta("Coral Accent", "#E07A5F", "Payment due within 15 days of invoice date."));
+        map.put(
+                "coral-accent",
+                new PresetMeta("Coral Accent", "#E07A5F", "Payment due within 15 days of invoice date."));
         map.put(
                 "elegant-classic",
                 new PresetMeta("Elegant Classic", "#111827", "This is a computer-generated tax invoice."));
@@ -133,7 +130,8 @@ public final class FixedInvoiceLayouts {
 
     private static String classicSage() {
         String accent = "#9CAF88";
-        return wrap("""
+        return wrap(
+                """
                 <table><tr>
                 <td valign="top">{{logoHtml}}
                 <div style="font-size:14px;font-weight:700;margin-top:8px;">{{organizationName}}</div>
@@ -145,15 +143,16 @@ public final class FixedInvoiceLayouts {
                 <div style="font-size:18px;font-weight:700;color:#9CAF88;margin-top:8px;">{{currencyPrefix}}{{grandTotal}}</div>
                 </td></tr></table>
                 """
-                + partiesBlock("#e2e8f0")
-                + "<div style=\"margin-top:20px;border-top:2px solid "
-                + accent
-                + ";padding-top:12px;\"><div style=\"background:#F3F6EF;border-radius:4px;overflow:hidden;\">{{lineItemsHtml}}</div></div>"
-                + footerTerms(accent));
+                        + partiesBlock("#e2e8f0")
+                        + "<div style=\"margin-top:20px;border-top:2px solid "
+                        + accent
+                        + ";padding-top:12px;\"><div style=\"background:#F3F6EF;border-radius:4px;overflow:hidden;\">{{lineItemsHtml}}</div></div>"
+                        + footerTerms(accent));
     }
 
     private static String botanical() {
-        return wrap("""
+        return wrap(
+                """
                 <table><tr>
                 <td width="14%" valign="top" style="padding-top:8px;font-size:28px;line-height:1;color:#9CA3AF;">*</td>
                 <td valign="top">
@@ -161,18 +160,19 @@ public final class FixedInvoiceLayouts {
                 <div style="font-size:13px;font-weight:600;margin-top:10px;color:#374151;">{{organizationName}}</div>
                 <div class="title-serif" style="font-size:32px;font-weight:600;margin-top:16px;color:#1f2937;">Invoice</div>
                 """
-                + metaRow("#6B7280")
-                + """
+                        + metaRow("#6B7280")
+                        + """
                 </td></tr></table>
                 """
-                + partiesBlock("#e5e7eb")
-                + "<div style=\"margin-top:20px;\">{{lineItemsHtml}}</div>"
-                + footerTerms("#6B7280"));
+                        + partiesBlock("#e5e7eb")
+                        + "<div style=\"margin-top:20px;\">{{lineItemsHtml}}</div>"
+                        + footerTerms("#6B7280"));
     }
 
     private static String mintGradient() {
         String accent = "#0F766E";
-        return wrap("""
+        return wrap(
+                """
                 <div style="background-color:#5EEAD4;padding:20px 18px;border-radius:6px 6px 0 0;">
                 <table><tr>
                 <td valign="middle">{{logoHtml}}
@@ -180,15 +180,16 @@ public final class FixedInvoiceLayouts {
                 <td valign="middle" style="text-align:right;font-size:34px;font-weight:800;color:#0f172a;line-height:1;">Invoice</td>
                 </tr></table></div>
                 """
-                + metaRow(accent)
-                + partiesBlock("#e2e8f0")
-                + "<div style=\"margin-top:20px;background:#ECFEFF;border-radius:4px;overflow:hidden;\">{{lineItemsHtml}}</div>"
-                + footerTerms(accent));
+                        + metaRow(accent)
+                        + partiesBlock("#e2e8f0")
+                        + "<div style=\"margin-top:20px;background:#ECFEFF;border-radius:4px;overflow:hidden;\">{{lineItemsHtml}}</div>"
+                        + footerTerms(accent));
     }
 
     private static String coralAccent() {
         String accent = "#E07A5F";
-        return wrap("""
+        return wrap(
+                """
                 <table><tr>
                 <td valign="top">{{logoHtml}}
                 <div style="font-size:14px;font-weight:700;margin-top:8px;">{{organizationName}}</div>
@@ -200,28 +201,30 @@ public final class FixedInvoiceLayouts {
                 <div style="font-size:18px;font-weight:700;color:#E07A5F;margin-top:8px;">{{currencyPrefix}}{{grandTotal}}</div>
                 </td></tr></table>
                 """
-                + partiesBlock("#fed7aa")
-                + "<div style=\"margin-top:20px;border-top:2px solid "
-                + accent
-                + ";padding-top:12px;\"><div style=\"background:#FFF7F5;border-radius:4px;overflow:hidden;\">{{lineItemsHtml}}</div></div>"
-                + footerTerms(accent));
+                        + partiesBlock("#fed7aa")
+                        + "<div style=\"margin-top:20px;border-top:2px solid "
+                        + accent
+                        + ";padding-top:12px;\"><div style=\"background:#FFF7F5;border-radius:4px;overflow:hidden;\">{{lineItemsHtml}}</div></div>"
+                        + footerTerms(accent));
     }
 
     private static String elegantClassic() {
-        return wrap("""
+        return wrap(
+                """
                 <div style="text-align:center;margin-bottom:8px;">
                 <div>{{logoHtml}}</div>
                 <div class="title-serif" style="font-size:40px;font-weight:500;margin-top:12px;letter-spacing:0.02em;">Invoice</div>
                 <div class="muted" style="margin-top:8px;">{{organizationName}} · {{invoiceNumber}} · {{invoiceDate}}</div>
                 </div>
                 """
-                + partiesBlock("#e7e5e4")
-                + "<div style=\"margin-top:22px;\">{{lineItemsHtml}}</div>"
-                + footerTerms("#111827"));
+                        + partiesBlock("#e7e5e4")
+                        + "<div style=\"margin-top:22px;\">{{lineItemsHtml}}</div>"
+                        + footerTerms("#111827"));
     }
 
     private static String ivonne() {
-        return wrap("""
+        return wrap(
+                """
                 <table><tr>
                 <td valign="top"><div style="font-size:22px;font-weight:700;">#{{invoiceNumber}}</div></td>
                 <td valign="top" style="text-align:right;">{{logoHtml}}

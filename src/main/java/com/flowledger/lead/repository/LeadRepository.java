@@ -14,8 +14,7 @@ public interface LeadRepository extends JpaRepository<Lead, UUID>, JpaSpecificat
 
     Page<Lead> findByOrganizationIdAndArchivedFalse(UUID organizationId, Pageable pageable);
 
-    Page<Lead> findByOrganizationIdAndStatusAndArchivedFalse(
-            UUID organizationId, String status, Pageable pageable);
+    Page<Lead> findByOrganizationIdAndStatusAndArchivedFalse(UUID organizationId, String status, Pageable pageable);
 
     List<Lead> findByOrganizationIdAndArchivedFalse(UUID organizationId);
 }
