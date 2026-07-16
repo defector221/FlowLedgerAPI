@@ -1,5 +1,6 @@
 package com.flowledger.accounting.entity;
 
+import com.flowledger.accounting.domain.AccountStatus;
 import com.flowledger.accounting.domain.AccountSubType;
 import com.flowledger.accounting.domain.AccountType;
 import com.flowledger.accounting.domain.SystemAccountKey;
@@ -23,6 +24,9 @@ public class Account extends AuditedEntity {
     @Column(name = "account_name", nullable = false)
     private String accountName;
 
+    @Column(columnDefinition = "text")
+    private String description;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "account_type", nullable = false)
     private AccountType accountType;
@@ -41,6 +45,17 @@ public class Account extends AuditedEntity {
     @Column(name = "system_account", nullable = false)
     private boolean systemAccount;
 
+    @Column(name = "is_editable", nullable = false)
+    private boolean editable = true;
+
+    @Column(name = "is_deletable", nullable = false)
+    private boolean deletable = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AccountStatus status = AccountStatus.ACTIVE;
+
+    /** Kept in sync with {@link #status} for backward compatibility with existing queries. */
     @Column(nullable = false)
     private boolean active = true;
 
@@ -52,4 +67,18 @@ public class Account extends AuditedEntity {
 
     @Column(name = "opening_credit", nullable = false, precision = 19, scale = 4)
     private BigDecimal openingCredit = BigDecimal.ZERO;
+
+    public void setStatus(AccountStatus status) {
+        this.status = status == null ? AccountStatus.ACTIVE : status;
+        this.active = this.status == AccountStatus.ACTIVE;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+        this.status = active ? AccountStatus.ACTIVE : AccountStatus.INACTIVE;
+    }
+
+    public boolean isGroupHeader() {
+        return systemAccount && systemAccountKey == null;
+    }
 }

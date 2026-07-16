@@ -48,6 +48,11 @@ public class AccountingController {
         return ApiResponse.of(accounts.list());
     }
 
+    @GetMapping("/accounts/tree")
+    public ApiResponse<List<AccountTreeNode>> accountTree() {
+        return ApiResponse.of(accounts.tree());
+    }
+
     @GetMapping("/accounts/{id}")
     public ApiResponse<AccountResponse> getAccount(@PathVariable UUID id) {
         return ApiResponse.of(accounts.get(id));
@@ -63,6 +68,12 @@ public class AccountingController {
     public ApiResponse<AccountResponse> updateAccount(
             @PathVariable UUID id, @Valid @RequestBody AccountRequest request) {
         return ApiResponse.of(accounts.update(id, request));
+    }
+
+    @DeleteMapping("/accounts/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAccount(@PathVariable UUID id) {
+        accounts.delete(id);
     }
 
     @GetMapping("/fiscal-years")

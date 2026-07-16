@@ -16,13 +16,18 @@ public final class AccountingMapper {
     public static AccountResponse toAccount(Account a) {
         return new AccountResponse(
                 a.getId(),
+                a.getOrganizationId(),
                 a.getAccountCode(),
                 a.getAccountName(),
+                a.getDescription(),
                 a.getAccountType(),
                 a.getAccountSubType(),
                 a.getParentAccountId(),
                 a.getSystemAccountKey(),
                 a.isSystemAccount(),
+                a.isEditable(),
+                a.isDeletable(),
+                a.getStatus(),
                 a.isActive(),
                 a.isAllowManualPosting(),
                 a.getOpeningDebit(),

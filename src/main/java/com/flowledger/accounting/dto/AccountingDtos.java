@@ -17,27 +17,51 @@ public final class AccountingDtos {
     public record AccountRequest(
             @NotBlank String accountCode,
             @NotBlank String accountName,
+            String description,
             @NotNull AccountType accountType,
             AccountSubType accountSubType,
             UUID parentAccountId,
             Boolean active,
+            AccountStatus status,
             Boolean allowManualPosting,
             BigDecimal openingDebit,
             BigDecimal openingCredit) {}
 
     public record AccountResponse(
             UUID id,
+            UUID organizationId,
             String accountCode,
             String accountName,
+            String description,
             AccountType accountType,
             AccountSubType accountSubType,
             UUID parentAccountId,
             SystemAccountKey systemAccountKey,
             boolean systemAccount,
+            boolean editable,
+            boolean deletable,
+            AccountStatus status,
             boolean active,
             boolean allowManualPosting,
             BigDecimal openingDebit,
             BigDecimal openingCredit) {}
+
+    public record AccountTreeNode(
+            UUID id,
+            String accountCode,
+            String accountName,
+            String description,
+            AccountType accountType,
+            AccountSubType accountSubType,
+            UUID parentAccountId,
+            SystemAccountKey systemAccountKey,
+            boolean systemAccount,
+            boolean editable,
+            boolean deletable,
+            AccountStatus status,
+            boolean active,
+            boolean allowManualPosting,
+            java.util.List<AccountTreeNode> children) {}
 
     public record FiscalYearRequest(@NotBlank String name, @NotNull LocalDate startDate, @NotNull LocalDate endDate) {}
 

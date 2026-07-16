@@ -12,6 +12,8 @@ public interface JournalEntryLineRepository extends JpaRepository<JournalEntryLi
 
     void deleteByJournalEntryId(UUID journalEntryId);
 
+    boolean existsByOrganizationIdAndAccountId(UUID organizationId, UUID accountId);
+
     @Query(
             """
             select l from JournalEntryLine l, JournalEntry j
