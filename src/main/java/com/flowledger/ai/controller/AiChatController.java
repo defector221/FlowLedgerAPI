@@ -1,11 +1,13 @@
 package com.flowledger.ai.controller;
 
+import com.flowledger.ai.agent.AgentCatalogService;
 import com.flowledger.ai.chat.ChatOrchestrationService;
 import com.flowledger.ai.config.ConditionalOnAiEnabled;
 import com.flowledger.ai.dto.AiDtos;
 import com.flowledger.ai.entity.AiConversation;
 import com.flowledger.ai.entity.AiMessage;
 import com.flowledger.ai.memory.ConversationMemoryService;
+import com.flowledger.ai.workflow.VoiceAiService;
 import com.flowledger.common.security.UserPrincipal;
 import com.flowledger.common.tenant.TenantContext;
 import jakarta.validation.Valid;
@@ -28,10 +30,25 @@ import org.springframework.web.server.ResponseStatusException;
 public class AiChatController {
     private final ChatOrchestrationService chat;
     private final ConversationMemoryService memory;
+    private final AgentCatalogService agents;
+    private final VoiceAiService voiceAi;
 
-    public AiChatController(ChatOrchestrationService chat, ConversationMemoryService memory) {
+    public AiChatController(
+            ChatOrchestrationService chat,
+            ConversationMemoryService memory,
+            AgentCatalogService agents,
+            VoiceAiService voiceAi) {
         this.chat = chat;
         this.memory = memory;
+        this.agents = agents;
+        this.voiceAi = voiceAi;
+    }
+
+    @GetMapping("/agents")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasRole('ORGANIZATION_ADMIN')")
+    public List<AiDtos.AgentInfo> listAgents(@AuthenticationPrincipal UserPrincipal principal) {
+        ensureTenant(principal);
+        return agents.list();
     }
 
     @PostMapping("/chat")
@@ -40,6 +57,35 @@ public class AiChatController {
             @AuthenticationPrincipal UserPrincipal principal, @Valid @RequestBody AiDtos.ChatRequest request) {
         ensureTenant(principal);
         return chat.chat(request);
+    }
+
+    @PostMapping("/ask")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasRole('ORGANIZATION_ADMIN')")
+    public AiDtos.ChatResponse ask(
+            @AuthenticationPrincipal UserPrincipal principal, @Valid @RequestBody AiDtos.ChatRequest request) {
+        ensureTenant(principal);
+        return chat.ask(request);
+    }
+
+    @PostMapping("/voice-chat")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasRole('ORGANIZATION_ADMIN')")
+    public AiDtos.ChatResponse voiceChat(
+            @AuthenticationPrincipal UserPrincipal principal, @RequestBody AiDtos.VoiceChatRequest request) {
+        ensureTenant(principal);
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "request required");
+        }
+        AiDtos.VoiceAiResponse transcribed =
+                voiceAi.transcribe(new AiDtos.VoiceAiRequest(request.contentType(), request.audioBase64()));
+        if (!transcribed.configured()
+                || transcribed.transcript() == null
+                || transcribed.transcript().isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    transcribed.message() == null ? "AI temporarily unavailable" : transcribed.message());
+        }
+        return chat.chat(new AiDtos.ChatRequest(
+                request.conversationId(), transcribed.transcript(), request.agent(), true));
     }
 
     @GetMapping("/conversations")

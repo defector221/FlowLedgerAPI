@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.flowledger.ai.agent.AiAgent;
 import com.flowledger.ai.agent.AiAgentType;
 import com.flowledger.ai.agent.AgentSelector;
+import com.flowledger.ai.agent.MultiAgentCollaborator;
 import com.flowledger.ai.audit.AiAuditService;
 import com.flowledger.ai.config.AiProperties;
 import com.flowledger.ai.dto.AiDtos;
@@ -23,6 +24,7 @@ import com.flowledger.ai.prompt.PromptTemplateService;
 import com.flowledger.ai.provider.AIProvider;
 import com.flowledger.ai.provider.AIProviderRegistry;
 import com.flowledger.ai.rag.RagService;
+import com.flowledger.ai.repository.AiAgentRunRepository;
 import com.flowledger.ai.repository.AiKnowledgeDocumentRepository;
 import com.flowledger.ai.tools.AiToolRegistry;
 import com.flowledger.common.tenant.TenantContext;
@@ -40,6 +42,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class AiChatServiceTest {
     @Mock
     AgentSelector agentSelector;
+
+    @Mock
+    MultiAgentCollaborator collaborator;
 
     @Mock
     PromptTemplateService prompts;
@@ -68,6 +73,9 @@ class AiChatServiceTest {
     @Mock
     EmbeddingPipeline embeddingPipeline;
 
+    @Mock
+    AiAgentRunRepository agentRuns;
+
     private ChatOrchestrationService service;
     private final UUID orgId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
@@ -79,10 +87,12 @@ class AiChatServiceTest {
         properties.setEnabled(true);
         properties.setChatEnabled(true);
         properties.setRagEnabled(true);
+        properties.setMultiAgentEnabled(true);
         properties.getOpenai().setChatModel("gpt-4o-mini");
         service = new ChatOrchestrationService(
                 properties,
                 agentSelector,
+                collaborator,
                 prompts,
                 memory,
                 tools,
@@ -90,7 +100,8 @@ class AiChatServiceTest {
                 providers,
                 audit,
                 knowledgeDocuments,
-                embeddingPipeline);
+                embeddingPipeline,
+                agentRuns);
     }
 
     @AfterEach
@@ -103,12 +114,12 @@ class AiChatServiceTest {
         AiAgent agent = new AiAgent() {
             @Override
             public AiAgentType type() {
-                return AiAgentType.CEO;
+                return AiAgentType.ASK;
             }
 
             @Override
             public String systemPromptTemplate() {
-                return "agent-ceo";
+                return "agent-ask";
             }
 
             @Override
@@ -118,6 +129,8 @@ class AiChatServiceTest {
         };
         when(knowledgeDocuments.countByOrganizationId(orgId)).thenReturn(1L);
         when(agentSelector.select(any(), anyString())).thenReturn(agent);
+        when(collaborator.consult(any(), anyString()))
+                .thenReturn(new MultiAgentCollaborator.ConsultResult(List.of("CFO"), "### AI CFO\nok"));
 
         AiConversation conversation = new AiConversation();
         conversation.setId(UUID.randomUUID());
@@ -128,7 +141,7 @@ class AiChatServiceTest {
                 .thenReturn(new AiMessage());
         when(rag.retrieveContext(anyString(), anyInt())).thenReturn("");
         when(tools.invokeAllowed(any(), anyString())).thenReturn("dashboard ok");
-        when(prompts.render(eq("agent-ceo"), any())).thenReturn("system prompt");
+        when(prompts.render(eq("agent-ask"), any())).thenReturn("system prompt");
         when(memory.historyAsChat(any(), anyInt()))
                 .thenReturn(List.of(new AIProvider.ChatMessage("user", "summary please")));
         when(providers.active()).thenReturn(provider);
@@ -143,11 +156,12 @@ class AiChatServiceTest {
                 .thenReturn(assistant);
 
         AiDtos.ChatResponse response =
-                service.chat(new AiDtos.ChatRequest(null, "Give me a dashboard summary", "CEO", true));
+                service.chat(new AiDtos.ChatRequest(null, "Give me a dashboard summary", null, true));
 
         assertEquals(conversation.getId(), response.conversationId());
         assertTrue(response.content().contains("AI mock response"));
-        assertEquals("CEO", response.agent());
+        assertEquals("ASK", response.agent());
+        assertEquals(List.of("CFO"), response.consultedAgents());
         verify(audit).record(eq("CHAT"), anyString(), anyString(), anyString(), any(), any(), eq(null));
     }
 }

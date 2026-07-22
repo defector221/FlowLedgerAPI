@@ -1,12 +1,15 @@
 package com.flowledger.ai.chat;
 
 import com.flowledger.ai.agent.AiAgent;
+import com.flowledger.ai.agent.AiAgentType;
 import com.flowledger.ai.agent.AgentSelector;
+import com.flowledger.ai.agent.MultiAgentCollaborator;
 import com.flowledger.ai.audit.AiAuditService;
 import com.flowledger.ai.config.AiProperties;
 import com.flowledger.ai.config.ConditionalOnAiEnabled;
 import com.flowledger.ai.dto.AiDtos;
 import com.flowledger.ai.embedding.EmbeddingPipeline;
+import com.flowledger.ai.entity.AiAgentRun;
 import com.flowledger.ai.entity.AiConversation;
 import com.flowledger.ai.entity.AiKnowledgeDocument;
 import com.flowledger.ai.entity.AiMessage;
@@ -16,6 +19,7 @@ import com.flowledger.ai.provider.AIProvider;
 import com.flowledger.ai.provider.AIProviderRegistry;
 import com.flowledger.ai.provider.AiProviderException;
 import com.flowledger.ai.rag.RagService;
+import com.flowledger.ai.repository.AiAgentRunRepository;
 import com.flowledger.ai.repository.AiKnowledgeDocumentRepository;
 import com.flowledger.ai.tools.AiToolRegistry;
 import com.flowledger.common.tenant.TenantContext;
@@ -31,16 +35,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Orchestrates chat: agent selection → optional RAG → keyword tool routing → provider call.
- *
- * <p>Interim tool binding: detects keywords and invokes {@link AiToolRegistry} directly. LangChain4j
- * AiServices + {@code @Tool} methods on tool beans are available for a later wiring pass.
+ * Orchestrates chat: agent selection → optional multi-agent consult → RAG → tools → provider.
  */
 @Service
 @ConditionalOnAiEnabled
 public class ChatOrchestrationService {
     private final AiProperties properties;
     private final AgentSelector agentSelector;
+    private final MultiAgentCollaborator collaborator;
     private final PromptTemplateService prompts;
     private final ConversationMemoryService memory;
     private final AiToolRegistry tools;
@@ -49,10 +51,12 @@ public class ChatOrchestrationService {
     private final AiAuditService audit;
     private final AiKnowledgeDocumentRepository knowledgeDocuments;
     private final EmbeddingPipeline embeddingPipeline;
+    private final AiAgentRunRepository agentRuns;
 
     public ChatOrchestrationService(
             AiProperties properties,
             AgentSelector agentSelector,
+            MultiAgentCollaborator collaborator,
             PromptTemplateService prompts,
             ConversationMemoryService memory,
             AiToolRegistry tools,
@@ -60,9 +64,11 @@ public class ChatOrchestrationService {
             AIProviderRegistry providers,
             AiAuditService audit,
             AiKnowledgeDocumentRepository knowledgeDocuments,
-            EmbeddingPipeline embeddingPipeline) {
+            EmbeddingPipeline embeddingPipeline,
+            AiAgentRunRepository agentRuns) {
         this.properties = properties;
         this.agentSelector = agentSelector;
+        this.collaborator = collaborator;
         this.prompts = prompts;
         this.memory = memory;
         this.tools = tools;
@@ -71,6 +77,7 @@ public class ChatOrchestrationService {
         this.audit = audit;
         this.knowledgeDocuments = knowledgeDocuments;
         this.embeddingPipeline = embeddingPipeline;
+        this.agentRuns = agentRuns;
     }
 
     @Transactional
@@ -88,6 +95,7 @@ public class ChatOrchestrationService {
 
         seedKnowledgeIfNeeded(org);
 
+        long start = System.currentTimeMillis();
         AiAgent agent = agentSelector.select(request.agent(), request.message());
         AiConversation conversation =
                 memory.getOrCreate(request.conversationId(), userId, agent.type().name(), request.message());
@@ -99,13 +107,18 @@ public class ChatOrchestrationService {
         String ragContext = useRag ? rag.retrieveContext(request.message(), 3) : "";
         String toolContext = gatherToolContext(agent.allowedTools(), request.message());
 
+        MultiAgentCollaborator.ConsultResult consult = collaborator.consult(agent.type(), request.message());
+        String consultBlock = consult.specialistNotes().isBlank()
+                ? ""
+                : "Specialist consult notes:\n" + consult.specialistNotes();
+
         String system = prompts.render(
                 agent.systemPromptTemplate(),
                 Map.of(
                         "organizationName",
                         org.toString(),
                         "context",
-                        (ragContext + "\n" + toolContext).trim(),
+                        (ragContext + "\n" + toolContext + "\n" + consultBlock).trim(),
                         "question",
                         request.message()));
 
@@ -119,17 +132,12 @@ public class ChatOrchestrationService {
                     .active()
                     .chat(new AIProvider.ChatRequest(properties.getOpenai().getChatModel(), messages, 0.2));
         } catch (AiProviderException e) {
-            audit.record(
-                    "CHAT",
-                    request.message(),
-                    null,
-                    null,
-                    null,
-                    null,
-                    e.getMessage());
+            audit.record("CHAT", request.message(), null, null, null, null, e.getMessage());
+            recordRun(org, userId, conversation.getId(), agent.type(), consult.consultedAgents(), request.message(), start, "ERROR");
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "AI temporarily unavailable");
         } catch (Exception e) {
             audit.record("CHAT", request.message(), null, null, null, null, e.getMessage());
+            recordRun(org, userId, conversation.getId(), agent.type(), consult.consultedAgents(), request.message(), start, "ERROR");
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "AI temporarily unavailable");
         }
 
@@ -153,19 +161,62 @@ public class ChatOrchestrationService {
                 (int) result.latencyMs(),
                 null);
 
+        recordRun(
+                org,
+                userId,
+                conversation.getId(),
+                agent.type(),
+                consult.consultedAgents(),
+                request.message(),
+                start,
+                "OK");
+
         return new AiDtos.ChatResponse(
                 conversation.getId(),
                 assistant.getId(),
                 agent.type().name(),
                 result.content(),
                 result.model(),
-                result.latencyMs());
+                result.latencyMs(),
+                List.copyOf(consult.consultedAgents()));
+    }
+
+    /** Forced Global Ask Agent entry for FAB clients. */
+    @Transactional
+    public AiDtos.ChatResponse ask(AiDtos.ChatRequest request) {
+        String message = request == null ? null : request.message();
+        return chat(new AiDtos.ChatRequest(
+                request == null ? null : request.conversationId(), message, AiAgentType.ASK.name(), request == null ? null : request.useRag()));
+    }
+
+    private void recordRun(
+            UUID org,
+            UUID userId,
+            UUID conversationId,
+            AiAgentType primary,
+            List<String> consulted,
+            String message,
+            long start,
+            String status) {
+        try {
+            AiAgentRun run = new AiAgentRun();
+            run.setOrganizationId(org);
+            run.setUserId(userId);
+            run.setConversationId(conversationId);
+            run.setPrimaryAgent(primary.name());
+            run.setConsultedAgents(consulted == null || consulted.isEmpty() ? null : String.join(",", consulted));
+            run.setMessagePreview(message == null ? null : message.substring(0, Math.min(500, message.length())));
+            run.setLatencyMs((int) (System.currentTimeMillis() - start));
+            run.setStatus(status);
+            agentRuns.save(run);
+        } catch (Exception ignored) {
+            // audit best-effort
+        }
     }
 
     private String gatherToolContext(Set<String> allowed, String message) {
         Set<String> toRun = selectToolsForMessage(allowed, message);
         if (toRun.isEmpty()) {
-            // still give CEO a dashboard snapshot
             if (allowed.contains("dashboard")) {
                 toRun = Set.of("dashboard");
             } else {
@@ -179,15 +230,15 @@ public class ChatOrchestrationService {
         String m = message == null ? "" : message.toLowerCase(Locale.ROOT);
         java.util.LinkedHashSet<String> selected = new java.util.LinkedHashSet<>();
         addIf(allowed, selected, "inventory", m, "stock", "inventory", "reorder", "warehouse");
-        addIf(allowed, selected, "sales", m, "sales", "invoice", "revenue");
-        addIf(allowed, selected, "purchase", m, "purchase", "po", "grn");
-        addIf(allowed, selected, "payment", m, "payment", "receivable", "payable", "cash");
+        addIf(allowed, selected, "sales", m, "sales", "invoice", "revenue", "pipeline");
+        addIf(allowed, selected, "purchase", m, "purchase", "po", "grn", "vendor");
+        addIf(allowed, selected, "payment", m, "payment", "receivable", "payable", "cash", "collect", "overdue");
         addIf(allowed, selected, "gst", m, "gst", "tax", "cgst", "sgst", "igst");
         addIf(allowed, selected, "customer", m, "customer", "crm");
-        addIf(allowed, selected, "supplier", m, "supplier");
-        addIf(allowed, selected, "accounting", m, "ledger", "journal", "trial", "p&l", "balance sheet");
+        addIf(allowed, selected, "supplier", m, "supplier", "vendor");
+        addIf(allowed, selected, "accounting", m, "ledger", "journal", "trial", "p&l", "balance sheet", "reconcile");
         addIf(allowed, selected, "report", m, "report", "gstr");
-        addIf(allowed, selected, "dashboard", m, "dashboard", "overview", "kpi", "summary");
+        addIf(allowed, selected, "dashboard", m, "dashboard", "overview", "kpi", "summary", "budget", "profit");
         return selected;
     }
 

@@ -16,6 +16,8 @@ public class AiProperties {
     private boolean analyticsEnabled = false;
     private boolean documentAiEnabled = false;
     private boolean voiceEnabled = false;
+    private boolean multiAgentEnabled = true;
+    private boolean workflowBuilderEnabled = true;
     private OpenAi openai = new OpenAi();
 
     @Getter
@@ -25,6 +27,7 @@ public class AiProperties {
         private String baseUrl = "https://api.openai.com/v1";
         private String chatModel = "gpt-4o-mini";
         private String embeddingModel = "text-embedding-3-small";
+        private String whisperModel = "whisper-1";
     }
 
     public boolean hasApiKey() {

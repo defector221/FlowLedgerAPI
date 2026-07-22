@@ -11,14 +11,18 @@ import org.springframework.stereotype.Component;
 public class AgentFactory {
     public AiAgent create(AiAgentType type) {
         return switch (type) {
-            case CEO -> new SimpleAiAgent(type, Set.of("dashboard", "sales", "inventory", "payment", "gst", "report"));
-            case ACCOUNTING -> new SimpleAiAgent(type, Set.of("accounting", "payment", "report"));
-            case INVENTORY -> new SimpleAiAgent(type, Set.of("inventory", "purchase", "dashboard"));
-            case PURCHASE -> new SimpleAiAgent(type, Set.of("purchase", "supplier", "inventory"));
-            case SALES -> new SimpleAiAgent(type, Set.of("sales", "customer", "payment", "dashboard"));
-            case GST -> new SimpleAiAgent(type, Set.of("gst", "report", "sales", "purchase"));
+            case ASK -> new SimpleAiAgent(
+                    type, Set.of("dashboard", "sales", "inventory", "payment", "gst", "report", "customer", "supplier"));
+            case BUSINESS_ADVISOR, CEO -> new SimpleAiAgent(
+                    type, Set.of("dashboard", "sales", "inventory", "payment", "gst", "report", "accounting"));
+            case CFO -> new SimpleAiAgent(type, Set.of("payment", "dashboard", "accounting", "report", "sales"));
+            case ACCOUNTANT -> new SimpleAiAgent(type, Set.of("accounting", "payment", "report"));
+            case INVENTORY_PLANNER -> new SimpleAiAgent(type, Set.of("inventory", "purchase", "dashboard", "supplier"));
+            case PROCUREMENT -> new SimpleAiAgent(type, Set.of("purchase", "supplier", "inventory", "report"));
+            case GST_EXPERT -> new SimpleAiAgent(type, Set.of("gst", "report", "sales", "purchase"));
+            case SALES_COACH -> new SimpleAiAgent(type, Set.of("sales", "customer", "payment", "dashboard"));
+            case COLLECTIONS -> new SimpleAiAgent(type, Set.of("payment", "customer", "sales", "dashboard"));
             case CRM -> new SimpleAiAgent(type, Set.of("customer", "supplier", "sales"));
-            case FINANCE -> new SimpleAiAgent(type, Set.of("payment", "dashboard", "accounting", "report"));
         };
     }
 

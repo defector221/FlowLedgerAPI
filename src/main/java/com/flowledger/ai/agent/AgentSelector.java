@@ -12,37 +12,51 @@ public class AgentSelector {
         this.registry = registry;
     }
 
+    /**
+     * Explicit agent field wins (with aliases). Blank agent → Global Ask ({@link AiAgentType#ASK}).
+     * Keyword routing only when agent is omitted and Ask collaboration will still consult specialists.
+     */
     public AiAgent select(String agentField, String message) {
         if (agentField != null && !agentField.isBlank()) {
-            try {
-                return registry.get(AiAgentType.from(agentField));
-            } catch (IllegalArgumentException ignored) {
-                // fall through to keyword selection
-            }
+            return AiAgentType.tryFrom(agentField)
+                    .map(registry::get)
+                    .orElseGet(() -> registry.get(AiAgentType.ASK));
         }
+        // Default product behavior: Global Ask Agent (multi-agent capable)
+        return registry.get(AiAgentType.ASK);
+    }
+
+    /** Keyword → specialist for multi-agent fan-out (not for primary selection when Ask is default). */
+    public AiAgentType suggestSpecialist(String message) {
         String m = message == null ? "" : message.toLowerCase();
-        if (containsAny(m, "gst", "tax", "cgst", "sgst", "igst")) {
-            return registry.get(AiAgentType.GST);
+        if (containsAny(m, "gst", "tax", "cgst", "sgst", "igst", "hsn")) {
+            return AiAgentType.GST_EXPERT;
         }
-        if (containsAny(m, "stock", "inventory", "reorder", "warehouse")) {
-            return registry.get(AiAgentType.INVENTORY);
+        if (containsAny(m, "collect", "overdue", "follow-up", "follow up", "dunning", "aging")) {
+            return AiAgentType.COLLECTIONS;
         }
-        if (containsAny(m, "purchase", "po ", "supplier bill", "grn")) {
-            return registry.get(AiAgentType.PURCHASE);
+        if (containsAny(m, "stock", "inventory", "reorder", "warehouse", "sku")) {
+            return AiAgentType.INVENTORY_PLANNER;
         }
-        if (containsAny(m, "invoice", "sales", "revenue", "customer invoice")) {
-            return registry.get(AiAgentType.SALES);
+        if (containsAny(m, "purchase", "po ", "supplier", "vendor", "procurement", "grn")) {
+            return AiAgentType.PROCUREMENT;
         }
-        if (containsAny(m, "ledger", "journal", "trial balance", "p&l", "balance sheet")) {
-            return registry.get(AiAgentType.ACCOUNTING);
+        if (containsAny(m, "pipeline", "coach", "upsell", "cross-sell", "quota")) {
+            return AiAgentType.SALES_COACH;
         }
-        if (containsAny(m, "payment", "receivable", "payable", "cashflow", "cash flow")) {
-            return registry.get(AiAgentType.FINANCE);
+        if (containsAny(m, "invoice", "sales", "revenue", "quotation")) {
+            return AiAgentType.SALES_COACH;
         }
-        if (containsAny(m, "customer", "supplier", "crm")) {
-            return registry.get(AiAgentType.CRM);
+        if (containsAny(m, "journal", "reconcile", "reconciliation", "trial balance", "ledger", "p&l")) {
+            return AiAgentType.ACCOUNTANT;
         }
-        return registry.get(AiAgentType.CEO);
+        if (containsAny(m, "cash", "budget", "profit", "cfo", "working capital", "receivable", "payable")) {
+            return AiAgentType.CFO;
+        }
+        if (containsAny(m, "customer", "crm", "lead")) {
+            return AiAgentType.CRM;
+        }
+        return AiAgentType.BUSINESS_ADVISOR;
     }
 
     private static boolean containsAny(String text, String... keys) {
