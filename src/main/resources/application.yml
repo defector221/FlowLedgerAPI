@@ -94,6 +94,21 @@ flowledger:
     client-secret: ${PAYPAL_CLIENT_SECRET:}
     webhook-id: ${PAYPAL_WEBHOOK_ID:}
     mode: ${PAYPAL_MODE:sandbox}
+  ai:
+    # Set FLOWLEDGER_AI_ENABLED=false to disable (ERP unchanged; AI beans/routes off).
+    enabled: ${FLOWLEDGER_AI_ENABLED:true}
+    provider: ${FLOWLEDGER_AI_PROVIDER:OPENAI}
+    chat-enabled: true
+    rag-enabled: true
+    embeddings-enabled: true
+    analytics-enabled: ${FLOWLEDGER_AI_ANALYTICS_ENABLED:true}
+    document-ai-enabled: ${FLOWLEDGER_AI_DOCUMENT_ENABLED:false}
+    voice-enabled: ${FLOWLEDGER_AI_VOICE_ENABLED:false}
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+      chat-model: gpt-4o-mini
+      embedding-model: text-embedding-3-small
   # Notification channels (unified NotificationService → email / WhatsApp / in-app)
   notifications:
     email:

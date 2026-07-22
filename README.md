@@ -101,6 +101,7 @@ dto/        mapper/     domain/ (enums)
 | `subscription` | Plans, org subscriptions, checkout, payment providers, usage limits |
 | `search` | OpenSearch indexing & global search |
 | `notification`, `audit`, `storage` | Notifications, audit log, MinIO files |
+| `ai` | Optional AI platform (chat, RAG, tools, recommendations, forecasts, workflow stubs). On by default locally (`flowledger.ai.enabled=true`); set `FLOWLEDGER_AI_ENABLED=false` to disable. See `docs/ai/` |
 | `common` | Security, tenant context, exceptions, utilities |
 
 **Cross-cutting (`common`):**
@@ -340,6 +341,10 @@ Environment variables (see `src/main/resources/application.yml`):
 | `FLOWLEDGER_SEARCH_SSL_VERIFY` | `false` | TLS verify (local dev) |
 | `FLOWLEDGER_EMAIL_ENABLED` | `true` | SMTP vs mock |
 | `FLOWLEDGER_EMAIL_FROM` | | From address |
+| `FLOWLEDGER_AI_ENABLED` | `true` | Master AI platform toggle |
+| `FLOWLEDGER_AI_PROVIDER` | `OPENAI` | Provider key |
+| `OPENAI_API_KEY` | | OpenAI API key (when AI enabled) |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible base URL |
 
 **Datasource (default):** `jdbc:postgresql://localhost:5432/flowledger`  
 **Server port:** `7070`  
@@ -364,7 +369,23 @@ Environment variables (see `src/main/resources/application.yml`):
 | `/api/v1/billing` | Legacy subscription & usage |
 | `/api/v1/subscriptions` | Plans, checkout, upgrade, webhooks, usage |
 | `/api/v1/search` | Global search |
+| `/api/v1/ai` | AI chat, recommendations, knowledge, analytics, workflow stubs (when enabled) |
 | `/api/v1/audit-logs` | Audit trail |
+
+### AI platform (optional)
+
+Enabled by default (`FLOWLEDGER_AI_ENABLED` / `flowledger.ai.enabled=true`). Set to `false` to unload AI beans/routes. LangChain4j 0.36.2.
+
+| Concern | Detail |
+|---------|--------|
+| Toggle | `@ConditionalOnAiEnabled` — beans absent when off |
+| Tools vs RAG | Tools call ERP domain services; RAG uses knowledge docs + embeddings |
+| Recommendations | Heuristics (`INVENTORY_RISK`, …); statuses NEW / ACKNOWLEDGED / DISMISSED |
+| Events | `AiSearchEventBridge` listens to search upsert/delete **AFTER_COMMIT** |
+| Analytics | `GET /api/v1/ai/analytics/forecasts?type=` gated by `analytics-enabled` (default false) |
+| Docs | [`docs/ai/ROADMAP.md`](docs/ai/ROADMAP.md), Architecture, Sequence, OpenAPI, Flows |
+
+Roadmap phases 1–8 are implemented; v2 covers streaming, real tool-calling agents, OCR/voice.
 
 ---
 
@@ -374,7 +395,9 @@ Environment variables (see `src/main/resources/application.yml`):
 mvn test
 ```
 
-Unit tests under `src/test/java/com/flowledger/` — Mockito-based; focus on accounting, GST, search, PDF, utilities.
+Unit tests under `src/test/java/com/flowledger/` — Mockito-based; focus on accounting, GST, search, PDF, utilities, and AI (chat, recommendations, event bridge).
+
+Docs: `docs/ai/` (ROADMAP, ARCHITECTURE, SEQUENCE, OPENAPI, FLOWS).
 
 ---
 
