@@ -1,6 +1,7 @@
 package com.flowledger.sales.repository;
 
 import com.flowledger.sales.entity.SalesInvoice;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,6 +31,8 @@ public interface SalesInvoiceRepository extends JpaRepository<SalesInvoice, UUID
     List<SalesInvoice> findByOrganizationIdOrderByInvoiceDateDesc(UUID org);
 
     Page<SalesInvoice> findByOrganizationId(UUID org, Pageable pageable);
+
+    long countByOrganizationIdAndInvoiceDateBetween(UUID organizationId, LocalDate start, LocalDate end);
 
     @Query(
             value =

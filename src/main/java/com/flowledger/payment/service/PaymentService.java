@@ -13,8 +13,10 @@ import com.flowledger.payment.entity.Payment;
 import com.flowledger.payment.entity.PaymentAllocation;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -74,8 +76,20 @@ public class PaymentService {
     }
 
     public Payment allocate(UUID id, Allocation a) {
+        return allocate(id, List.of(a));
+    }
+
+    public Payment allocate(UUID id, List<Allocation> allocations) {
+        if (allocations == null || allocations.isEmpty()) {
+            throw bad("At least one allocation is required");
+        }
         Payment p = get(id);
-        allocate(p, a);
+        if ("CANCELLED".equals(p.getStatus())) {
+            throw bad("Cannot allocate a cancelled payment");
+        }
+        for (Allocation a : allocations) {
+            allocate(p, a);
+        }
         if (p.getAccountingStatus() != AccountingStatus.POSTED) {
             accounting.postPayment(p);
         }
@@ -129,15 +143,85 @@ public class PaymentService {
         if (p == null || !p.getOrganizationId().equals(TenantContext.getOrganizationId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment not found");
         }
+        p.getAllocations().size(); // initialize
         return p;
     }
 
     public List<Payment> list() {
-        return em.createQuery(
-                        "from Payment p where p.organizationId=:org order by p.paymentDate desc,p.createdAt desc",
-                        Payment.class)
-                .setParameter("org", TenantContext.getOrganizationId())
-                .getResultList();
+        return list(null, null, null, null, null, null, null, null);
+    }
+
+    public List<Payment> list(
+            Payment.Type type,
+            Payment.Party partyType,
+            String status,
+            UUID customerId,
+            UUID supplierId,
+            LocalDate from,
+            LocalDate to,
+            String search) {
+        StringBuilder jpql = new StringBuilder(
+                "from Payment p where p.organizationId=:org");
+        List<String> conditions = new ArrayList<>();
+        if (type != null) {
+            conditions.add("p.paymentType = :type");
+        }
+        if (partyType != null) {
+            conditions.add("p.partyType = :partyType");
+        }
+        if (status != null && !status.isBlank()) {
+            conditions.add("p.status = :status");
+        }
+        if (customerId != null) {
+            conditions.add("p.customerId = :customerId");
+        }
+        if (supplierId != null) {
+            conditions.add("p.supplierId = :supplierId");
+        }
+        if (from != null) {
+            conditions.add("p.paymentDate >= :from");
+        }
+        if (to != null) {
+            conditions.add("p.paymentDate <= :to");
+        }
+        if (search != null && !search.isBlank()) {
+            conditions.add(
+                    "(lower(p.paymentNumber) like :search or lower(coalesce(p.transactionReference,'')) like :search or lower(coalesce(p.notes,'')) like :search)");
+        }
+        for (String condition : conditions) {
+            jpql.append(" and ").append(condition);
+        }
+        jpql.append(" order by p.paymentDate desc, p.createdAt desc");
+
+        TypedQuery<Payment> query = em.createQuery(jpql.toString(), Payment.class)
+                .setParameter("org", TenantContext.getOrganizationId());
+        if (type != null) {
+            query.setParameter("type", type);
+        }
+        if (partyType != null) {
+            query.setParameter("partyType", partyType);
+        }
+        if (status != null && !status.isBlank()) {
+            query.setParameter("status", status.trim().toUpperCase(Locale.ROOT));
+        }
+        if (customerId != null) {
+            query.setParameter("customerId", customerId);
+        }
+        if (supplierId != null) {
+            query.setParameter("supplierId", supplierId);
+        }
+        if (from != null) {
+            query.setParameter("from", from);
+        }
+        if (to != null) {
+            query.setParameter("to", to);
+        }
+        if (search != null && !search.isBlank()) {
+            query.setParameter("search", "%" + search.trim().toLowerCase(Locale.ROOT) + "%");
+        }
+        List<Payment> rows = query.getResultList();
+        rows.forEach(p -> p.getAllocations().size());
+        return rows;
     }
 
     public Payment cancel(UUID id) {

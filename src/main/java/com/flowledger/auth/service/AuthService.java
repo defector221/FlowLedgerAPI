@@ -135,6 +135,7 @@ public class AuthService {
         Role role = roles.findByCode("ORGANIZATION_ADMIN")
                 .orElseThrow(() -> new BusinessException("Organization admin role is unavailable"));
         membershipService.createAdminMembership(user, organization, role);
+        subscriptions.ensureOrganizationSubscription(organization.getId(), "FREE");
         bootstrapAccounting(organization);
         return tokens(user, organization.getId());
     }
@@ -269,6 +270,7 @@ public class AuthService {
         users.save(user);
         membershipService.createAdminMembership(user, organization, role);
         subscriptions.ensureDefaultSubscription(user.getId(), "FREE");
+        subscriptions.ensureOrganizationSubscription(organization.getId(), "FREE");
         bootstrapAccounting(organization);
         return tokens(user, organization.getId());
     }

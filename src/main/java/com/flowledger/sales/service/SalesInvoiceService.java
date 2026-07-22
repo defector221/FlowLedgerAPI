@@ -21,6 +21,7 @@ import com.flowledger.sales.entity.*;
 import com.flowledger.sales.repository.SalesInvoiceRepository;
 import com.flowledger.search.event.SearchIndexEventPublisher;
 import com.flowledger.search.model.SearchEntityType;
+import com.flowledger.subscription.service.SubscriptionService;
 import com.flowledger.tax.TaxSplitDefaults;
 import com.flowledger.tax.dto.GstCalculationDtos;
 import com.flowledger.tax.service.GstCalculationService;
@@ -53,6 +54,7 @@ public class SalesInvoiceService {
     private final GstCalculationService gst;
     private final SearchIndexEventPublisher searchEvents;
     private final AccountingPostingService accounting;
+    private final SubscriptionService subscriptions;
 
     public SalesInvoiceService(
             SalesInvoiceRepository r,
@@ -66,7 +68,8 @@ public class SalesInvoiceService {
             DocumentNumberService n,
             GstCalculationService g,
             SearchIndexEventPublisher searchEvents,
-            AccountingPostingService accounting) {
+            AccountingPostingService accounting,
+            SubscriptionService subscriptions) {
         repo = r;
         inventory = i;
         this.products = products;
@@ -79,12 +82,14 @@ public class SalesInvoiceService {
         gst = g;
         this.searchEvents = searchEvents;
         this.accounting = accounting;
+        this.subscriptions = subscriptions;
     }
 
     @Transactional
     public InvoiceDetail createDraft(Invoice d) {
         Organization o = orgs.findById(TenantContext.getOrganizationId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found"));
+        subscriptions.checkCanCreateInvoice(o.getId());
         SalesInvoice i = new SalesInvoice();
         i.setOrganizationId(o.getId());
         apply(i, d);
