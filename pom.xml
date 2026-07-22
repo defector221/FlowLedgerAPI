@@ -25,6 +25,8 @@
     <poi.version>5.3.0</poi.version>
     <testcontainers.version>1.20.4</testcontainers.version>
     <opensearch-java.version>2.19.0</opensearch-java.version>
+    <!-- LangChain4j 1.0.0-beta3 pulled incompatible transitive deps with Boot 3.4; 0.36.2 compiles cleanly. -->
+    <langchain4j.version>0.36.2</langchain4j.version>
   </properties>
 
   <dependencies>
@@ -144,6 +146,16 @@
       <groupId>org.opensearch.client</groupId>
       <artifactId>opensearch-java</artifactId>
       <version>${opensearch-java.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j</artifactId>
+      <version>${langchain4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j-open-ai</artifactId>
+      <version>${langchain4j.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents.client5</groupId>

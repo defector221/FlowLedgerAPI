@@ -20,7 +20,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     com.flowledger.subscription.config.RazorpayProperties.class,
     com.flowledger.subscription.config.StripeProperties.class,
     com.flowledger.subscription.config.CashfreeProperties.class,
-    com.flowledger.subscription.config.PayPalProperties.class
+    com.flowledger.subscription.config.PayPalProperties.class,
+    com.flowledger.ai.config.AiProperties.class
 })
 public class FlowLedgerApplication {
     public static void main(String[] args) {
