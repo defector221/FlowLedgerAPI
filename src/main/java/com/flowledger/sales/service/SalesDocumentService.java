@@ -106,7 +106,7 @@ public class SalesDocumentService {
     @Transactional(readOnly = true)
     public Quotation getQuotation(UUID id) {
         return quotations
-                .findByIdAndOrganizationId(id, orgId())
+                .findDetailedByIdAndOrganizationId(id, orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quotation not found"));
     }
 
@@ -229,7 +229,7 @@ public class SalesDocumentService {
 
     @Transactional(readOnly = true)
     public SalesOrder getOrder(UUID id) {
-        return orders.findByIdAndOrganizationId(id, orgId())
+        return orders.findDetailedByIdAndOrganizationId(id, orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Sales order not found"));
     }
 
