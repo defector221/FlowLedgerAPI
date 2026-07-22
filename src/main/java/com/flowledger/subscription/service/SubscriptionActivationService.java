@@ -65,9 +65,8 @@ public class SubscriptionActivationService {
         OffsetDateTime now = OffsetDateTime.now();
         OffsetDateTime nextBilling = billingCycle == BillingCycle.YEARLY ? now.plusYears(1) : now.plusMonths(1);
 
-        OrganizationSubscription orgSub = organizationSubscriptions
-                .findByOrganizationId(organizationId)
-                .orElseGet(OrganizationSubscription::new);
+        OrganizationSubscription orgSub =
+                organizationSubscriptions.findByOrganizationId(organizationId).orElseGet(OrganizationSubscription::new);
         orgSub.setOrganizationId(organizationId);
         orgSub.setPlanId(plan.getId());
         orgSub.setBillingCycle(billingCycle.name());
@@ -91,11 +90,7 @@ public class SubscriptionActivationService {
         }
         createSubscriptionInvoice(organizationId, plan, transaction);
 
-        log.info(
-                "Activated organization {} on plan {} ({})",
-                organizationId,
-                plan.getCode(),
-                billingCycle);
+        log.info("Activated organization {} on plan {} ({})", organizationId, plan.getCode(), billingCycle);
         return orgSub;
     }
 
@@ -146,7 +141,8 @@ public class SubscriptionActivationService {
         return memberships.findByOrganizationId(organizationId).stream()
                 .filter(m -> "ACTIVE".equals(m.getStatus()))
                 .filter(this::isOrgAdmin)
-                .sorted(Comparator.comparing(OrganizationMembership::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                .sorted(Comparator.comparing(
+                        OrganizationMembership::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(OrganizationMembership::getUserId)
                 .findFirst()
                 .orElse(null);
@@ -155,5 +151,4 @@ public class SubscriptionActivationService {
     private boolean isOrgAdmin(OrganizationMembership membership) {
         return membership.getRoles().stream().map(Role::getCode).anyMatch("ORGANIZATION_ADMIN"::equals);
     }
-
 }

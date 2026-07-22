@@ -67,12 +67,13 @@ public class ForecastService {
         }
 
         UUID org = TenantContext.getOrganizationId();
-        ForecastResult computed = switch (normalized) {
-            case "SALES", "DEMAND" -> salesMovingAverage();
-            case "CASHFLOW" -> cashflowStub();
-            case "INVENTORY" -> inventoryStub();
-            default -> new ForecastResult(List.of(), Map.of());
-        };
+        ForecastResult computed =
+                switch (normalized) {
+                    case "SALES", "DEMAND" -> salesMovingAverage();
+                    case "CASHFLOW" -> cashflowStub();
+                    case "INVENTORY" -> inventoryStub();
+                    default -> new ForecastResult(List.of(), Map.of());
+                };
 
         Map<String, Object> resultJson = new HashMap<>(computed.summary());
         resultJson.put(
@@ -123,8 +124,8 @@ public class ForecastService {
         List<Integer> recentCounts = new ArrayList<>();
         for (Map.Entry<YearMonth, Integer> e : counts.entrySet()) {
             recentCounts.add(e.getValue());
-            points.add(new AiDtos.ForecastPoint(
-                    e.getKey().toString(), BigDecimal.valueOf(e.getValue()), BigDecimal.ZERO));
+            points.add(
+                    new AiDtos.ForecastPoint(e.getKey().toString(), BigDecimal.valueOf(e.getValue()), BigDecimal.ZERO));
         }
         double avg = recentCounts.stream().mapToInt(Integer::intValue).average().orElse(0);
         BigDecimal forecastNext = BigDecimal.valueOf(avg).setScale(2, RoundingMode.HALF_UP);

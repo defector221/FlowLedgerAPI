@@ -44,8 +44,7 @@ public class SupplierCatalogController {
 
     @PutMapping("/suppliers/{supplierId}/catalog/{id}")
     @PreAuthorize("hasAnyRole('ORGANIZATION_ADMIN', 'PURCHASE_MANAGER')")
-    public Response update(
-            @PathVariable UUID supplierId, @PathVariable UUID id, @Valid @RequestBody Update dto) {
+    public Response update(@PathVariable UUID supplierId, @PathVariable UUID id, @Valid @RequestBody Update dto) {
         return service.update(supplierId, id, dto);
     }
 

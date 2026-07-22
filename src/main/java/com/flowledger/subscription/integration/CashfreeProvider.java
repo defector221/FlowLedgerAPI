@@ -34,7 +34,8 @@ public class CashfreeProvider implements PaymentProvider {
     @Override
     public CreateOrderResult createOrder(CreateOrderRequest request) {
         if (!properties.isConfigured()) {
-            String mockOrderId = "order_dev_" + UUID.randomUUID().toString().replace("-", "").substring(0, 14);
+            String mockOrderId =
+                    "order_dev_" + UUID.randomUUID().toString().replace("-", "").substring(0, 14);
             log.warn("Cashfree keys blank — returning mock order {}", mockOrderId);
             return new CreateOrderResult(mockOrderId, request.amount(), request.currency(), "{\"mock\":true}");
         }
@@ -47,13 +48,16 @@ public class CashfreeProvider implements PaymentProvider {
         }
 
         Map<String, Object> body = Map.of(
-                "order_id", orderId,
-                "order_amount", request.amount(),
-                "order_currency", request.currency() == null ? "INR" : request.currency(),
-                "order_note", request.notes() == null ? "" : request.notes(),
-                "customer_details", Map.of(
-                        "customer_id", "cust_" + orderId,
-                        "customer_phone", "9999999999"));
+                "order_id",
+                orderId,
+                "order_amount",
+                request.amount(),
+                "order_currency",
+                request.currency() == null ? "INR" : request.currency(),
+                "order_note",
+                request.notes() == null ? "" : request.notes(),
+                "customer_details",
+                Map.of("customer_id", "cust_" + orderId, "customer_phone", "9999999999"));
 
         String response = restClientBuilder
                 .baseUrl(properties.apiBaseUrl())
@@ -74,7 +78,8 @@ public class CashfreeProvider implements PaymentProvider {
             BigDecimal amount = node.has("order_amount")
                     ? new BigDecimal(node.path("order_amount").asText("0"))
                     : request.amount();
-            String currency = node.path("order_currency").asText(request.currency() == null ? "INR" : request.currency());
+            String currency =
+                    node.path("order_currency").asText(request.currency() == null ? "INR" : request.currency());
             return new CreateOrderResult(cfOrderId, amount, currency, response);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to parse Cashfree order response", e);

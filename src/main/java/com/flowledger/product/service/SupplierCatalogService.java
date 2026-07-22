@@ -29,9 +29,7 @@ public class SupplierCatalogService extends OrganizationScopedService {
     private final SupplierRepository suppliers;
 
     public SupplierCatalogService(
-            SupplierCatalogItemRepository repository,
-            ProductRepository products,
-            SupplierRepository suppliers) {
+            SupplierCatalogItemRepository repository, ProductRepository products, SupplierRepository suppliers) {
         this.repository = repository;
         this.products = products;
         this.suppliers = suppliers;
@@ -59,7 +57,8 @@ public class SupplierCatalogService extends OrganizationScopedService {
     @Transactional(readOnly = true)
     public List<Response> listByProduct(UUID productId) {
         requireProduct(productId);
-        return repository.findByOrganizationIdAndProductIdAndDeletedFalseOrderByPreferredDesc(orgId(), productId)
+        return repository
+                .findByOrganizationIdAndProductIdAndDeletedFalseOrderByPreferredDesc(orgId(), productId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -96,8 +95,11 @@ public class SupplierCatalogService extends OrganizationScopedService {
         }
         if (dto.supplierSku() != null) {
             if (dto.supplierSku().isBlank()) {
-                Product product = products.findByIdAndOrganizationId(item.getProductId(), orgId()).orElseThrow();
-                Supplier supplier = suppliers.findByIdAndOrganizationId(item.getSupplierId(), orgId()).orElseThrow();
+                Product product = products.findByIdAndOrganizationId(item.getProductId(), orgId())
+                        .orElseThrow();
+                Supplier supplier = suppliers
+                        .findByIdAndOrganizationId(item.getSupplierId(), orgId())
+                        .orElseThrow();
                 item.setSupplierSku(resolveSupplierSku(orgId(), null, product.getSku(), supplier.getSupplierCode()));
             } else {
                 item.setSupplierSku(dto.supplierSku().trim().toUpperCase(Locale.ROOT));
@@ -200,8 +202,8 @@ public class SupplierCatalogService extends OrganizationScopedService {
 
     private void clearOtherPreferred(UUID productId, UUID currentId) {
         UUID excludedId = currentId == null ? new UUID(0, 0) : currentId;
-        List<SupplierCatalogItem> others = repository
-                .findByOrganizationIdAndProductIdAndPreferredTrueAndActiveTrueAndDeletedFalseAndIdNot(
+        List<SupplierCatalogItem> others =
+                repository.findByOrganizationIdAndProductIdAndPreferredTrueAndActiveTrueAndDeletedFalseAndIdNot(
                         orgId(), productId, excludedId);
         others.forEach(item -> {
             item.setPreferred(false);
@@ -239,8 +241,11 @@ public class SupplierCatalogService extends OrganizationScopedService {
     }
 
     private Response toResponse(SupplierCatalogItem item) {
-        var product = products.findByIdAndOrganizationId(item.getProductId(), orgId()).orElse(null);
-        var supplier = suppliers.findByIdAndOrganizationId(item.getSupplierId(), orgId()).orElse(null);
+        var product =
+                products.findByIdAndOrganizationId(item.getProductId(), orgId()).orElse(null);
+        var supplier = suppliers
+                .findByIdAndOrganizationId(item.getSupplierId(), orgId())
+                .orElse(null);
         return new Response(
                 item.getId(),
                 item.getProductId(),

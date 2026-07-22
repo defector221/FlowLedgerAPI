@@ -1,6 +1,7 @@
 package com.flowledger.sales.service;
 
 import com.flowledger.accounting.service.AccountingPostingService;
+import com.flowledger.ai.workflow.AiWorkflowGateService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.inventory.dto.InventoryDtos.PostTransaction;
@@ -19,6 +20,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +43,7 @@ public class SalesDocumentService {
     private final GstCalculationService gst;
     private final InventoryService inventory;
     private final AccountingPostingService accounting;
+    private final ObjectProvider<AiWorkflowGateService> workflowGate;
 
     public SalesDocumentService(
             QuotationRepository quotations,
@@ -54,7 +57,8 @@ public class SalesDocumentService {
             SalesInvoiceService invoiceService,
             GstCalculationService gst,
             InventoryService inventory,
-            AccountingPostingService accounting) {
+            AccountingPostingService accounting,
+            ObjectProvider<AiWorkflowGateService> workflowGate) {
         this.quotations = quotations;
         this.orders = orders;
         this.challans = challans;
@@ -67,6 +71,14 @@ public class SalesDocumentService {
         this.gst = gst;
         this.inventory = inventory;
         this.accounting = accounting;
+        this.workflowGate = workflowGate;
+    }
+
+    private void gate(String documentType, UUID entityId, BigDecimal amount, String action) {
+        AiWorkflowGateService gate = workflowGate.getIfAvailable();
+        if (gate != null) {
+            gate.requireApproved(documentType, entityId, amount, action);
+        }
     }
 
     // ── Quotations ──────────────────────────────────────────────────────────
@@ -106,7 +118,7 @@ public class SalesDocumentService {
     @Transactional(readOnly = true)
     public Quotation getQuotation(UUID id) {
         return quotations
-                .findByIdAndOrganizationId(id, orgId())
+                .findDetailedByIdAndOrganizationId(id, orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quotation not found"));
     }
 
@@ -133,6 +145,7 @@ public class SalesDocumentService {
         if (q.getStatus() == Quotation.Status.CANCELLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled quotation cannot be converted");
         }
+        gate("QUOTATION", q.getId(), q.getGrandTotal(), "convert to sales order");
         Organization org = organization();
         SalesOrder order = new SalesOrder();
         order.setOrganizationId(orgId());
@@ -229,7 +242,7 @@ public class SalesDocumentService {
 
     @Transactional(readOnly = true)
     public SalesOrder getOrder(UUID id) {
-        return orders.findByIdAndOrganizationId(id, orgId())
+        return orders.findDetailedByIdAndOrganizationId(id, orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Sales order not found"));
     }
 
@@ -252,6 +265,7 @@ public class SalesDocumentService {
         if (order.getStatus() == SalesOrder.Status.CANCELLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled order cannot be converted");
         }
+        gate("SALES_ORDER", order.getId(), order.getGrandTotal(), "convert to delivery challan");
         challans.findByOrganizationIdAndSalesOrderId(orgId(), orderId).ifPresent(existing -> {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Challan already exists for order");
         });
@@ -290,6 +304,7 @@ public class SalesDocumentService {
         if (order.getStatus() == SalesOrder.Status.CANCELLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled order cannot be converted");
         }
+        gate("SALES_ORDER", order.getId(), order.getGrandTotal(), "convert to invoice");
         return invoices.findByOrganizationIdAndSalesOrderIdAndDeliveryChallanIdIsNull(orgId(), orderId)
                 .orElseGet(() -> createInvoiceFromOrder(order, warehouseId, null));
     }
@@ -359,6 +374,7 @@ public class SalesDocumentService {
                     if (order == null) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Challan has no linked sales order");
                     }
+                    gate("SALES_ORDER", order.getId(), order.getGrandTotal(), "convert challan to invoice");
                     return createInvoiceFromOrder(order, challan.getWarehouseId(), challan.getId());
                 });
     }

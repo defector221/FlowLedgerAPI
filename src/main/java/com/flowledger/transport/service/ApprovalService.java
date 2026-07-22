@@ -20,14 +20,21 @@ public class ApprovalService {
     private final OrganizationSettingsRepository settings;
     private final ShipmentEventRepository events;
 
-    public ApprovalService(ApprovalRequestRepository requests, ApprovalActionRepository actions,
-            OrganizationSettingsRepository settings, ShipmentEventRepository events) {
-        this.requests = requests; this.actions = actions; this.settings = settings; this.events = events;
+    public ApprovalService(
+            ApprovalRequestRepository requests,
+            ApprovalActionRepository actions,
+            OrganizationSettingsRepository settings,
+            ShipmentEventRepository events) {
+        this.requests = requests;
+        this.actions = actions;
+        this.settings = settings;
+        this.events = events;
     }
 
     public boolean approvalRequired() {
         return settings.findByOrganizationId(TenantContext.getOrganizationId())
-                .map(s -> s.isTransportApprovalRequired()).orElse(false);
+                .map(s -> s.isTransportApprovalRequired())
+                .orElse(false);
     }
 
     public ApprovalRequest submit(Shipment shipment, String remarks) {
@@ -47,14 +54,20 @@ public class ApprovalService {
         return request;
     }
 
-    public void approve(Shipment shipment, String remarks) { decide(shipment, ApprovalStatus.APPROVED, remarks); }
-    public void reject(Shipment shipment, String remarks) { decide(shipment, ApprovalStatus.REJECTED, remarks); }
+    public void approve(Shipment shipment, String remarks) {
+        decide(shipment, ApprovalStatus.APPROVED, remarks);
+    }
+
+    public void reject(Shipment shipment, String remarks) {
+        decide(shipment, ApprovalStatus.REJECTED, remarks);
+    }
 
     private void decide(Shipment shipment, ApprovalStatus decision, String remarks) {
-        ApprovalRequest request = requests
-                .findFirstByOrganizationIdAndEntityTypeAndEntityIdAndStatusOrderByRequestedAtDesc(
-                        TenantContext.getOrganizationId(), "SHIPMENT", shipment.getId(), ApprovalStatus.PENDING)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No pending approval request"));
+        ApprovalRequest request =
+                requests.findFirstByOrganizationIdAndEntityTypeAndEntityIdAndStatusOrderByRequestedAtDesc(
+                                TenantContext.getOrganizationId(), "SHIPMENT", shipment.getId(), ApprovalStatus.PENDING)
+                        .orElseThrow(
+                                () -> new ResponseStatusException(HttpStatus.CONFLICT, "No pending approval request"));
         UUID user = user();
         request.setStatus(decision);
         request.setDecidedBy(user);
@@ -67,17 +80,27 @@ public class ApprovalService {
 
     private void action(UUID requestId, String value, String remarks) {
         ApprovalAction a = new ApprovalAction();
-        a.setRequestId(requestId); a.setAction(value); a.setActorId(user());
-        a.setActedAt(OffsetDateTime.now()); a.setRemarks(remarks); actions.save(a);
+        a.setRequestId(requestId);
+        a.setAction(value);
+        a.setActorId(user());
+        a.setActedAt(OffsetDateTime.now());
+        a.setRemarks(remarks);
+        actions.save(a);
     }
 
     private void event(UUID shipmentId, String type, String remarks) {
         ShipmentEvent e = new ShipmentEvent();
-        e.setShipmentId(shipmentId); e.setEventType(type); e.setOccurredAt(OffsetDateTime.now());
-        e.setActorUserId(user()); e.setActorType(ShipmentActorType.USER); e.setRemarks(remarks); events.save(e);
+        e.setShipmentId(shipmentId);
+        e.setEventType(type);
+        e.setOccurredAt(OffsetDateTime.now());
+        e.setActorUserId(user());
+        e.setActorType(ShipmentActorType.USER);
+        e.setRemarks(remarks);
+        events.save(e);
     }
 
     private UUID user() {
-        return TenantContext.userId().orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user required"));
+        return TenantContext.userId()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user required"));
     }
 }

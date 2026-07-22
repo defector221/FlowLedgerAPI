@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TransportCompanyRepository extends JpaRepository<TransportCompany, UUID> {
     List<TransportCompany> findByOrganizationIdAndDeletedFalseOrderByNameAsc(UUID organizationId);
+
     Optional<TransportCompany> findByIdAndOrganizationIdAndDeletedFalse(UUID id, UUID organizationId);
+
     boolean existsByOrganizationIdAndCodeIgnoreCaseAndDeletedFalse(UUID organizationId, String code);
 }

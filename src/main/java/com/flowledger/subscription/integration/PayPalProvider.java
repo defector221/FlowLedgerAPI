@@ -3,7 +3,6 @@ package com.flowledger.subscription.integration;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowledger.subscription.config.PayPalProperties;
-import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +35,8 @@ public class PayPalProvider implements PaymentProvider {
     @Override
     public CreateOrderResult createOrder(CreateOrderRequest request) {
         if (!properties.isConfigured()) {
-            String mockOrderId = "ORDER-DEV-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+            String mockOrderId =
+                    "ORDER-DEV-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
             log.warn("PayPal keys blank — returning mock order {}", mockOrderId);
             return new CreateOrderResult(mockOrderId, request.amount(), request.currency(), "{\"mock\":true}");
         }
@@ -44,16 +44,23 @@ public class PayPalProvider implements PaymentProvider {
         String accessToken = fetchAccessToken();
         String currency = request.currency() == null ? "USD" : request.currency();
         Map<String, Object> body = Map.of(
-                "intent", "CAPTURE",
-                "purchase_units", List.of(Map.of(
-                        "reference_id", request.receipt() == null ? UUID.randomUUID().toString() : request.receipt(),
+                "intent",
+                "CAPTURE",
+                "purchase_units",
+                List.of(Map.of(
+                        "reference_id",
+                                request.receipt() == null ? UUID.randomUUID().toString() : request.receipt(),
                         "description", request.notes() == null ? "FlowLedger subscription" : request.notes(),
-                        "amount", Map.of(
-                                "currency_code", currency,
-                                "value", request.amount().setScale(2, RoundingMode.HALF_UP).toPlainString()))));
+                        "amount",
+                                Map.of(
+                                        "currency_code",
+                                        currency,
+                                        "value",
+                                        request.amount()
+                                                .setScale(2, RoundingMode.HALF_UP)
+                                                .toPlainString()))));
 
-        String response = client()
-                .post()
+        String response = client().post()
                 .uri("/v2/checkout/orders")
                 .contentType(MediaType.APPLICATION_JSON)
                 .headers(h -> h.setBearerAuth(accessToken))
@@ -81,8 +88,7 @@ public class PayPalProvider implements PaymentProvider {
         try {
             String accessToken = fetchAccessToken();
             // Prefer capture when client sends a completed order; otherwise inspect status.
-            String getResponse = client()
-                    .get()
+            String getResponse = client().get()
                     .uri("/v2/checkout/orders/{id}", orderId)
                     .headers(h -> h.setBearerAuth(accessToken))
                     .retrieve()
@@ -93,8 +99,7 @@ public class PayPalProvider implements PaymentProvider {
                 return true;
             }
             if ("APPROVED".equalsIgnoreCase(status)) {
-                String captureResponse = client()
-                        .post()
+                String captureResponse = client().post()
                         .uri("/v2/checkout/orders/{id}/capture", orderId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .headers(h -> h.setBearerAuth(accessToken))
@@ -142,8 +147,7 @@ public class PayPalProvider implements PaymentProvider {
                     "webhook_id", properties.getWebhookId(),
                     "webhook_event", objectMapper.readTree(payload));
 
-            String response = client()
-                    .post()
+            String response = client().post()
                     .uri("/v1/notifications/verify-webhook-signature")
                     .contentType(MediaType.APPLICATION_JSON)
                     .headers(h -> h.setBearerAuth(accessToken))
@@ -161,8 +165,7 @@ public class PayPalProvider implements PaymentProvider {
     private String fetchAccessToken() {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "client_credentials");
-        String response = client()
-                .post()
+        String response = client().post()
                 .uri("/v1/oauth2/token")
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .headers(h -> h.setBasicAuth(properties.getClientId(), properties.getClientSecret()))

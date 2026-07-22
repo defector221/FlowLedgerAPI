@@ -14,6 +14,6 @@ public class AgentRegistry {
     }
 
     public AiAgent get(AiAgentType type) {
-        return agents.getOrDefault(type, agents.get(AiAgentType.CEO));
+        return agents.getOrDefault(type, agents.get(AiAgentType.ASK));
     }
 }

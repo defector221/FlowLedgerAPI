@@ -30,6 +30,8 @@ public class AiHealthController {
                 properties.isAnalyticsEnabled(),
                 properties.isDocumentAiEnabled(),
                 properties.isVoiceEnabled(),
-                properties.hasApiKey());
+                properties.hasApiKey(),
+                properties.isMultiAgentEnabled(),
+                properties.isWorkflowBuilderEnabled());
     }
 }

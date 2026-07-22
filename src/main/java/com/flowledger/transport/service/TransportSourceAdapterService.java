@@ -37,9 +37,7 @@ public class TransportSourceAdapterService {
         if (ret == null || !TenantContext.getOrganizationId().equals(ret.getOrganizationId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Purchase return not found");
         }
-        List<LineRequest> selected = lines == null
-                ? List.of()
-                : lines;
+        List<LineRequest> selected = lines == null ? List.of() : lines;
         ShipmentRequest request = new ShipmentRequest(
                 "PURCHASE_RETURN",
                 ret.getId(),
@@ -66,10 +64,7 @@ public class TransportSourceAdapterService {
     }
 
     public ShipmentResponse createForStockTransfer(
-            UUID fromWarehouseId,
-            UUID toWarehouseId,
-            String remarks,
-            List<LineRequest> lines) {
+            UUID fromWarehouseId, UUID toWarehouseId, String remarks, List<LineRequest> lines) {
         if (fromWarehouseId == null || toWarehouseId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from/to warehouse are required");
         }

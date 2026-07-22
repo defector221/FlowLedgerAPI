@@ -11,11 +11,7 @@ public interface PaymentProvider {
 
     boolean verifyWebhookSignature(String payload, String signature);
 
-    record CreateOrderRequest(
-            BigDecimal amount,
-            String currency,
-            String receipt,
-            String notes) {}
+    record CreateOrderRequest(BigDecimal amount, String currency, String receipt, String notes) {}
 
     record CreateOrderResult(String orderId, BigDecimal amount, String currency, String rawJson) {}
 }

@@ -15,14 +15,34 @@ sequenceDiagram
 
   UI->>API: POST /api/v1/ai/chat
   API->>Orch: chat(request)
-  Orch->>Agent: select agent
+  Orch->>Agent: select agent (default ASK)
   Orch->>Mem: load history
+  Note over Orch: MultiAgentCollaborator fans out specialists when enabled
   Orch->>Tools: invokeAllowed(tools, query)
   Orch->>RAG: retrieve (if enabled)
   Orch->>LLM: complete(prompt)
   Orch->>Mem: persist messages
-  Orch-->>API: ChatResponse
+  Orch-->>API: ChatResponse + consultedAgents
   API-->>UI: conversationId + content
+```
+
+## Global Ask / Voice
+
+```mermaid
+sequenceDiagram
+  participant UI as GlobalAskFab_or_Mic
+  participant API as AiChatController
+  participant Voice as VoiceAiService
+  participant Orch as ChatOrchestrationService
+
+  UI->>API: POST /ask or /voice-chat
+  opt voice-chat
+    API->>Voice: Whisper transcribe
+    Voice-->>API: transcript
+  end
+  API->>Orch: ask/chat with ASK agent
+  Orch-->>API: ChatResponse
+  API-->>UI: answer + consultedAgents
 ```
 
 ## Recommendation seed (event-driven)

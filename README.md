@@ -369,7 +369,7 @@ Environment variables (see `src/main/resources/application.yml`):
 | `/api/v1/billing` | Legacy subscription & usage |
 | `/api/v1/subscriptions` | Plans, checkout, upgrade, webhooks, usage |
 | `/api/v1/search` | Global search |
-| `/api/v1/ai` | AI chat, recommendations, knowledge, analytics, workflow stubs (when enabled) |
+| `/api/v1/ai` | AI chat, specialists, Ask, recommendations, knowledge, analytics, voice, workflow drafts (when enabled) |
 | `/api/v1/audit-logs` | Audit trail |
 
 ### AI platform (optional)
@@ -384,8 +384,9 @@ Enabled by default (`FLOWLEDGER_AI_ENABLED` / `flowledger.ai.enabled=true`). Set
 | Events | `AiSearchEventBridge` listens to search upsert/delete **AFTER_COMMIT** |
 | Analytics | `GET /api/v1/ai/analytics/forecasts?type=` gated by `analytics-enabled` (default false) |
 | Docs | [`docs/ai/ROADMAP.md`](docs/ai/ROADMAP.md), Architecture, Sequence, OpenAPI, Flows |
+| v2 agents | Global Ask + specialist catalog; Whisper voice; workflow drafts (`AI_WORKFLOW`) |
 
-Roadmap phases 1–8 are implemented; v2 covers streaming, real tool-calling agents, OCR/voice.
+Roadmap phases 1–8 + **v2 specialist agents** are implemented; v2.1 covers streaming, true AiServices tool-calling, OCR, workflow execution hooks.
 
 ---
 

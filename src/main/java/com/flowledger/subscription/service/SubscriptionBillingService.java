@@ -31,6 +31,7 @@ import com.flowledger.subscription.repository.SubscriptionInvoiceRepository;
 import com.flowledger.subscription.repository.SubscriptionPlanRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Locale;
@@ -47,7 +48,8 @@ public class SubscriptionBillingService {
     private static final Map<String, Integer> PLAN_RANK = Map.of(
             "FREE", 0,
             "STARTER", 1,
-            "BUSINESS", 2);
+            "BUSINESS", 2,
+            "PRO", 2);
 
     private final SubscriptionPlanRepository plans;
     private final OrganizationSubscriptionRepository organizationSubscriptions;
@@ -104,21 +106,12 @@ public class SubscriptionBillingService {
 
     @Transactional(readOnly = true)
     public CurrentSubscriptionResponse getCurrent(UUID organizationId) {
-        OrganizationSubscription orgSub = organizationSubscriptions
-                .findByOrganizationId(organizationId)
-                .orElse(null);
+        OrganizationSubscription orgSub =
+                organizationSubscriptions.findByOrganizationId(organizationId).orElse(null);
         SubscriptionPlan plan = subscriptionService.resolvePlanForOrganization(organizationId);
         if (orgSub == null) {
             return new CurrentSubscriptionResponse(
-                    toPlanResponse(plan),
-                    "NONE",
-                    BillingCycle.MONTHLY.name(),
-                    null,
-                    null,
-                    null,
-                    true,
-                    null,
-                    null);
+                    toPlanResponse(plan), "NONE", BillingCycle.MONTHLY.name(), null, null, null, true, null, null);
         }
         return toCurrentResponse(orgSub, plan);
     }
@@ -132,13 +125,45 @@ public class SubscriptionBillingService {
     }
 
     public CurrentSubscriptionResponse cancel(UUID organizationId) {
+        return cancel(organizationId, false);
+    }
+
+    public CurrentSubscriptionResponse cancel(UUID organizationId, boolean immediate) {
         OrganizationSubscription orgSub = organizationSubscriptions
                 .findByOrganizationId(organizationId)
                 .orElseThrow(() -> new BusinessException("No organization subscription found"));
+        SubscriptionPlan currentPlan = subscriptionService.resolvePlanForOrganization(organizationId);
+        if ("FREE".equalsIgnoreCase(currentPlan.getCode())) {
+            throw new BusinessException("Free plan cannot be cancelled");
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
         orgSub.setAutoRenew(false);
+
+        if (immediate) {
+            SubscriptionPlan free =
+                    plans.findByCode("FREE").orElseThrow(() -> new BusinessException("FREE plan not found"));
+            orgSub.setStatus("CANCELLED");
+            orgSub.setEndDate(now);
+            orgSub.setNextBillingDate(null);
+            orgSub.setPlanId(free.getId());
+            organizationSubscriptions.save(orgSub);
+            activationService.syncOwningAdminUserSubscription(organizationId, free.getId());
+            return toCurrentResponse(orgSub, free);
+        }
+
+        OffsetDateTime end = orgSub.getNextBillingDate();
+        if (end == null || !end.isAfter(now)) {
+            end = "YEARLY".equalsIgnoreCase(orgSub.getBillingCycle()) ? now.plusYears(1) : now.plusMonths(1);
+            orgSub.setNextBillingDate(end);
+        }
+        orgSub.setEndDate(end);
+        // Keep ACTIVE so limits apply until period end; autoRenew=false stops renewal.
+        if (!"ACTIVE".equalsIgnoreCase(orgSub.getStatus()) && !"TRIAL".equalsIgnoreCase(orgSub.getStatus())) {
+            orgSub.setStatus("ACTIVE");
+        }
         organizationSubscriptions.save(orgSub);
-        SubscriptionPlan plan = subscriptionService.resolvePlanForOrganization(organizationId);
-        return toCurrentResponse(orgSub, plan);
+        return toCurrentResponse(orgSub, currentPlan);
     }
 
     @Transactional(readOnly = true)
@@ -186,7 +211,8 @@ public class SubscriptionBillingService {
             return getCurrent(organizationId);
         }
 
-        String providerName = firstNonBlank(request.provider(), txn.getProvider(), paymentProviders.active().name());
+        String providerName = firstNonBlank(
+                request.provider(), txn.getProvider(), paymentProviders.active().name());
         PaymentProvider provider = paymentProviders.require(providerName);
         // Razorpay requires signature; other providers may verify via API when signature is blank.
         if ("razorpay".equalsIgnoreCase(provider.name()) && (signature == null || signature.isBlank())) {
@@ -196,11 +222,11 @@ public class SubscriptionBillingService {
             throw new BusinessException("Payment signature verification failed");
         }
 
-        SubscriptionPlan plan = plans.findById(txn.getPlanId())
-                .orElseThrow(() -> new BusinessException("Subscription plan not found"));
+        SubscriptionPlan plan =
+                plans.findById(txn.getPlanId()).orElseThrow(() -> new BusinessException("Subscription plan not found"));
         BillingCycle cycle = parseCycle(txn.getBillingCycle());
-        OrganizationSubscription orgSub = activationService.activate(
-                organizationId, plan, cycle, txn, provider.name(), paymentId);
+        OrganizationSubscription orgSub =
+                activationService.activate(organizationId, plan, cycle, txn, provider.name(), paymentId);
         return toCurrentResponse(orgSub, plan);
     }
 
@@ -217,13 +243,15 @@ public class SubscriptionBillingService {
             throw new BusinessException("Plan code is required");
         }
         BillingCycle cycle = request.billingCycle() == null ? BillingCycle.MONTHLY : request.billingCycle();
-        SubscriptionPlan target = plans.findByCode(request.planCode().trim().toUpperCase(Locale.ROOT))
+        String planCode = normalizePlanCode(request.planCode());
+        SubscriptionPlan target = plans.findByCode(planCode)
                 .orElseThrow(() -> new BusinessException("Subscription plan not found: " + request.planCode()));
         if (!target.isActive()) {
             throw new BusinessException("Subscription plan is inactive");
         }
 
-        OrganizationSubscription current = organizationSubscriptions.findByOrganizationId(organizationId).orElse(null);
+        OrganizationSubscription current =
+                organizationSubscriptions.findByOrganizationId(organizationId).orElse(null);
         SubscriptionPlan currentPlan = subscriptionService.resolvePlanForOrganization(organizationId);
 
         if (current != null
@@ -344,6 +372,14 @@ public class SubscriptionBillingService {
             }
         }
         return null;
+    }
+
+    private static String normalizePlanCode(String code) {
+        String normalized = code.trim().toUpperCase(Locale.ROOT);
+        if ("PRO".equals(normalized)) {
+            return "BUSINESS";
+        }
+        return normalized;
     }
 
     private void assertUpgradeAllowed(SubscriptionPlan current, SubscriptionPlan target) {

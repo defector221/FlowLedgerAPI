@@ -25,13 +25,8 @@ public class InventoryTool {
         List<Alert> reorder = inventoryService.lowStockAlerts(true);
         String top = positions.stream()
                 .limit(15)
-                .map(p -> p.productName()
-                        + " sku="
-                        + p.sku()
-                        + " qty="
-                        + p.available()
-                        + " min="
-                        + p.minimumStockLevel())
+                .map(p ->
+                        p.productName() + " sku=" + p.sku() + " qty=" + p.available() + " min=" + p.minimumStockLevel())
                 .collect(Collectors.joining("; "));
         return "Stock positions (sample "
                 + Math.min(15, positions.size())

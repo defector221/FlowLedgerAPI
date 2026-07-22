@@ -103,12 +103,15 @@ flowledger:
     embeddings-enabled: true
     analytics-enabled: ${FLOWLEDGER_AI_ANALYTICS_ENABLED:true}
     document-ai-enabled: ${FLOWLEDGER_AI_DOCUMENT_ENABLED:false}
-    voice-enabled: ${FLOWLEDGER_AI_VOICE_ENABLED:false}
+    voice-enabled: ${FLOWLEDGER_AI_VOICE_ENABLED:true}
+    multi-agent-enabled: ${FLOWLEDGER_AI_MULTI_AGENT_ENABLED:true}
+    workflow-builder-enabled: ${FLOWLEDGER_AI_WORKFLOW_ENABLED:true}
     openai:
       api-key: ${OPENAI_API_KEY:}
       base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
       chat-model: gpt-4o-mini
       embedding-model: text-embedding-3-small
+      whisper-model: whisper-1
   # Notification channels (unified NotificationService → email / WhatsApp / in-app)
   notifications:
     email:

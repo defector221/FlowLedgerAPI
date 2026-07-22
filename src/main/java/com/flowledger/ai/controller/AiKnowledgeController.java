@@ -33,7 +33,8 @@ public class AiKnowledgeController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('AI_ADMIN') or hasRole('ORGANIZATION_ADMIN')")
     public AiDtos.KnowledgeResponse create(
-            @AuthenticationPrincipal UserPrincipal principal, @Valid @RequestBody AiDtos.KnowledgeCreateRequest request) {
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody AiDtos.KnowledgeCreateRequest request) {
         ensureTenant(principal);
         return knowledgeService.create(request);
     }

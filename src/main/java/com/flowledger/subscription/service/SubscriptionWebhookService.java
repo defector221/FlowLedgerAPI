@@ -100,7 +100,8 @@ public class SubscriptionWebhookService {
             return;
         }
 
-        PaymentTransaction txn = paymentTransactions.findByProviderOrderId(orderId).orElse(null);
+        PaymentTransaction txn =
+                paymentTransactions.findByProviderOrderId(orderId).orElse(null);
         if (txn == null) {
             log.warn("No payment transaction for {} order {}", providerName, orderId);
             return;
@@ -109,8 +110,8 @@ public class SubscriptionWebhookService {
             return;
         }
 
-        SubscriptionPlan plan = plans.findById(txn.getPlanId())
-                .orElseThrow(() -> new BusinessException("Subscription plan not found"));
+        SubscriptionPlan plan =
+                plans.findById(txn.getPlanId()).orElseThrow(() -> new BusinessException("Subscription plan not found"));
         BillingCycle cycle;
         try {
             cycle = BillingCycle.valueOf(txn.getBillingCycle().toUpperCase(Locale.ROOT));
@@ -125,30 +126,34 @@ public class SubscriptionWebhookService {
         return switch (provider.toLowerCase(Locale.ROOT)) {
             case "razorpay" -> type.contains("payment.captured") || type.contains("order.paid");
             case "stripe" -> type.contains("payment_intent.succeeded") || type.contains("checkout.session.completed");
-            case "cashfree" -> type.contains("payment_success")
-                    || type.contains("order_paid")
-                    || "PAID".equalsIgnoreCase(text(root, "order_status"))
-                    || "SUCCESS".equalsIgnoreCase(text(root.path("data").path("payment"), "payment_status"));
-            case "paypal" -> type.contains("payment.capture.completed")
-                    || type.contains("checkout.order.approved")
-                    || type.contains("checkout.order.completed");
+            case "cashfree" ->
+                type.contains("payment_success")
+                        || type.contains("order_paid")
+                        || "PAID".equalsIgnoreCase(text(root, "order_status"))
+                        || "SUCCESS".equalsIgnoreCase(text(root.path("data").path("payment"), "payment_status"));
+            case "paypal" ->
+                type.contains("payment.capture.completed")
+                        || type.contains("checkout.order.approved")
+                        || type.contains("checkout.order.completed");
             default -> false;
         };
     }
 
     private static String resolveEventId(String provider, JsonNode root) {
         return switch (provider.toLowerCase(Locale.ROOT)) {
-            case "razorpay" -> firstNonBlank(
-                    text(root, "event_id"),
-                    text(root.path("payload").path("payment").path("entity"), "id"),
-                    text(root, "id"),
-                    UUID.randomUUID().toString());
+            case "razorpay" ->
+                firstNonBlank(
+                        text(root, "event_id"),
+                        text(root.path("payload").path("payment").path("entity"), "id"),
+                        text(root, "id"),
+                        UUID.randomUUID().toString());
             case "stripe" -> firstNonBlank(text(root, "id"), UUID.randomUUID().toString());
-            case "cashfree" -> firstNonBlank(
-                    text(root, "event_id"),
-                    text(root.path("data").path("order"), "order_id"),
-                    text(root, "orderId"),
-                    UUID.randomUUID().toString());
+            case "cashfree" ->
+                firstNonBlank(
+                        text(root, "event_id"),
+                        text(root.path("data").path("order"), "order_id"),
+                        text(root, "orderId"),
+                        UUID.randomUUID().toString());
             case "paypal" -> firstNonBlank(text(root, "id"), UUID.randomUUID().toString());
             default -> UUID.randomUUID().toString();
         };
@@ -170,17 +175,27 @@ public class SubscriptionWebhookService {
                 }
                 yield firstNonBlank(text(paymentEntity, "order_id"), text(paymentEntity, "id"));
             }
-            case "stripe" -> firstNonBlank(
-                    text(root.path("data").path("object"), "id"),
-                    text(root.path("data").path("object"), "payment_intent"));
-            case "cashfree" -> firstNonBlank(
-                    text(root.path("data").path("order"), "order_id"),
-                    text(root, "order_id"),
-                    text(root, "orderId"));
-            case "paypal" -> firstNonBlank(
-                    text(root.path("resource").path("supplementary_data").path("related_ids"), "order_id"),
-                    text(root.path("resource"), "id"),
-                    text(root.path("resource").path("purchase_units").path(0).path("payments").path("captures").path(0), "id"));
+            case "stripe" ->
+                firstNonBlank(
+                        text(root.path("data").path("object"), "id"),
+                        text(root.path("data").path("object"), "payment_intent"));
+            case "cashfree" ->
+                firstNonBlank(
+                        text(root.path("data").path("order"), "order_id"),
+                        text(root, "order_id"),
+                        text(root, "orderId"));
+            case "paypal" ->
+                firstNonBlank(
+                        text(root.path("resource").path("supplementary_data").path("related_ids"), "order_id"),
+                        text(root.path("resource"), "id"),
+                        text(
+                                root.path("resource")
+                                        .path("purchase_units")
+                                        .path(0)
+                                        .path("payments")
+                                        .path("captures")
+                                        .path(0),
+                                "id"));
             default -> null;
         };
     }
@@ -191,15 +206,25 @@ public class SubscriptionWebhookService {
                 JsonNode paymentEntity = root.path("payload").path("payment").path("entity");
                 yield text(paymentEntity, "id");
             }
-            case "stripe" -> firstNonBlank(
-                    text(root.path("data").path("object"), "latest_charge"),
-                    text(root.path("data").path("object"), "id"));
-            case "cashfree" -> firstNonBlank(
-                    text(root.path("data").path("payment"), "cf_payment_id"),
-                    text(root.path("data").path("payment"), "payment_id"));
-            case "paypal" -> firstNonBlank(
-                    text(root.path("resource"), "id"),
-                    text(root.path("resource").path("purchase_units").path(0).path("payments").path("captures").path(0), "id"));
+            case "stripe" ->
+                firstNonBlank(
+                        text(root.path("data").path("object"), "latest_charge"),
+                        text(root.path("data").path("object"), "id"));
+            case "cashfree" ->
+                firstNonBlank(
+                        text(root.path("data").path("payment"), "cf_payment_id"),
+                        text(root.path("data").path("payment"), "payment_id"));
+            case "paypal" ->
+                firstNonBlank(
+                        text(root.path("resource"), "id"),
+                        text(
+                                root.path("resource")
+                                        .path("purchase_units")
+                                        .path(0)
+                                        .path("payments")
+                                        .path("captures")
+                                        .path(0),
+                                "id"));
             default -> null;
         };
     }

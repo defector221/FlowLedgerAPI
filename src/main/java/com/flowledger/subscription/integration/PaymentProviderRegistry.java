@@ -16,7 +16,8 @@ public class PaymentProviderRegistry {
 
     public PaymentProviderRegistry(BillingProperties billingProperties, List<PaymentProvider> providers) {
         this.billingProperties = billingProperties;
-        this.providers = providers.stream().collect(Collectors.toMap(p -> p.name().toLowerCase(Locale.ROOT), Function.identity()));
+        this.providers = providers.stream()
+                .collect(Collectors.toMap(p -> p.name().toLowerCase(Locale.ROOT), Function.identity()));
     }
 
     public PaymentProvider active() {
