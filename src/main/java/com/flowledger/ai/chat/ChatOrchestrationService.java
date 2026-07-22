@@ -36,6 +36,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Orchestrates chat: agent selection → optional multi-agent consult → RAG → tools → provider.
+ *
+ * <p>Interim tool binding: detects keywords and invokes {@link AiToolRegistry} directly. LangChain4j
+ * AiServices + {@code @Tool} methods on tool beans are available for a later wiring pass.
  */
 @Service
 @ConditionalOnAiEnabled
@@ -229,6 +232,7 @@ public class ChatOrchestrationService {
     private String gatherToolContext(Set<String> allowed, String message) {
         Set<String> toRun = selectToolsForMessage(allowed, message);
         if (toRun.isEmpty()) {
+            // still give CEO a dashboard snapshot
             if (allowed.contains("dashboard")) {
                 toRun = Set.of("dashboard");
             } else {

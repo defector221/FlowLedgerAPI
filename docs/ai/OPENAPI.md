@@ -42,18 +42,18 @@ Default agent when omitted: **ASK**. Legacy codes (`FINANCE`, `GST`, …) alias 
 
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
-| GET | `/analytics/forecasts?type=` | AI_ANALYSIS / AI_CHAT | `DEMAND\|SALES\|CASHFLOW\|INVENTORY` |
+| GET | `/analytics/forecasts?type=` | AI_ANALYSIS / AI_CHAT | `DEMAND\|SALES\|CASHFLOW\|INVENTORY`. If analytics disabled: `{ enabled:false, message }` |
 
 ## Workflow & voice
 
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
-| POST | `/workflow/suggest-from-text` | AI_CHAT / AI_WORKFLOW | field suggestions; **no PI/PO** |
+| POST | `/workflow/suggest-from-text` | AI_CHAT / AI_WORKFLOW | `{ text }` → suggested fields JSON; **no PI/PO** |
 | POST | `/workflow/suggest` | AI_CHAT / AI_WORKFLOW | NL → create draft workflow |
 | GET | `/workflow/drafts` | AI_CHAT / AI_WORKFLOW | list |
 | POST | `/workflow/drafts` | AI_WORKFLOW / AI_ADMIN | create |
 | PUT | `/workflow/drafts/{id}` | AI_WORKFLOW / AI_ADMIN | update |
 | POST | `/workflow/drafts/{id}/activate` | AI_WORKFLOW / AI_ADMIN | stores ACTIVE config only |
 | POST | `/workflow/drafts/{id}/deactivate` | AI_WORKFLOW / AI_ADMIN | → DRAFT |
-| POST | `/workflow/document-extract` | AI_CHAT | stub |
+| POST | `/workflow/document-extract` | AI_CHAT | stub / not configured |
 | POST | `/workflow/voice-transcribe` | AI_CHAT | Whisper STT `{ contentType, audioBase64 }` |

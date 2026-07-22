@@ -1,6 +1,6 @@
 # FlowLedger AI Platform — Roadmap
 
-Default master switch: `flowledger.ai.enabled` (local YAML often `true` via `FLOWLEDGER_AI_ENABLED`). LangChain4j **0.36.2**.
+Default master switch: `flowledger.ai.enabled` (local YAML often `true` via `FLOWLEDGER_AI_ENABLED`; defaults to `false` in code). LangChain4j **0.36.2**.
 
 | Phase | Status | Summary |
 |-------|--------|---------|
@@ -11,7 +11,7 @@ Default master switch: `flowledger.ai.enabled` (local YAML often `true` via `FLO
 | **5** Recommendation engine | Done | Heuristic types, NEW/ACKNOWLEDGED/DISMISSED, generator |
 | **6** Event-driven AI | Done | `AiSearchEventBridge` AFTER_COMMIT; lifecycle publisher |
 | **7** Predictive / analytics | Done | Moving-average forecast stubs; `analytics-enabled` gate |
-| **8** Autonomous stubs | Done | Document suggest stubs; no document posting |
+| **8** Autonomous stubs | Done | Document/Voice/Workflow suggest stubs; no document posting |
 | **v2 Specialist Agents** | Done | Global Ask, CFO/Accountant/… catalog, multi-agent consult, Whisper STT, Workflow Builder drafts |
 | **v2.1** | Planned | True LangChain4j AiServices tool-calling, streaming, pgvector ANN, OCR, workflow execution hooks, model budgets |
 
