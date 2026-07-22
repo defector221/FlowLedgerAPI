@@ -182,5 +182,13 @@ public final class AiDtos {
             OffsetDateTime requestedAt,
             UUID decidedBy,
             OffsetDateTime decidedAt,
-            String remarks) {}
+            String remarks,
+            UUID workflowDraftId,
+            String workflowName,
+            int currentStep,
+            int totalSteps,
+            String currentStepRole,
+            String currentStepAction,
+            boolean canApprove,
+            String stepsSnapshotJson) {}
 }

@@ -2,6 +2,8 @@ package com.flowledger.ai.workflow;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.flowledger.ai.config.ConditionalOnAiEnabled;
 import com.flowledger.ai.entity.AiWorkflowDraft;
 import com.flowledger.ai.repository.AiWorkflowDraftRepository;
@@ -14,19 +16,25 @@ import com.flowledger.transport.repository.ApprovalRequestRepository;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Evaluates ACTIVE AI workflow drafts and gates ERP actions via {@code approval_requests}.
- * Matching docs require human approve before convert/confirm proceeds.
+ * Matching docs require sequential human approvals (e.g. Admin then Accountant) before convert/confirm.
  */
 @Service
 @ConditionalOnAiEnabled
@@ -34,6 +42,8 @@ public class AiWorkflowGateService {
     private static final Logger log = LoggerFactory.getLogger(AiWorkflowGateService.class);
     private static final List<String> DOCUMENT_TYPES =
             List.of("QUOTATION", "SALES_ORDER", "SALES_INVOICE", "PURCHASE_ORDER", "PURCHASE_INVOICE");
+    private static final Set<String> APPROVAL_ACTIONS = Set.of("APPROVE", "REVIEW");
+    private static final Set<String> SKIP_ROLES = Set.of("REQUESTER");
 
     private final AiWorkflowDraftRepository drafts;
     private final ApprovalRequestRepository requests;
@@ -52,8 +62,8 @@ public class AiWorkflowGateService {
     }
 
     /**
-     * If any ACTIVE workflow matches this document, require an APPROVED request.
-     * Creates PENDING on first hit and throws 409; retries after approve succeed.
+     * If any ACTIVE workflow matches this document, require a fully APPROVED request
+     * (all sequential steps completed). Creates PENDING on first hit and throws 409.
      */
     @Transactional
     public void requireApproved(String documentType, UUID entityId, BigDecimal amount, String action) {
@@ -72,16 +82,20 @@ public class AiWorkflowGateService {
         var pending = requests.findFirstByOrganizationIdAndEntityTypeAndEntityIdAndStatusOrderByRequestedAtDesc(
                 org, documentType, entityId, ApprovalStatus.PENDING);
         if (pending.isPresent()) {
+            ApprovalRequest p = pending.get();
+            String stepHint = describeCurrentStep(p);
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Awaiting workflow approval for "
                             + documentType
-                            + ". Approve it under AI → Workflows, then retry "
+                            + (stepHint.isBlank() ? "" : " (" + stepHint + ")")
+                            + ". Approve under AI → Workflows, then retry "
                             + action
                             + ".");
         }
 
         AiWorkflowDraft primary = matched.get(0);
+        List<WorkflowStep> approvalSteps = approvalStepsFromDraft(primary);
         UUID user = TenantContext.userId()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user required"));
 
@@ -94,22 +108,38 @@ public class AiWorkflowGateService {
         request.setRequestedAt(OffsetDateTime.now());
         request.setCreatedBy(user);
         request.setUpdatedBy(user);
-        request.setRemarks(buildRemarks(primary, action, amount, matched.size()));
+        request.setWorkflowDraftId(primary.getId());
+        request.setWorkflowName(primary.getName());
+        request.setCurrentStep(1);
+        request.setTotalSteps(approvalSteps.size());
+        request.setStepsSnapshotJson(toStepsJson(approvalSteps));
+        request.setRemarks(buildRemarks(primary, action, amount, matched.size(), approvalSteps));
         request = requests.save(request);
-        saveAction(request.getId(), "SUBMITTED", request.getRemarks());
+        saveAction(
+                request.getId(),
+                "SUBMITTED",
+                "Submitted · awaiting step 1/"
+                        + approvalSteps.size()
+                        + " · "
+                        + approvalSteps.get(0).role());
 
         log.info(
-                "AI workflow gate submitted approval org={} type={} id={} workflow={}",
+                "AI workflow gate submitted approval org={} type={} id={} workflow={} steps={}",
                 org,
                 documentType,
                 entityId,
-                primary.getName());
+                primary.getName(),
+                approvalSteps.size());
 
         throw new ResponseStatusException(
                 HttpStatus.CONFLICT,
                 "Submitted for workflow approval (\""
                         + primary.getName()
-                        + "\"). Approve under AI → Workflows, then retry "
+                        + "\", step 1/"
+                        + approvalSteps.size()
+                        + " · "
+                        + humanize(approvalSteps.get(0).role())
+                        + "). Approve under AI → Workflows, then retry "
                         + action
                         + ".");
     }
@@ -132,15 +162,6 @@ public class AiWorkflowGateService {
 
     @Transactional
     public ApprovalRequest approve(UUID requestId, String remarks) {
-        return decide(requestId, ApprovalStatus.APPROVED, remarks);
-    }
-
-    @Transactional
-    public ApprovalRequest reject(UUID requestId, String remarks) {
-        return decide(requestId, ApprovalStatus.REJECTED, remarks);
-    }
-
-    private ApprovalRequest decide(UUID requestId, ApprovalStatus decision, String remarks) {
         UUID org = TenantContext.getOrganizationId();
         UUID user = TenantContext.userId()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user required"));
@@ -150,15 +171,150 @@ public class AiWorkflowGateService {
         if (request.getStatus() != ApprovalStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Approval request is not pending");
         }
-        request.setStatus(decision);
+
+        List<WorkflowStep> steps = parseStepsSnapshot(request.getStepsSnapshotJson());
+        if (steps.isEmpty()) {
+            // Legacy single-flip approvals created before multi-step
+            request.setStatus(ApprovalStatus.APPROVED);
+            request.setDecidedBy(user);
+            request.setDecidedAt(OffsetDateTime.now());
+            request.setUpdatedBy(user);
+            if (remarks != null && !remarks.isBlank()) {
+                request.setRemarks(remarks);
+            }
+            saveAction(request.getId(), "APPROVED", remarks);
+            return requests.save(request);
+        }
+
+        int stepIndex = Math.max(1, request.getCurrentStep());
+        if (stepIndex > steps.size()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Approval request has no remaining steps");
+        }
+        WorkflowStep step = steps.get(stepIndex - 1);
+        assertCanApproveStep(step.role());
+
+        String stepRemark = "Step "
+                + stepIndex
+                + "/"
+                + steps.size()
+                + " · "
+                + step.role()
+                + " · "
+                + step.action()
+                + (remarks == null || remarks.isBlank() ? "" : " · " + remarks.trim());
+        saveAction(request.getId(), "STEP_APPROVED", stepRemark);
+        request.setUpdatedBy(user);
+
+        if (stepIndex >= steps.size()) {
+            request.setStatus(ApprovalStatus.APPROVED);
+            request.setCurrentStep(steps.size());
+            request.setDecidedBy(user);
+            request.setDecidedAt(OffsetDateTime.now());
+            if (remarks != null && !remarks.isBlank()) {
+                request.setRemarks(remarks);
+            } else {
+                request.setRemarks("Fully approved · " + steps.size() + " step(s)");
+            }
+            saveAction(request.getId(), "APPROVED", "All " + steps.size() + " approval steps completed");
+            log.info("AI workflow fully approved request={}", request.getId());
+        } else {
+            int next = stepIndex + 1;
+            request.setCurrentStep(next);
+            WorkflowStep nextStep = steps.get(next - 1);
+            request.setRemarks(
+                    "Awaiting step "
+                            + next
+                            + "/"
+                            + steps.size()
+                            + " · "
+                            + humanize(nextStep.role())
+                            + " · "
+                            + humanize(nextStep.action()));
+            log.info(
+                    "AI workflow step approved request={} step={}/{} nextRole={}",
+                    request.getId(),
+                    stepIndex,
+                    steps.size(),
+                    nextStep.role());
+        }
+        return requests.save(request);
+    }
+
+    @Transactional
+    public ApprovalRequest reject(UUID requestId, String remarks) {
+        UUID org = TenantContext.getOrganizationId();
+        UUID user = TenantContext.userId()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user required"));
+        ApprovalRequest request = requests
+                .findByIdAndOrganizationId(requestId, org)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Approval request not found"));
+        if (request.getStatus() != ApprovalStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Approval request is not pending");
+        }
+        request.setStatus(ApprovalStatus.REJECTED);
         request.setDecidedBy(user);
         request.setDecidedAt(OffsetDateTime.now());
         request.setUpdatedBy(user);
         if (remarks != null && !remarks.isBlank()) {
             request.setRemarks(remarks);
         }
-        saveAction(request.getId(), decision.name(), remarks);
+        saveAction(request.getId(), "REJECTED", remarks);
         return requests.save(request);
+    }
+
+    public ApprovalProgress progressOf(ApprovalRequest request) {
+        List<WorkflowStep> steps = parseStepsSnapshot(request.getStepsSnapshotJson());
+        int total = request.getTotalSteps() > 0 ? request.getTotalSteps() : Math.max(steps.size(), 1);
+        int current = Math.max(1, request.getCurrentStep());
+        String role = null;
+        String action = null;
+        if (!steps.isEmpty() && request.getStatus() == ApprovalStatus.PENDING) {
+            int idx = Math.min(current, steps.size()) - 1;
+            role = steps.get(idx).role();
+            action = steps.get(idx).action();
+        }
+        boolean canApprove = request.getStatus() == ApprovalStatus.PENDING
+                && (role == null || currentUserCanApprove(role));
+        return new ApprovalProgress(
+                request.getWorkflowDraftId(),
+                request.getWorkflowName(),
+                current,
+                total,
+                role,
+                action,
+                request.getStepsSnapshotJson(),
+                canApprove,
+                steps);
+    }
+
+    private void assertCanApproveStep(String requiredRole) {
+        if (!currentUserCanApprove(requiredRole)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Step requires role "
+                            + humanize(requiredRole)
+                            + ". Sign in as that role (or Organization Admin) to approve.");
+        }
+    }
+
+    private boolean currentUserCanApprove(String requiredRole) {
+        if (requiredRole == null || requiredRole.isBlank()) {
+            return true;
+        }
+        Set<String> authorities = currentAuthorities();
+        if (authorities.contains("ROLE_ORGANIZATION_ADMIN") || authorities.contains("ORGANIZATION_ADMIN")) {
+            return true;
+        }
+        String role = requiredRole.trim().toUpperCase(Locale.ROOT);
+        return authorities.contains("ROLE_" + role) || authorities.contains(role);
+    }
+
+    private Set<String> currentAuthorities() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities() == null) {
+            return Set.of();
+        }
+        return auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toSet());
     }
 
     private List<AiWorkflowDraft> matchingActive(UUID org, String documentType, BigDecimal amount) {
@@ -221,6 +377,58 @@ public class AiWorkflowGateService {
         return true;
     }
 
+    private List<WorkflowStep> approvalStepsFromDraft(AiWorkflowDraft draft) {
+        List<WorkflowStep> raw = parseStepsSnapshot(draft.getStepsJson());
+        List<WorkflowStep> approval = raw.stream()
+                .filter(s -> s.role() == null || !SKIP_ROLES.contains(s.role().toUpperCase(Locale.ROOT)))
+                .filter(s -> {
+                    String action = s.action() == null ? "" : s.action().toUpperCase(Locale.ROOT);
+                    return action.isBlank() || APPROVAL_ACTIONS.contains(action);
+                })
+                .sorted(Comparator.comparingInt(WorkflowStep::order))
+                .toList();
+        if (approval.isEmpty()) {
+            return List.of(new WorkflowStep(1, "ORGANIZATION_ADMIN", "APPROVE"));
+        }
+        List<WorkflowStep> renumbered = new ArrayList<>();
+        for (int i = 0; i < approval.size(); i++) {
+            WorkflowStep s = approval.get(i);
+            renumbered.add(new WorkflowStep(
+                    i + 1,
+                    s.role() == null || s.role().isBlank() ? "ORGANIZATION_ADMIN" : s.role().toUpperCase(Locale.ROOT),
+                    s.action() == null || s.action().isBlank() ? "APPROVE" : s.action().toUpperCase(Locale.ROOT)));
+        }
+        return renumbered;
+    }
+
+    private List<WorkflowStep> parseStepsSnapshot(String raw) {
+        JsonNode root = parseJson(raw);
+        if (root == null || !root.isArray()) {
+            return List.of();
+        }
+        List<WorkflowStep> steps = new ArrayList<>();
+        for (JsonNode n : root) {
+            int order = n.has("order") ? n.get("order").asInt(steps.size() + 1) : steps.size() + 1;
+            String role = n.has("role") ? n.get("role").asText(null) : null;
+            String action = n.has("action") ? n.get("action").asText(null) : null;
+            steps.add(new WorkflowStep(order, role, action));
+        }
+        steps.sort(Comparator.comparingInt(WorkflowStep::order));
+        return steps;
+    }
+
+    private String toStepsJson(List<WorkflowStep> steps) {
+        ArrayNode arr = objectMapper.createArrayNode();
+        for (WorkflowStep s : steps) {
+            ObjectNode n = objectMapper.createObjectNode();
+            n.put("order", s.order());
+            n.put("role", s.role());
+            n.put("action", s.action());
+            arr.add(n);
+        }
+        return arr.toString();
+    }
+
     private JsonNode parseJson(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
@@ -232,7 +440,21 @@ public class AiWorkflowGateService {
         }
     }
 
-    private static String buildRemarks(AiWorkflowDraft draft, String action, BigDecimal amount, int matchedCount) {
+    private String describeCurrentStep(ApprovalRequest request) {
+        ApprovalProgress p = progressOf(request);
+        if (p.currentStepRole() == null) {
+            return "step " + p.currentStep() + "/" + p.totalSteps();
+        }
+        return "step "
+                + p.currentStep()
+                + "/"
+                + p.totalSteps()
+                + " · "
+                + humanize(p.currentStepRole());
+    }
+
+    private static String buildRemarks(
+            AiWorkflowDraft draft, String action, BigDecimal amount, int matchedCount, List<WorkflowStep> steps) {
         return "AI workflow \""
                 + draft.getName()
                 + "\" · action="
@@ -240,7 +462,29 @@ public class AiWorkflowGateService {
                 + " · amount="
                 + (amount == null ? "0" : amount.toPlainString())
                 + " · matched="
-                + matchedCount;
+                + matchedCount
+                + " · steps="
+                + steps.size()
+                + " · awaiting "
+                + humanize(steps.get(0).role());
+    }
+
+    private static String humanize(String value) {
+        if (value == null || value.isBlank()) {
+            return "—";
+        }
+        String[] parts = value.toLowerCase(Locale.ROOT).replace('_', ' ').split(" ");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            if (part.isBlank()) {
+                continue;
+            }
+            if (!sb.isEmpty()) {
+                sb.append(' ');
+            }
+            sb.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+        }
+        return sb.toString();
     }
 
     private void saveAction(UUID requestId, String value, String remarks) {
@@ -252,4 +496,17 @@ public class AiWorkflowGateService {
         a.setRemarks(remarks);
         actions.save(a);
     }
+
+    public record WorkflowStep(int order, String role, String action) {}
+
+    public record ApprovalProgress(
+            UUID workflowDraftId,
+            String workflowName,
+            int currentStep,
+            int totalSteps,
+            String currentStepRole,
+            String currentStepAction,
+            String stepsSnapshotJson,
+            boolean canApprove,
+            List<WorkflowStep> steps) {}
 }

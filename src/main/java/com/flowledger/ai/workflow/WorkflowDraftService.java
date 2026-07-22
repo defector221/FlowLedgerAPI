@@ -35,6 +35,7 @@ public class WorkflowDraftService {
         ensureBuilder();
         UUID org = TenantContext.getOrganizationId();
         return drafts.findByOrganizationIdOrderByUpdatedAtDesc(org).stream()
+                .filter(d -> !isDeleted(d))
                 .map(this::toDto)
                 .toList();
     }
@@ -56,7 +57,7 @@ public class WorkflowDraftService {
     @Transactional
     public AiDtos.WorkflowDraftResponse update(UUID id, AiDtos.WorkflowDraftRequest request) {
         ensureBuilder();
-        AiWorkflowDraft d = require(id);
+        AiWorkflowDraft d = requireAlive(id);
         if ("ACTIVE".equalsIgnoreCase(d.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Deactivate before editing an active workflow");
         }
@@ -67,18 +68,25 @@ public class WorkflowDraftService {
     @Transactional
     public AiDtos.WorkflowDraftResponse activate(UUID id) {
         ensureBuilder();
-        AiWorkflowDraft d = require(id);
+        AiWorkflowDraft d = requireAlive(id);
         d.setStatus("ACTIVE");
-        // Advisory only — stores config; does not hook posting/approvals yet.
         return toDto(drafts.save(d));
     }
 
     @Transactional
     public AiDtos.WorkflowDraftResponse deactivate(UUID id) {
         ensureBuilder();
-        AiWorkflowDraft d = require(id);
+        AiWorkflowDraft d = requireAlive(id);
         d.setStatus("DRAFT");
         return toDto(drafts.save(d));
+    }
+
+    @Transactional
+    public void softDelete(UUID id) {
+        ensureBuilder();
+        AiWorkflowDraft d = requireAlive(id);
+        d.setStatus("DELETED");
+        drafts.save(d);
     }
 
     /** NL → draft suggestion fields + optional persisted draft shell. */
@@ -136,7 +144,7 @@ public class WorkflowDraftService {
         plan.put("triggerType", trigger);
         plan.put(
                 "description",
-                "AI-suggested approval workflow. Activation stores configuration only — it does not auto-approve ERP documents.");
+                "AI-suggested approval workflow. Activate to require approval before matching sales convert/confirm.");
         plan.put(
                 "conditionsJson",
                 "{\"source\":\"ai\",\"promptPreview\":\""
@@ -194,6 +202,18 @@ public class WorkflowDraftService {
     private AiWorkflowDraft require(UUID id) {
         return drafts.findByIdAndOrganizationId(id, TenantContext.getOrganizationId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Workflow draft not found"));
+    }
+
+    private AiWorkflowDraft requireAlive(UUID id) {
+        AiWorkflowDraft d = require(id);
+        if (isDeleted(d)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Workflow draft not found");
+        }
+        return d;
+    }
+
+    private static boolean isDeleted(AiWorkflowDraft d) {
+        return "DELETED".equalsIgnoreCase(d.getStatus());
     }
 
     private void ensureBuilder() {

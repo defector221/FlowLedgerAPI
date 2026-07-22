@@ -31,6 +31,7 @@ import com.flowledger.subscription.repository.SubscriptionInvoiceRepository;
 import com.flowledger.subscription.repository.SubscriptionPlanRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Locale;
@@ -47,7 +48,8 @@ public class SubscriptionBillingService {
     private static final Map<String, Integer> PLAN_RANK = Map.of(
             "FREE", 0,
             "STARTER", 1,
-            "BUSINESS", 2);
+            "BUSINESS", 2,
+            "PRO", 2);
 
     private final SubscriptionPlanRepository plans;
     private final OrganizationSubscriptionRepository organizationSubscriptions;
@@ -132,13 +134,45 @@ public class SubscriptionBillingService {
     }
 
     public CurrentSubscriptionResponse cancel(UUID organizationId) {
+        return cancel(organizationId, false);
+    }
+
+    public CurrentSubscriptionResponse cancel(UUID organizationId, boolean immediate) {
         OrganizationSubscription orgSub = organizationSubscriptions
                 .findByOrganizationId(organizationId)
                 .orElseThrow(() -> new BusinessException("No organization subscription found"));
+        SubscriptionPlan currentPlan = subscriptionService.resolvePlanForOrganization(organizationId);
+        if ("FREE".equalsIgnoreCase(currentPlan.getCode())) {
+            throw new BusinessException("Free plan cannot be cancelled");
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
         orgSub.setAutoRenew(false);
+
+        if (immediate) {
+            SubscriptionPlan free = plans.findByCode("FREE")
+                    .orElseThrow(() -> new BusinessException("FREE plan not found"));
+            orgSub.setStatus("CANCELLED");
+            orgSub.setEndDate(now);
+            orgSub.setNextBillingDate(null);
+            orgSub.setPlanId(free.getId());
+            organizationSubscriptions.save(orgSub);
+            activationService.syncOwningAdminUserSubscription(organizationId, free.getId());
+            return toCurrentResponse(orgSub, free);
+        }
+
+        OffsetDateTime end = orgSub.getNextBillingDate();
+        if (end == null || !end.isAfter(now)) {
+            end = "YEARLY".equalsIgnoreCase(orgSub.getBillingCycle()) ? now.plusYears(1) : now.plusMonths(1);
+            orgSub.setNextBillingDate(end);
+        }
+        orgSub.setEndDate(end);
+        // Keep ACTIVE so limits apply until period end; autoRenew=false stops renewal.
+        if (!"ACTIVE".equalsIgnoreCase(orgSub.getStatus()) && !"TRIAL".equalsIgnoreCase(orgSub.getStatus())) {
+            orgSub.setStatus("ACTIVE");
+        }
         organizationSubscriptions.save(orgSub);
-        SubscriptionPlan plan = subscriptionService.resolvePlanForOrganization(organizationId);
-        return toCurrentResponse(orgSub, plan);
+        return toCurrentResponse(orgSub, currentPlan);
     }
 
     @Transactional(readOnly = true)
@@ -217,7 +251,8 @@ public class SubscriptionBillingService {
             throw new BusinessException("Plan code is required");
         }
         BillingCycle cycle = request.billingCycle() == null ? BillingCycle.MONTHLY : request.billingCycle();
-        SubscriptionPlan target = plans.findByCode(request.planCode().trim().toUpperCase(Locale.ROOT))
+        String planCode = normalizePlanCode(request.planCode());
+        SubscriptionPlan target = plans.findByCode(planCode)
                 .orElseThrow(() -> new BusinessException("Subscription plan not found: " + request.planCode()));
         if (!target.isActive()) {
             throw new BusinessException("Subscription plan is inactive");
@@ -344,6 +379,14 @@ public class SubscriptionBillingService {
             }
         }
         return null;
+    }
+
+    private static String normalizePlanCode(String code) {
+        String normalized = code.trim().toUpperCase(Locale.ROOT);
+        if ("PRO".equals(normalized)) {
+            return "BUSINESS";
+        }
+        return normalized;
     }
 
     private void assertUpgradeAllowed(SubscriptionPlan current, SubscriptionPlan target) {

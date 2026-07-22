@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -49,8 +50,8 @@ public class SubscriptionController {
     }
 
     @PostMapping("/cancel")
-    public CurrentSubscriptionResponse cancel() {
-        return billing.cancel(SecurityUtils.currentOrganizationId());
+    public CurrentSubscriptionResponse cancel(@RequestParam(defaultValue = "false") boolean immediate) {
+        return billing.cancel(SecurityUtils.currentOrganizationId(), immediate);
     }
 
     @GetMapping("/invoices")

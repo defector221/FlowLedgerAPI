@@ -39,4 +39,19 @@ public class ApprovalRequest extends TransportAuditedEntity {
 
     @Column(columnDefinition = "text")
     private String remarks;
+
+    @Column(name = "workflow_draft_id")
+    private UUID workflowDraftId;
+
+    @Column(name = "workflow_name")
+    private String workflowName;
+
+    @Column(name = "current_step", nullable = false)
+    private int currentStep = 1;
+
+    @Column(name = "total_steps", nullable = false)
+    private int totalSteps = 1;
+
+    @Column(name = "steps_snapshot_json", columnDefinition = "text")
+    private String stepsSnapshotJson;
 }

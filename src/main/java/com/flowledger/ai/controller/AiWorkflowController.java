@@ -14,6 +14,8 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -101,6 +103,15 @@ public class AiWorkflowController {
         return drafts.deactivate(id);
     }
 
+    @DeleteMapping("/drafts/{id}")
+    @PreAuthorize("hasAuthority('AI_WORKFLOW') or hasAuthority('AI_ADMIN') or hasRole('ORGANIZATION_ADMIN')")
+    public ResponseEntity<Void> softDeleteDraft(
+            @AuthenticationPrincipal UserPrincipal principal, @PathVariable UUID id) {
+        ensureTenant(principal);
+        drafts.softDelete(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/document-extract")
     @PreAuthorize("hasAuthority('AI_CHAT') or hasRole('ORGANIZATION_ADMIN')")
     public AiDtos.DocumentAiResponse documentExtract(
@@ -149,6 +160,7 @@ public class AiWorkflowController {
     }
 
     private AiDtos.WorkflowApprovalResponse toApproval(ApprovalRequest r) {
+        AiWorkflowGateService.ApprovalProgress progress = gate.progressOf(r);
         return new AiDtos.WorkflowApprovalResponse(
                 r.getId(),
                 r.getEntityType(),
@@ -158,7 +170,15 @@ public class AiWorkflowController {
                 r.getRequestedAt(),
                 r.getDecidedBy(),
                 r.getDecidedAt(),
-                r.getRemarks());
+                r.getRemarks(),
+                progress.workflowDraftId(),
+                progress.workflowName(),
+                progress.currentStep(),
+                progress.totalSteps(),
+                progress.currentStepRole(),
+                progress.currentStepAction(),
+                progress.canApprove(),
+                progress.stepsSnapshotJson());
     }
 
     private void ensureTenant(UserPrincipal principal) {
