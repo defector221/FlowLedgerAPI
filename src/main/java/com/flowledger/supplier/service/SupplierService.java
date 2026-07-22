@@ -1,12 +1,14 @@
 package com.flowledger.supplier.service;
 
 import com.flowledger.common.service.OrganizationScopedService;
+import com.flowledger.common.util.EntityCodeGenerator;
 import com.flowledger.search.event.SearchIndexEventPublisher;
 import com.flowledger.search.model.SearchEntityType;
 import com.flowledger.supplier.dto.SupplierDtos.*;
 import com.flowledger.supplier.entity.Supplier;
 import com.flowledger.supplier.mapper.SupplierMapper;
 import com.flowledger.supplier.repository.SupplierRepository;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -31,10 +33,15 @@ public class SupplierService extends OrganizationScopedService {
 
     public Response create(Create dto) {
         UUID org = orgId();
-        if (repo.existsByOrganizationIdAndSupplierCode(org, dto.supplierCode())) {
+        String nameForCode = dto.companyName() != null && !dto.companyName().isBlank()
+                ? dto.companyName()
+                : dto.supplierName();
+        String code = resolveCode(org, dto.supplierCode(), nameForCode);
+        if (repo.existsByOrganizationIdAndSupplierCode(org, code)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Supplier code already exists");
         }
         Supplier supplier = mapper.toEntity(dto);
+        supplier.setSupplierCode(code);
         supplier.setOrganizationId(org);
         if (supplier.getCountry() == null || supplier.getCountry().isBlank()) {
             supplier.setCountry("India");
@@ -45,6 +52,14 @@ public class SupplierService extends OrganizationScopedService {
         Supplier saved = repo.save(supplier);
         searchEvents.upsert(org, SearchEntityType.SUPPLIER, saved.getId());
         return mapper.toResponse(saved);
+    }
+
+    private String resolveCode(UUID org, String provided, String name) {
+        if (provided != null && !provided.isBlank()) {
+            return provided.trim().toUpperCase(Locale.ROOT);
+        }
+        return EntityCodeGenerator.uniqueFromName(
+                name, "SUP", candidate -> repo.existsByOrganizationIdAndSupplierCode(org, candidate));
     }
 
     @Transactional(readOnly = true)

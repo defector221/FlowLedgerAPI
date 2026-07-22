@@ -34,6 +34,10 @@ public interface SupplierCatalogItemRepository extends JpaRepository<SupplierCat
             findByOrganizationIdAndProductIdAndPreferredTrueAndActiveTrueAndDeletedFalseAndIdNot(
                     UUID organizationId, UUID productId, UUID id);
 
+    boolean existsByOrganizationIdAndSupplierSkuIgnoreCaseAndDeletedFalse(UUID organizationId, String supplierSku);
+
+    long countByOrganizationIdAndProductIdAndDeletedFalse(UUID organizationId, UUID productId);
+
     @Query(
             """
             select item from SupplierCatalogItem item
