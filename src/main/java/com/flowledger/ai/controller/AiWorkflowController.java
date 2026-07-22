@@ -2,11 +2,13 @@ package com.flowledger.ai.controller;
 
 import com.flowledger.ai.config.ConditionalOnAiEnabled;
 import com.flowledger.ai.dto.AiDtos;
+import com.flowledger.ai.workflow.AiWorkflowGateService;
 import com.flowledger.ai.workflow.DocumentAiService;
 import com.flowledger.ai.workflow.VoiceAiService;
 import com.flowledger.ai.workflow.WorkflowDraftService;
 import com.flowledger.common.security.UserPrincipal;
 import com.flowledger.common.tenant.TenantContext;
+import com.flowledger.transport.entity.ApprovalRequest;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -28,12 +31,17 @@ public class AiWorkflowController {
     private final WorkflowDraftService drafts;
     private final DocumentAiService documentAi;
     private final VoiceAiService voiceAi;
+    private final AiWorkflowGateService gate;
 
     public AiWorkflowController(
-            WorkflowDraftService drafts, DocumentAiService documentAi, VoiceAiService voiceAi) {
+            WorkflowDraftService drafts,
+            DocumentAiService documentAi,
+            VoiceAiService voiceAi,
+            AiWorkflowGateService gate) {
         this.drafts = drafts;
         this.documentAi = documentAi;
         this.voiceAi = voiceAi;
+        this.gate = gate;
     }
 
     @PostMapping("/suggest-from-text")
@@ -107,6 +115,50 @@ public class AiWorkflowController {
             @AuthenticationPrincipal UserPrincipal principal, @RequestBody AiDtos.VoiceAiRequest request) {
         ensureTenant(principal);
         return voiceAi.transcribe(request);
+    }
+
+    @GetMapping("/approvals")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('AI_WORKFLOW') or hasRole('ORGANIZATION_ADMIN')")
+    public List<AiDtos.WorkflowApprovalResponse> listApprovals(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(defaultValue = "pending") String status) {
+        ensureTenant(principal);
+        List<ApprovalRequest> rows =
+                "all".equalsIgnoreCase(status) ? gate.listRecent() : gate.listPending();
+        return rows.stream().map(this::toApproval).toList();
+    }
+
+    @PostMapping("/approvals/{id}/approve")
+    @PreAuthorize("hasAuthority('AI_WORKFLOW') or hasAuthority('AI_ADMIN') or hasRole('ORGANIZATION_ADMIN')")
+    public AiDtos.WorkflowApprovalResponse approve(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id,
+            @RequestBody(required = false) AiDtos.WorkflowApprovalDecideRequest body) {
+        ensureTenant(principal);
+        return toApproval(gate.approve(id, body == null ? null : body.remarks()));
+    }
+
+    @PostMapping("/approvals/{id}/reject")
+    @PreAuthorize("hasAuthority('AI_WORKFLOW') or hasAuthority('AI_ADMIN') or hasRole('ORGANIZATION_ADMIN')")
+    public AiDtos.WorkflowApprovalResponse reject(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id,
+            @RequestBody(required = false) AiDtos.WorkflowApprovalDecideRequest body) {
+        ensureTenant(principal);
+        return toApproval(gate.reject(id, body == null ? null : body.remarks()));
+    }
+
+    private AiDtos.WorkflowApprovalResponse toApproval(ApprovalRequest r) {
+        return new AiDtos.WorkflowApprovalResponse(
+                r.getId(),
+                r.getEntityType(),
+                r.getEntityId(),
+                r.getStatus() == null ? null : r.getStatus().name(),
+                r.getRequestedBy(),
+                r.getRequestedAt(),
+                r.getDecidedBy(),
+                r.getDecidedAt(),
+                r.getRemarks());
     }
 
     private void ensureTenant(UserPrincipal principal) {

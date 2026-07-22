@@ -10,4 +10,7 @@ public interface AiWorkflowDraftRepository extends JpaRepository<AiWorkflowDraft
     List<AiWorkflowDraft> findByOrganizationIdOrderByUpdatedAtDesc(UUID organizationId);
 
     Optional<AiWorkflowDraft> findByIdAndOrganizationId(UUID id, UUID organizationId);
+
+    List<AiWorkflowDraft> findByOrganizationIdAndStatusIgnoreCaseOrderByUpdatedAtDesc(
+            UUID organizationId, String status);
 }

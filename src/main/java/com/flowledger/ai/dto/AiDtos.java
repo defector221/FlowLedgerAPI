@@ -170,4 +170,17 @@ public final class AiDtos {
             OffsetDateTime updatedAt) {}
 
     public record WorkflowNlSuggestRequest(String prompt) {}
+
+    public record WorkflowApprovalDecideRequest(String remarks) {}
+
+    public record WorkflowApprovalResponse(
+            UUID id,
+            String entityType,
+            UUID entityId,
+            String status,
+            UUID requestedBy,
+            OffsetDateTime requestedAt,
+            UUID decidedBy,
+            OffsetDateTime decidedAt,
+            String remarks) {}
 }
