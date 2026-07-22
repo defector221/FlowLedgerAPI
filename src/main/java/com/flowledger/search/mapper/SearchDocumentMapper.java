@@ -8,6 +8,7 @@ import com.flowledger.search.model.SearchDocument;
 import com.flowledger.search.model.SearchDocumentIds;
 import com.flowledger.search.model.SearchEntityType;
 import com.flowledger.supplier.entity.Supplier;
+import com.flowledger.transport.entity.Shipment;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Objects;
@@ -109,6 +110,30 @@ public class SearchDocumentMapper {
                         invoice.getSupplierGstin(),
                         invoice.getNotes(),
                         invoice.getStatus())
+                .build();
+    }
+
+    public SearchDocument fromShipment(Shipment shipment) {
+        String status = shipment.getStatus() == null ? null : shipment.getStatus().name();
+        return base(
+                        shipment.getOrganizationId(),
+                        SearchEntityType.SHIPMENT,
+                        shipment.getId(),
+                        shipment.getShipmentNumber(),
+                        join(
+                                shipment.getSourceDocumentType(),
+                                status,
+                                shipment.getEwayBillNumber(),
+                                shipment.getGpsTrackingUrl()),
+                        shipment.getShipmentNumber(),
+                        status,
+                        toInstant(shipment.getUpdatedAt()),
+                        shipment.getShipmentNumber(),
+                        shipment.getSourceDocumentType(),
+                        shipment.getEwayBillNumber(),
+                        shipment.getEinvoiceReference(),
+                        shipment.getRemarks(),
+                        status)
                 .build();
     }
 

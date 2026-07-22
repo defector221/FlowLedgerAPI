@@ -9,4 +9,10 @@ public record OrganizationSettingsResponse(
         boolean taxInclusiveDefault,
         boolean roundOffEnabled,
         UUID defaultWarehouseId,
+        boolean transportEnabled,
+        boolean transportRequiredDefault,
+        boolean transportAllowOverride,
+        boolean transportApprovalRequired,
+        String transportDefaultFreightPayer,
+        Integer transportDelayThresholdHours,
         String settingsJson) {}

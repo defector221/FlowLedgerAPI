@@ -4,6 +4,7 @@ import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
+import com.flowledger.product.service.SupplierCatalogService;
 import com.flowledger.purchase.dto.PurchaseDtos.Line;
 import com.flowledger.purchase.dto.PurchaseDtos.OrderRequest;
 import com.flowledger.purchase.entity.PurchaseOrder;
@@ -29,10 +30,13 @@ public class PurchaseOrderService {
 
     private final DocumentNumberService numbers;
     private final OrganizationRepository organizations;
+    private final SupplierCatalogService supplierCatalog;
 
-    public PurchaseOrderService(DocumentNumberService n, OrganizationRepository o) {
+    public PurchaseOrderService(
+            DocumentNumberService n, OrganizationRepository o, SupplierCatalogService supplierCatalog) {
         numbers = n;
         organizations = o;
+        this.supplierCatalog = supplierCatalog;
     }
 
     public PurchaseOrder create(OrderRequest request) {
@@ -111,6 +115,8 @@ public class PurchaseOrderService {
     private void applyOrderLines(PurchaseOrder po, List<Line> lines) {
         int i = 0;
         for (Line line : lines) {
+            supplierCatalog.requireActiveCatalogItem(
+                    TenantContext.getOrganizationId(), po.getSupplierId(), line.productId());
             PurchaseOrderItem item = new PurchaseOrderItem();
             item.setOrder(po);
             item.setProductId(line.productId());

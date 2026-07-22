@@ -27,6 +27,14 @@ public class DeliveryChallanItem {
     @Column(nullable = false)
     private BigDecimal quantity;
 
+    @Column(nullable = false)
+    private BigDecimal quantityDispatched = BigDecimal.ZERO;
+
+    @Transient
+    public BigDecimal getQuantityRemaining() {
+        return quantity.subtract(quantityDispatched == null ? BigDecimal.ZERO : quantityDispatched);
+    }
+
     private UUID unitId;
     private int lineOrder;
 }

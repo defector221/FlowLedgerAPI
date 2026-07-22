@@ -627,6 +627,7 @@ public class SalesDocumentService {
         challan.setSalesOrderId(request.salesOrderId());
         challan.setWarehouseId(request.warehouseId());
         challan.setNotes(request.notes());
+        challan.setTransportRequired(Boolean.TRUE.equals(request.transportRequired()));
         challan.getItems().clear();
         int i = 0;
         for (ChallanItem ci : request.items()) {

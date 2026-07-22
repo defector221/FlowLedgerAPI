@@ -99,6 +99,24 @@ public class OrganizationService {
         if (request.defaultWarehouseId() != null) {
             settings.setDefaultWarehouseId(request.defaultWarehouseId());
         }
+        if (request.transportEnabled() != null) {
+            settings.setTransportEnabled(request.transportEnabled());
+        }
+        if (request.transportRequiredDefault() != null) {
+            settings.setTransportRequiredDefault(request.transportRequiredDefault());
+        }
+        if (request.transportAllowOverride() != null) {
+            settings.setTransportAllowOverride(request.transportAllowOverride());
+        }
+        if (request.transportApprovalRequired() != null) {
+            settings.setTransportApprovalRequired(request.transportApprovalRequired());
+        }
+        if (request.transportDefaultFreightPayer() != null) {
+            settings.setTransportDefaultFreightPayer(request.transportDefaultFreightPayer());
+        }
+        if (request.transportDelayThresholdHours() != null) {
+            settings.setTransportDelayThresholdHours(request.transportDelayThresholdHours());
+        }
         if (request.settingsJson() != null) {
             settings.setSettingsJson(request.settingsJson());
         }

@@ -7,4 +7,10 @@ public record UpdateOrganizationSettingsRequest(
         Boolean taxInclusiveDefault,
         Boolean roundOffEnabled,
         UUID defaultWarehouseId,
+        Boolean transportEnabled,
+        Boolean transportRequiredDefault,
+        Boolean transportAllowOverride,
+        Boolean transportApprovalRequired,
+        String transportDefaultFreightPayer,
+        Integer transportDelayThresholdHours,
         String settingsJson) {}

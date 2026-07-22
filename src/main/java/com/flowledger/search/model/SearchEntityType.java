@@ -5,5 +5,6 @@ public enum SearchEntityType {
     CUSTOMER,
     SUPPLIER,
     SALES_INVOICE,
-    PURCHASE_INVOICE
+    PURCHASE_INVOICE,
+    SHIPMENT
 }

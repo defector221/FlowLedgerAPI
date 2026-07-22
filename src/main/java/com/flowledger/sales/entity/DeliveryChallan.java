@@ -36,6 +36,9 @@ public class DeliveryChallan extends AuditedEntity {
     @Column(columnDefinition = "text")
     private String notes;
 
+    @Column(nullable = false)
+    private boolean transportRequired;
+
     @Version
     private Long version;
 

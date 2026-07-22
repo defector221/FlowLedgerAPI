@@ -9,6 +9,7 @@ import com.flowledger.search.model.SearchDocument;
 import com.flowledger.search.model.SearchEntityType;
 import com.flowledger.search.service.SearchIndexService;
 import com.flowledger.supplier.repository.SupplierRepository;
+import com.flowledger.transport.repository.ShipmentRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.UUID;
@@ -28,6 +29,7 @@ public class SearchIndexEventListener {
     private final CustomerRepository customers;
     private final SupplierRepository suppliers;
     private final SalesInvoiceRepository salesInvoices;
+    private final ShipmentRepository shipments;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -104,6 +106,11 @@ public class SearchIndexEventListener {
                         .orElse(null);
                 yield mapper.fromPurchaseInvoice(invoice, supplierName);
             }
+            case SHIPMENT ->
+                shipments
+                        .findByIdAndOrganizationIdAndDeletedFalse(entityId, organizationId)
+                        .map(mapper::fromShipment)
+                        .orElse(null);
         };
     }
 }

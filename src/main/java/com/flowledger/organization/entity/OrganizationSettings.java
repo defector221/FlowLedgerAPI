@@ -31,6 +31,22 @@ public class OrganizationSettings {
 
     private UUID defaultWarehouseId;
 
+    @Column(nullable = false)
+    private boolean transportEnabled;
+
+    @Column(nullable = false)
+    private boolean transportRequiredDefault;
+
+    @Column(nullable = false)
+    private boolean transportAllowOverride = true;
+
+    @Column(nullable = false)
+    private boolean transportApprovalRequired;
+
+    private String transportDefaultFreightPayer;
+
+    private Integer transportDelayThresholdHours = 24;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, name = "settings_json", columnDefinition = "jsonb")
     private String settingsJson = "{}";

@@ -79,6 +79,7 @@ public final class SalesDtos {
             UUID salesOrderId,
             UUID warehouseId,
             String notes,
+            Boolean transportRequired,
             @NotEmpty @Valid List<ChallanItem> items) {}
 
     public record ReturnRequest(
