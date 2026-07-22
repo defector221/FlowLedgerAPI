@@ -15,7 +15,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     JwtProperties.class,
     NotificationProperties.class,
     com.flowledger.storage.MinioStorageProperties.class,
-    com.flowledger.search.config.SearchProperties.class
+    com.flowledger.search.config.SearchProperties.class,
+    com.flowledger.subscription.config.BillingProperties.class,
+    com.flowledger.subscription.config.RazorpayProperties.class,
+    com.flowledger.subscription.config.StripeProperties.class,
+    com.flowledger.subscription.config.CashfreeProperties.class,
+    com.flowledger.subscription.config.PayPalProperties.class
 })
 public class FlowLedgerApplication {
     public static void main(String[] args) {

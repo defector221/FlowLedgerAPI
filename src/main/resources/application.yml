@@ -74,6 +74,26 @@ flowledger:
     username: ${FLOWLEDGER_SEARCH_USERNAME:admin}
     password: ${FLOWLEDGER_SEARCH_PASSWORD:Vayupa2024wan}
     ssl-verify: ${FLOWLEDGER_SEARCH_SSL_VERIFY:false}
+  billing:
+    provider: ${FLOWLEDGER_BILLING_PROVIDER:razorpay}
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID:}
+    key-secret: ${RAZORPAY_KEY_SECRET:}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
+  stripe:
+    secret-key: ${STRIPE_SECRET_KEY:}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+    publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
+  cashfree:
+    app-id: ${CASHFREE_APP_ID:}
+    secret-key: ${CASHFREE_SECRET_KEY:}
+    webhook-secret: ${CASHFREE_WEBHOOK_SECRET:}
+    env: ${CASHFREE_ENV:sandbox}
+  paypal:
+    client-id: ${PAYPAL_CLIENT_ID:}
+    client-secret: ${PAYPAL_CLIENT_SECRET:}
+    webhook-id: ${PAYPAL_WEBHOOK_ID:}
+    mode: ${PAYPAL_MODE:sandbox}
   # Notification channels (unified NotificationService → email / WhatsApp / in-app)
   notifications:
     email:

@@ -92,13 +92,13 @@ dto/        mapper/     domain/ (enums)
 | `warehouse`, `inventory` | Warehouses, stock ledger (append-only) |
 | `sales` | Quotations, SO, challans, invoices, returns, credit notes |
 | `purchase` | PO, GRN, purchase invoices, returns, debit notes |
-| `payment` | Receipts, supplier payments, reminder rules |
+| `payment` | Receipts, supplier payments, multi-line allocations, reminder rules |
 | `accounting` | Chart of accounts, journals, ledgers, GST summary, reports |
 | `tax` | GST calculation (intra/inter-state) |
 | `template`, `pdf` | Invoice templates, PDF generation |
 | `report`, `dashboard` | Business reports, KPIs |
 | `lead`, `marketing`, `emailtemplate` | CRM, sequences, campaigns |
-| `subscription` | Plans, billing limits |
+| `subscription` | Plans, org subscriptions, checkout, payment providers, usage limits |
 | `search` | OpenSearch indexing & global search |
 | `notification`, `audit`, `storage` | Notifications, audit log, MinIO files |
 | `common` | Security, tenant context, exceptions, utilities |
@@ -120,7 +120,7 @@ dto/        mapper/     domain/ (enums)
 flowchart LR
   A["POST auth register"] --> B["Create Organization"]
   B --> C["Create admin user"]
-  C --> D["FREE subscription"]
+  C --> D["FREE org + user subscription"]
   D --> E["COA bootstrap"]
   E --> F["Return JWT tokens"]
   F --> G["PUT organizations current"]
@@ -235,8 +235,56 @@ JPA: `ddl-auto: validate` (schema owned by Flyway)
 | V22–V24 | YRV Solutions demo seed |
 | V25 | COA enhancements (hierarchy, status, flags) |
 | V26 | YRV COA demo enrichment |
+| V27–V31 | Later incremental features (see migration files) |
+| V32 | Subscription billing extension (org subscriptions, payment transactions, webhooks) |
 
-> **Never edit an already-applied migration.** Add new `V27+` files instead; Flyway validates checksums on startup.
+### Flyway policy
+
+- **Never edit an already-applied migration** in shared/prod environments (V1–V31 and beyond once applied). Flyway checksum validation will fail on startup.
+- **Unreleased local-only** migrations may be fixed in place before they are applied anywhere else.
+- Otherwise use **forward-only** new versions (`V33+`).
+
+---
+
+## Subscriptions & billing
+
+Organization subscription is the **source of truth** for plan limits (users/org, invoices/month, etc.).
+
+| Endpoint prefix | Purpose |
+|-----------------|---------|
+| `/api/v1/subscriptions/plans` | List active plans |
+| `/api/v1/subscriptions/current` | Current org subscription |
+| `/api/v1/subscriptions/checkout` | Start paid checkout (or activate FREE) |
+| `/api/v1/subscriptions/upgrade` | Upgrade path |
+| `/api/v1/subscriptions/cancel` | Stop auto-renew |
+| `/api/v1/subscriptions/verify-payment` | Client-side payment confirmation |
+| `/api/v1/subscriptions/usage` | Usage vs plan limits |
+| `/api/v1/subscriptions/invoices` | Subscription invoices |
+| `/api/v1/subscriptions/webhooks/{provider}` | Provider webhooks (`razorpay`, `stripe`, `cashfree`, `paypal`) — `permitAll` |
+| `/api/v1/billing/current` | Legacy billing view (org plan preferred) |
+
+**Providers** (`flowledger.billing.provider`): `razorpay` (default), `stripe`, `cashfree`, `paypal`.  
+When API keys are blank, providers return **dev mock order ids** and accept signatures locally (same pattern as Razorpay).
+
+Config keys: `FLOWLEDGER_BILLING_PROVIDER`, `RAZORPAY_*`, `STRIPE_*`, `CASHFREE_*`, `PAYPAL_*` (see `application.yml`).
+
+### Dual model / `user_subscriptions` deprecation
+
+- `organization_subscriptions` is SoT for plan enforcement when present.
+- `user_subscriptions` remains for soak/back-compat (`UserSubscription` is `@Deprecated`); **table is not dropped yet**.
+- Registration creates both a FREE user subscription and a FREE org subscription.
+- After soak, a future migration may drop `user_subscriptions`.
+
+---
+
+## AR payments
+
+`/api/v1/payments` supports:
+
+- Server-side list filters: `type`, `partyType`, `status`, `customerId`, `supplierId`, `from`, `to`, `search`
+- Multi-line allocations on create and `POST /{id}/allocations` (list of `documentId` + `amount`)
+- Get response includes `allocatedAmount`, `unallocatedAmount`, and allocation lines
+- `POST /{id}/cancel` reverses allocations and accounting
 
 ---
 
@@ -309,11 +357,12 @@ Environment variables (see `src/main/resources/application.yml`):
 | `/api/v1/customers`, `suppliers`, `products`, `categories`, `units`, `tax-rates` | Masters |
 | `/api/v1/warehouses`, `/inventory` | Inventory |
 | `/api/v1/sales`, `/purchases` | Sales & purchase documents |
-| `/api/v1/payments` | Receipts & supplier payments |
+| `/api/v1/payments` | Receipts & supplier payments (filters, multi-line allocate, cancel) |
 | `/api/v1/accounting` | COA, journals, ledgers, reports |
 | `/api/v1/dashboard`, `/reports` | KPIs & reports |
 | `/api/v1/leads`, `/marketing` | CRM & campaigns |
-| `/api/v1/billing` | Subscription & usage |
+| `/api/v1/billing` | Legacy subscription & usage |
+| `/api/v1/subscriptions` | Plans, checkout, upgrade, webhooks, usage |
 | `/api/v1/search` | Global search |
 | `/api/v1/audit-logs` | Audit trail |
 

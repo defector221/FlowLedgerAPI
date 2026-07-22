@@ -14,9 +14,16 @@ public final class BillingDtos {
             int maxOrganizations,
             int maxUsersPerOrg,
             int maxInvoicesPerMonth,
-            BigDecimal priceMonthly) {}
+            BigDecimal priceMonthly,
+            BigDecimal priceYearly) {}
 
-    public record UsageInfo(int organizationCount, int organizationLimit, int userCount, int userLimit) {}
+    public record UsageInfo(
+            int organizationCount,
+            int organizationLimit,
+            int userCount,
+            int userLimit,
+            int invoiceCount,
+            int invoiceLimit) {}
 
     public record CurrentBilling(PlanInfo plan, String subscriptionStatus, UsageInfo usage) {}
 }

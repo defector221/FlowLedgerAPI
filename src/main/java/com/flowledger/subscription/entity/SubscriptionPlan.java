@@ -36,6 +36,24 @@ public class SubscriptionPlan {
     @Column(name = "price_monthly", nullable = false)
     private BigDecimal priceMonthly = BigDecimal.ZERO;
 
+    @Column(name = "price_yearly", nullable = false)
+    private BigDecimal priceYearly = BigDecimal.ZERO;
+
+    @Column(nullable = false, length = 3)
+    private String currency = "INR";
+
+    @Column(name = "display_order", nullable = false)
+    private int displayOrder = 0;
+
+    @Column(name = "highlight_plan", nullable = false)
+    private boolean highlightPlan = false;
+
+    @Column(nullable = false)
+    private boolean recommended = false;
+
+    @Column(name = "trial_days", nullable = false)
+    private int trialDays = 0;
+
     private boolean active = true;
 
     @Column(name = "created_at", updatable = false)
