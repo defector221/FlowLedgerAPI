@@ -10,6 +10,7 @@ import com.flowledger.organization.mapper.OrganizationMapper;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.organization.repository.OrganizationSettingsRepository;
 import com.flowledger.storage.StorageService;
+import java.io.InputStream;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -59,6 +60,39 @@ public class OrganizationService {
         organization.setLogoObjectKey(key);
         repo.save(organization);
         return key;
+    }
+
+    @Transactional(readOnly = true)
+    public OrganizationLogo currentLogo() {
+        Organization organization = get(SecurityUtils.currentOrganizationId());
+        String key = organization.getLogoObjectKey();
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        try (InputStream in = storage.get(key)) {
+            return new OrganizationLogo(in.readAllBytes(), mimeFromKey(key));
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public record OrganizationLogo(byte[] bytes, String contentType) {}
+
+    private static String mimeFromKey(String objectKey) {
+        String lower = objectKey.toLowerCase();
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+            return "image/jpeg";
+        }
+        if (lower.endsWith(".gif")) {
+            return "image/gif";
+        }
+        if (lower.endsWith(".webp")) {
+            return "image/webp";
+        }
+        if (lower.endsWith(".svg")) {
+            return "image/svg+xml";
+        }
+        return "image/png";
     }
 
     @Transactional

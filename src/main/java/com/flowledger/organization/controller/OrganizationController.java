@@ -5,6 +5,9 @@ import com.flowledger.common.security.SecurityUtils;
 import com.flowledger.organization.dto.*;
 import com.flowledger.organization.service.OrganizationService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,6 +36,18 @@ public class OrganizationController {
     @PreAuthorize("hasRole('ORGANIZATION_ADMIN')")
     ApiResponse<String> logo(@RequestParam("file") MultipartFile file) {
         return ApiResponse.of(service.uploadLogo(SecurityUtils.currentOrganizationId(), file));
+    }
+
+    @GetMapping("/current/logo")
+    ResponseEntity<byte[]> currentLogo() {
+        OrganizationService.OrganizationLogo logo = service.currentLogo();
+        if (logo == null || logo.bytes() == null || logo.bytes().length == 0) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, "private, max-age=300")
+                .contentType(MediaType.parseMediaType(logo.contentType()))
+                .body(logo.bytes());
     }
 
     @PostMapping("/current/complete-onboarding")
