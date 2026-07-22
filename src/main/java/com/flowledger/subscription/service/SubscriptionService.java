@@ -77,7 +77,9 @@ public class SubscriptionService {
         memberships.findByUserIdAndStatus(userId, "ACTIVE").stream()
                 .filter(this::isOrgAdmin)
                 .forEach(m -> {
-                    if (organizationSubscriptions.findByOrganizationId(m.getOrganizationId()).isEmpty()) {
+                    if (organizationSubscriptions
+                            .findByOrganizationId(m.getOrganizationId())
+                            .isEmpty()) {
                         OrganizationSubscription orgSub = new OrganizationSubscription();
                         orgSub.setOrganizationId(m.getOrganizationId());
                         orgSub.setPlanId(plan.getId());
@@ -127,7 +129,8 @@ public class SubscriptionService {
 
     @Transactional(readOnly = true)
     public CurrentBilling getCurrentBilling(UUID userId, UUID organizationId) {
-        OrganizationSubscription orgSub = organizationSubscriptions.findByOrganizationId(organizationId).orElse(null);
+        OrganizationSubscription orgSub =
+                organizationSubscriptions.findByOrganizationId(organizationId).orElse(null);
         SubscriptionPlan plan;
         String status;
         if (orgSub != null && isUsableSubscription(orgSub)) {

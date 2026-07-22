@@ -1,8 +1,8 @@
 package com.flowledger.ai.chat;
 
+import com.flowledger.ai.agent.AgentSelector;
 import com.flowledger.ai.agent.AiAgent;
 import com.flowledger.ai.agent.AiAgentType;
-import com.flowledger.ai.agent.AgentSelector;
 import com.flowledger.ai.agent.MultiAgentCollaborator;
 import com.flowledger.ai.audit.AiAuditService;
 import com.flowledger.ai.config.AiProperties;
@@ -97,8 +97,8 @@ public class ChatOrchestrationService {
 
         long start = System.currentTimeMillis();
         AiAgent agent = agentSelector.select(request.agent(), request.message());
-        AiConversation conversation =
-                memory.getOrCreate(request.conversationId(), userId, agent.type().name(), request.message());
+        AiConversation conversation = memory.getOrCreate(
+                request.conversationId(), userId, agent.type().name(), request.message());
         conversation.setAgentType(agent.type().name());
 
         memory.append(conversation, "user", request.message(), null, null, null, null);
@@ -108,9 +108,8 @@ public class ChatOrchestrationService {
         String toolContext = gatherToolContext(agent.allowedTools(), request.message());
 
         MultiAgentCollaborator.ConsultResult consult = collaborator.consult(agent.type(), request.message());
-        String consultBlock = consult.specialistNotes().isBlank()
-                ? ""
-                : "Specialist consult notes:\n" + consult.specialistNotes();
+        String consultBlock =
+                consult.specialistNotes().isBlank() ? "" : "Specialist consult notes:\n" + consult.specialistNotes();
 
         String system = prompts.render(
                 agent.systemPromptTemplate(),
@@ -133,11 +132,27 @@ public class ChatOrchestrationService {
                     .chat(new AIProvider.ChatRequest(properties.getOpenai().getChatModel(), messages, 0.2));
         } catch (AiProviderException e) {
             audit.record("CHAT", request.message(), null, null, null, null, e.getMessage());
-            recordRun(org, userId, conversation.getId(), agent.type(), consult.consultedAgents(), request.message(), start, "ERROR");
+            recordRun(
+                    org,
+                    userId,
+                    conversation.getId(),
+                    agent.type(),
+                    consult.consultedAgents(),
+                    request.message(),
+                    start,
+                    "ERROR");
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "AI temporarily unavailable");
         } catch (Exception e) {
             audit.record("CHAT", request.message(), null, null, null, null, e.getMessage());
-            recordRun(org, userId, conversation.getId(), agent.type(), consult.consultedAgents(), request.message(), start, "ERROR");
+            recordRun(
+                    org,
+                    userId,
+                    conversation.getId(),
+                    agent.type(),
+                    consult.consultedAgents(),
+                    request.message(),
+                    start,
+                    "ERROR");
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "AI temporarily unavailable");
         }
 
@@ -153,13 +168,7 @@ public class ChatOrchestrationService {
         int tokens = (result.promptTokens() == null ? 0 : result.promptTokens())
                 + (result.completionTokens() == null ? 0 : result.completionTokens());
         audit.record(
-                "CHAT",
-                request.message(),
-                result.content(),
-                result.model(),
-                tokens,
-                (int) result.latencyMs(),
-                null);
+                "CHAT", request.message(), result.content(), result.model(), tokens, (int) result.latencyMs(), null);
 
         recordRun(
                 org,
@@ -186,7 +195,10 @@ public class ChatOrchestrationService {
     public AiDtos.ChatResponse ask(AiDtos.ChatRequest request) {
         String message = request == null ? null : request.message();
         return chat(new AiDtos.ChatRequest(
-                request == null ? null : request.conversationId(), message, AiAgentType.ASK.name(), request == null ? null : request.useRag()));
+                request == null ? null : request.conversationId(),
+                message,
+                AiAgentType.ASK.name(),
+                request == null ? null : request.useRag()));
     }
 
     private void recordRun(
@@ -242,8 +254,7 @@ public class ChatOrchestrationService {
         return selected;
     }
 
-    private static void addIf(
-            Set<String> allowed, Set<String> selected, String tool, String message, String... keys) {
+    private static void addIf(Set<String> allowed, Set<String> selected, String tool, String message, String... keys) {
         if (!allowed.contains(tool)) {
             return;
         }

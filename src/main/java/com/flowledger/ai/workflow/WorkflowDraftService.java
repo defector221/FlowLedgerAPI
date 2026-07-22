@@ -93,7 +93,9 @@ public class WorkflowDraftService {
     @Transactional
     public AiDtos.WorkflowDraftResponse suggestAndCreate(AiDtos.WorkflowNlSuggestRequest request) {
         ensureBuilder();
-        String prompt = request == null || request.prompt() == null ? "" : request.prompt().trim();
+        String prompt = request == null || request.prompt() == null
+                ? ""
+                : request.prompt().trim();
         if (prompt.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "prompt is required");
         }
@@ -119,7 +121,9 @@ public class WorkflowDraftService {
         }
         if (!properties.isWorkflowBuilderEnabled()) {
             return new AiDtos.WorkflowSuggestResponse(
-                    false, "Workflow builder not configured. Set flowledger.ai.workflow-builder-enabled=true.", Map.of());
+                    false,
+                    "Workflow builder not configured. Set flowledger.ai.workflow-builder-enabled=true.",
+                    Map.of());
         }
         String text = request == null || request.text() == null ? "" : request.text();
         Map<String, Object> plan = buildApprovalPlan(text);
@@ -219,7 +223,8 @@ public class WorkflowDraftService {
     private void ensureBuilder() {
         if (!properties.isWorkflowBuilderEnabled()) {
             throw new ResponseStatusException(
-                    HttpStatus.SERVICE_UNAVAILABLE, "Workflow builder disabled. Set flowledger.ai.workflow-builder-enabled=true.");
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Workflow builder disabled. Set flowledger.ai.workflow-builder-enabled=true.");
         }
     }
 

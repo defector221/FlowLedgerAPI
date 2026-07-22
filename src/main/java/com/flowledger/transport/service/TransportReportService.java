@@ -15,16 +15,30 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class TransportReportService {
-    public static final Set<String> REPORTS = Set.of("transport-register", "vehicle-utilization",
-            "driver-performance", "shipment-tracking", "pending-dispatch", "in-transit",
-            "delayed-deliveries", "freight-cost", "transporter-performance", "vehicle-history", "driver-history");
+    public static final Set<String> REPORTS = Set.of(
+            "transport-register",
+            "vehicle-utilization",
+            "driver-performance",
+            "shipment-tracking",
+            "pending-dispatch",
+            "in-transit",
+            "delayed-deliveries",
+            "freight-cost",
+            "transporter-performance",
+            "vehicle-history",
+            "driver-history");
     private final ShipmentRepository shipments;
     private final ShipmentLegRepository legs;
-    public TransportReportService(ShipmentRepository shipments, ShipmentLegRepository legs) { this.shipments = shipments; this.legs = legs; }
+
+    public TransportReportService(ShipmentRepository shipments, ShipmentLegRepository legs) {
+        this.shipments = shipments;
+        this.legs = legs;
+    }
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> report(String name) {
-        if (!REPORTS.contains(name)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown transport report");
+        if (!REPORTS.contains(name))
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown transport report");
         return shipments.findAll().stream()
                 .filter(s -> s.getOrganizationId().equals(TenantContext.getOrganizationId()) && !s.isDeleted())
                 .filter(s -> include(name, s))
@@ -34,12 +48,19 @@ public class TransportReportService {
 
     private boolean include(String name, Shipment s) {
         return switch (name) {
-            case "pending-dispatch" -> EnumSet.of(ShipmentStatus.APPROVED, ShipmentStatus.ASSIGNED,
-                    ShipmentStatus.LOADING, ShipmentStatus.LOADED).contains(s.getStatus());
+            case "pending-dispatch" ->
+                EnumSet.of(
+                                ShipmentStatus.APPROVED,
+                                ShipmentStatus.ASSIGNED,
+                                ShipmentStatus.LOADING,
+                                ShipmentStatus.LOADED)
+                        .contains(s.getStatus());
             case "in-transit" -> s.getStatus() == ShipmentStatus.IN_TRANSIT;
-            case "delayed-deliveries" -> s.getExpectedDeliveryDate() != null
-                    && s.getExpectedDeliveryDate().isBefore(OffsetDateTime.now())
-                    && !EnumSet.of(ShipmentStatus.DELIVERED, ShipmentStatus.CLOSED, ShipmentStatus.CANCELLED).contains(s.getStatus());
+            case "delayed-deliveries" ->
+                s.getExpectedDeliveryDate() != null
+                        && s.getExpectedDeliveryDate().isBefore(OffsetDateTime.now())
+                        && !EnumSet.of(ShipmentStatus.DELIVERED, ShipmentStatus.CLOSED, ShipmentStatus.CANCELLED)
+                                .contains(s.getStatus());
             default -> true;
         };
     }
@@ -52,16 +73,26 @@ public class TransportReportService {
 
     private Map<String, Object> base(String report, Shipment s, ShipmentLeg l) {
         Map<String, Object> row = new LinkedHashMap<>();
-        row.put("report", report); row.put("shipmentId", s.getId()); row.put("shipmentNumber", s.getShipmentNumber());
-        row.put("status", s.getStatus()); row.put("sourceDocumentType", s.getSourceDocumentType());
-        row.put("sourceDocumentId", s.getSourceDocumentId()); row.put("warehouseId", s.getFromWarehouseId());
-        row.put("customerId", s.getShipToPartyId()); row.put("expectedDispatchDate", s.getExpectedDispatchDate());
-        row.put("actualDispatchDate", s.getActualDispatchDate()); row.put("expectedDeliveryDate", s.getExpectedDeliveryDate());
-        row.put("actualDeliveryDate", s.getActualDeliveryDate()); row.put("freightCharges", s.getFreightCharges());
+        row.put("report", report);
+        row.put("shipmentId", s.getId());
+        row.put("shipmentNumber", s.getShipmentNumber());
+        row.put("status", s.getStatus());
+        row.put("sourceDocumentType", s.getSourceDocumentType());
+        row.put("sourceDocumentId", s.getSourceDocumentId());
+        row.put("warehouseId", s.getFromWarehouseId());
+        row.put("customerId", s.getShipToPartyId());
+        row.put("expectedDispatchDate", s.getExpectedDispatchDate());
+        row.put("actualDispatchDate", s.getActualDispatchDate());
+        row.put("expectedDeliveryDate", s.getExpectedDeliveryDate());
+        row.put("actualDeliveryDate", s.getActualDeliveryDate());
+        row.put("freightCharges", s.getFreightCharges());
         row.put("transportCompanyId", l == null ? s.getTransportCompanyId() : l.getTransportCompanyId());
-        row.put("vehicleId", l == null ? null : l.getVehicleId()); row.put("vehicleNumber", l == null ? null : l.getVehicleNumberSnapshot());
-        row.put("driverId", l == null ? null : l.getDriverId()); row.put("driverName", l == null ? null : l.getDriverNameSnapshot());
-        row.put("driverMobile", l == null ? null : l.getDriverMobileSnapshot()); row.put("lrNumber", l == null ? null : l.getLrNumber());
+        row.put("vehicleId", l == null ? null : l.getVehicleId());
+        row.put("vehicleNumber", l == null ? null : l.getVehicleNumberSnapshot());
+        row.put("driverId", l == null ? null : l.getDriverId());
+        row.put("driverName", l == null ? null : l.getDriverNameSnapshot());
+        row.put("driverMobile", l == null ? null : l.getDriverMobileSnapshot());
+        row.put("lrNumber", l == null ? null : l.getLrNumber());
         return row;
     }
 }

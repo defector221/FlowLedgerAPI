@@ -11,10 +11,13 @@ import org.springframework.stereotype.Component;
 public class AgentFactory {
     public AiAgent create(AiAgentType type) {
         return switch (type) {
-            case ASK -> new SimpleAiAgent(
-                    type, Set.of("dashboard", "sales", "inventory", "payment", "gst", "report", "customer", "supplier"));
-            case BUSINESS_ADVISOR, CEO -> new SimpleAiAgent(
-                    type, Set.of("dashboard", "sales", "inventory", "payment", "gst", "report", "accounting"));
+            case ASK ->
+                new SimpleAiAgent(
+                        type,
+                        Set.of("dashboard", "sales", "inventory", "payment", "gst", "report", "customer", "supplier"));
+            case BUSINESS_ADVISOR, CEO ->
+                new SimpleAiAgent(
+                        type, Set.of("dashboard", "sales", "inventory", "payment", "gst", "report", "accounting"));
             case CFO -> new SimpleAiAgent(type, Set.of("payment", "dashboard", "accounting", "report", "sales"));
             case ACCOUNTANT -> new SimpleAiAgent(type, Set.of("accounting", "payment", "report"));
             case INVENTORY_PLANNER -> new SimpleAiAgent(type, Set.of("inventory", "purchase", "dashboard", "supplier"));

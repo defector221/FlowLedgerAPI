@@ -37,13 +37,14 @@ public class VoiceAiService {
             return new AiDtos.VoiceAiResponse(
                     false, "Voice AI not configured. Set flowledger.ai.voice-enabled=true.", null, Map.of());
         }
-        if (request == null || request.audioBase64() == null || request.audioBase64().isBlank()) {
+        if (request == null
+                || request.audioBase64() == null
+                || request.audioBase64().isBlank()) {
             return new AiDtos.VoiceAiResponse(false, "audioBase64 is required", null, Map.of());
         }
 
-        String contentType = request.contentType() == null || request.contentType().isBlank()
-                ? "audio/webm"
-                : request.contentType();
+        String contentType =
+                request.contentType() == null || request.contentType().isBlank() ? "audio/webm" : request.contentType();
 
         if (!properties.hasApiKey()) {
             String mock = "Mock transcript (no API key): please configure OPENAI_API_KEY for Whisper.";
@@ -57,14 +58,12 @@ public class VoiceAiService {
         try {
             byte[] audio = Base64.getDecoder().decode(request.audioBase64());
             MultipartBodyBuilder body = new MultipartBodyBuilder();
-            body.part(
-                    "file",
-                    new ByteArrayResource(audio) {
-                        @Override
-                        public String getFilename() {
-                            return "audio" + extensionFor(contentType);
-                        }
-                    });
+            body.part("file", new ByteArrayResource(audio) {
+                @Override
+                public String getFilename() {
+                    return "audio" + extensionFor(contentType);
+                }
+            });
             body.part("model", properties.getOpenai().getWhisperModel());
 
             String raw = restClient

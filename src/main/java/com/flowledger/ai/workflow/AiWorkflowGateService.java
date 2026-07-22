@@ -165,8 +165,7 @@ public class AiWorkflowGateService {
         UUID org = TenantContext.getOrganizationId();
         UUID user = TenantContext.userId()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user required"));
-        ApprovalRequest request = requests
-                .findByIdAndOrganizationId(requestId, org)
+        ApprovalRequest request = requests.findByIdAndOrganizationId(requestId, org)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Approval request not found"));
         if (request.getStatus() != ApprovalStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Approval request is not pending");
@@ -221,15 +220,14 @@ public class AiWorkflowGateService {
             int next = stepIndex + 1;
             request.setCurrentStep(next);
             WorkflowStep nextStep = steps.get(next - 1);
-            request.setRemarks(
-                    "Awaiting step "
-                            + next
-                            + "/"
-                            + steps.size()
-                            + " · "
-                            + humanize(nextStep.role())
-                            + " · "
-                            + humanize(nextStep.action()));
+            request.setRemarks("Awaiting step "
+                    + next
+                    + "/"
+                    + steps.size()
+                    + " · "
+                    + humanize(nextStep.role())
+                    + " · "
+                    + humanize(nextStep.action()));
             log.info(
                     "AI workflow step approved request={} step={}/{} nextRole={}",
                     request.getId(),
@@ -245,8 +243,7 @@ public class AiWorkflowGateService {
         UUID org = TenantContext.getOrganizationId();
         UUID user = TenantContext.userId()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user required"));
-        ApprovalRequest request = requests
-                .findByIdAndOrganizationId(requestId, org)
+        ApprovalRequest request = requests.findByIdAndOrganizationId(requestId, org)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Approval request not found"));
         if (request.getStatus() != ApprovalStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Approval request is not pending");
@@ -273,8 +270,8 @@ public class AiWorkflowGateService {
             role = steps.get(idx).role();
             action = steps.get(idx).action();
         }
-        boolean canApprove = request.getStatus() == ApprovalStatus.PENDING
-                && (role == null || currentUserCanApprove(role));
+        boolean canApprove =
+                request.getStatus() == ApprovalStatus.PENDING && (role == null || currentUserCanApprove(role));
         return new ApprovalProgress(
                 request.getWorkflowDraftId(),
                 request.getWorkflowName(),
@@ -314,11 +311,14 @@ public class AiWorkflowGateService {
         if (auth == null || auth.getAuthorities() == null) {
             return Set.of();
         }
-        return auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toSet());
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toSet());
     }
 
     private List<AiWorkflowDraft> matchingActive(UUID org, String documentType, BigDecimal amount) {
-        List<AiWorkflowDraft> active = drafts.findByOrganizationIdAndStatusIgnoreCaseOrderByUpdatedAtDesc(org, "ACTIVE");
+        List<AiWorkflowDraft> active =
+                drafts.findByOrganizationIdAndStatusIgnoreCaseOrderByUpdatedAtDesc(org, "ACTIVE");
         List<AiWorkflowDraft> matched = new ArrayList<>();
         BigDecimal amt = amount == null ? BigDecimal.ZERO : amount;
         for (AiWorkflowDraft draft : active) {
@@ -330,7 +330,8 @@ public class AiWorkflowGateService {
     }
 
     private boolean matches(AiWorkflowDraft draft, String documentType, BigDecimal amount) {
-        String trigger = draft.getTriggerType() == null ? "" : draft.getTriggerType().toUpperCase(Locale.ROOT);
+        String trigger =
+                draft.getTriggerType() == null ? "" : draft.getTriggerType().toUpperCase(Locale.ROOT);
         String doc = documentType.toUpperCase(Locale.ROOT);
 
         boolean triggerOk =
@@ -351,7 +352,9 @@ public class AiWorkflowGateService {
         }
 
         JsonNode conditions = parseJson(draft.getConditionsJson());
-        if (conditions != null && conditions.has("documentTypes") && conditions.get("documentTypes").isArray()) {
+        if (conditions != null
+                && conditions.has("documentTypes")
+                && conditions.get("documentTypes").isArray()) {
             boolean listed = false;
             for (JsonNode n : conditions.get("documentTypes")) {
                 if (doc.equalsIgnoreCase(n.asText())) {
@@ -395,8 +398,12 @@ public class AiWorkflowGateService {
             WorkflowStep s = approval.get(i);
             renumbered.add(new WorkflowStep(
                     i + 1,
-                    s.role() == null || s.role().isBlank() ? "ORGANIZATION_ADMIN" : s.role().toUpperCase(Locale.ROOT),
-                    s.action() == null || s.action().isBlank() ? "APPROVE" : s.action().toUpperCase(Locale.ROOT)));
+                    s.role() == null || s.role().isBlank()
+                            ? "ORGANIZATION_ADMIN"
+                            : s.role().toUpperCase(Locale.ROOT),
+                    s.action() == null || s.action().isBlank()
+                            ? "APPROVE"
+                            : s.action().toUpperCase(Locale.ROOT)));
         }
         return renumbered;
     }
@@ -445,12 +452,7 @@ public class AiWorkflowGateService {
         if (p.currentStepRole() == null) {
             return "step " + p.currentStep() + "/" + p.totalSteps();
         }
-        return "step "
-                + p.currentStep()
-                + "/"
-                + p.totalSteps()
-                + " · "
-                + humanize(p.currentStepRole());
+        return "step " + p.currentStep() + "/" + p.totalSteps() + " · " + humanize(p.currentStepRole());
     }
 
     private static String buildRemarks(

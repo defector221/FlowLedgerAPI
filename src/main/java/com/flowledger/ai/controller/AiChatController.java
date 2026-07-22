@@ -84,8 +84,8 @@ public class AiChatController {
                     HttpStatus.SERVICE_UNAVAILABLE,
                     transcribed.message() == null ? "AI temporarily unavailable" : transcribed.message());
         }
-        return chat.chat(new AiDtos.ChatRequest(
-                request.conversationId(), transcribed.transcript(), request.agent(), true));
+        return chat.chat(
+                new AiDtos.ChatRequest(request.conversationId(), transcribed.transcript(), request.agent(), true));
     }
 
     @GetMapping("/conversations")

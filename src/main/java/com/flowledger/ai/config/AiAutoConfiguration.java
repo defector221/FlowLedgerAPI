@@ -18,7 +18,8 @@ import org.springframework.web.client.RestClient;
 public class AiAutoConfiguration {
 
     @Bean
-    OpenAIProvider openAIProvider(AiProperties properties, ObjectMapper objectMapper, RestClient.Builder restClientBuilder) {
+    OpenAIProvider openAIProvider(
+            AiProperties properties, ObjectMapper objectMapper, RestClient.Builder restClientBuilder) {
         return new OpenAIProvider(properties, objectMapper, restClientBuilder.build());
     }
 

@@ -160,8 +160,7 @@ public class PaymentService {
             LocalDate from,
             LocalDate to,
             String search) {
-        StringBuilder jpql = new StringBuilder(
-                "from Payment p where p.organizationId=:org");
+        StringBuilder jpql = new StringBuilder("from Payment p where p.organizationId=:org");
         List<String> conditions = new ArrayList<>();
         if (type != null) {
             conditions.add("p.paymentType = :type");
@@ -193,8 +192,8 @@ public class PaymentService {
         }
         jpql.append(" order by p.paymentDate desc, p.createdAt desc");
 
-        TypedQuery<Payment> query = em.createQuery(jpql.toString(), Payment.class)
-                .setParameter("org", TenantContext.getOrganizationId());
+        TypedQuery<Payment> query =
+                em.createQuery(jpql.toString(), Payment.class).setParameter("org", TenantContext.getOrganizationId());
         if (type != null) {
             query.setParameter("type", type);
         }

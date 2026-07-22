@@ -21,7 +21,8 @@ class AgentSelectorTest {
 
     @Test
     void catalogIncludesAskAndCollections() {
-        List<String> codes = java.util.Arrays.stream(AiAgentType.values()).map(Enum::name).toList();
+        List<String> codes =
+                java.util.Arrays.stream(AiAgentType.values()).map(Enum::name).toList();
         assertTrue(codes.contains("ASK"));
         assertTrue(codes.contains("COLLECTIONS"));
         assertTrue(codes.contains("CFO"));

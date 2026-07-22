@@ -31,6 +31,8 @@ public class AiProperties {
     }
 
     public boolean hasApiKey() {
-        return openai != null && openai.getApiKey() != null && !openai.getApiKey().isBlank();
+        return openai != null
+                && openai.getApiKey() != null
+                && !openai.getApiKey().isBlank();
     }
 }

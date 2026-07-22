@@ -52,8 +52,8 @@ class RecommendationServiceTest {
     void setUp() {
         TenantContext.set(orgId, userId);
         service = new RecommendationService(repository);
-        generator = new RecommendationGenerator(
-                service, repository, inventoryService, paymentService, salesInvoiceService);
+        generator =
+                new RecommendationGenerator(service, repository, inventoryService, paymentService, salesInvoiceService);
     }
 
     @AfterEach

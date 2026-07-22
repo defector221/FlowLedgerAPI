@@ -106,21 +106,12 @@ public class SubscriptionBillingService {
 
     @Transactional(readOnly = true)
     public CurrentSubscriptionResponse getCurrent(UUID organizationId) {
-        OrganizationSubscription orgSub = organizationSubscriptions
-                .findByOrganizationId(organizationId)
-                .orElse(null);
+        OrganizationSubscription orgSub =
+                organizationSubscriptions.findByOrganizationId(organizationId).orElse(null);
         SubscriptionPlan plan = subscriptionService.resolvePlanForOrganization(organizationId);
         if (orgSub == null) {
             return new CurrentSubscriptionResponse(
-                    toPlanResponse(plan),
-                    "NONE",
-                    BillingCycle.MONTHLY.name(),
-                    null,
-                    null,
-                    null,
-                    true,
-                    null,
-                    null);
+                    toPlanResponse(plan), "NONE", BillingCycle.MONTHLY.name(), null, null, null, true, null, null);
         }
         return toCurrentResponse(orgSub, plan);
     }
@@ -150,8 +141,8 @@ public class SubscriptionBillingService {
         orgSub.setAutoRenew(false);
 
         if (immediate) {
-            SubscriptionPlan free = plans.findByCode("FREE")
-                    .orElseThrow(() -> new BusinessException("FREE plan not found"));
+            SubscriptionPlan free =
+                    plans.findByCode("FREE").orElseThrow(() -> new BusinessException("FREE plan not found"));
             orgSub.setStatus("CANCELLED");
             orgSub.setEndDate(now);
             orgSub.setNextBillingDate(null);
@@ -220,7 +211,8 @@ public class SubscriptionBillingService {
             return getCurrent(organizationId);
         }
 
-        String providerName = firstNonBlank(request.provider(), txn.getProvider(), paymentProviders.active().name());
+        String providerName = firstNonBlank(
+                request.provider(), txn.getProvider(), paymentProviders.active().name());
         PaymentProvider provider = paymentProviders.require(providerName);
         // Razorpay requires signature; other providers may verify via API when signature is blank.
         if ("razorpay".equalsIgnoreCase(provider.name()) && (signature == null || signature.isBlank())) {
@@ -230,11 +222,11 @@ public class SubscriptionBillingService {
             throw new BusinessException("Payment signature verification failed");
         }
 
-        SubscriptionPlan plan = plans.findById(txn.getPlanId())
-                .orElseThrow(() -> new BusinessException("Subscription plan not found"));
+        SubscriptionPlan plan =
+                plans.findById(txn.getPlanId()).orElseThrow(() -> new BusinessException("Subscription plan not found"));
         BillingCycle cycle = parseCycle(txn.getBillingCycle());
-        OrganizationSubscription orgSub = activationService.activate(
-                organizationId, plan, cycle, txn, provider.name(), paymentId);
+        OrganizationSubscription orgSub =
+                activationService.activate(organizationId, plan, cycle, txn, provider.name(), paymentId);
         return toCurrentResponse(orgSub, plan);
     }
 
@@ -258,7 +250,8 @@ public class SubscriptionBillingService {
             throw new BusinessException("Subscription plan is inactive");
         }
 
-        OrganizationSubscription current = organizationSubscriptions.findByOrganizationId(organizationId).orElse(null);
+        OrganizationSubscription current =
+                organizationSubscriptions.findByOrganizationId(organizationId).orElse(null);
         SubscriptionPlan currentPlan = subscriptionService.resolvePlanForOrganization(organizationId);
 
         if (current != null

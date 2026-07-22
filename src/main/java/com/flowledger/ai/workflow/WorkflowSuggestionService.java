@@ -14,7 +14,8 @@ import org.springframework.stereotype.Service;
 @Service
 @ConditionalOnAiEnabled
 public class WorkflowSuggestionService {
-    private static final Pattern AMOUNT = Pattern.compile("(?i)(?:rs\\.?|inr|₹)\\s*([0-9]+(?:,[0-9]{3})*(?:\\.[0-9]+)?)");
+    private static final Pattern AMOUNT =
+            Pattern.compile("(?i)(?:rs\\.?|inr|₹)\\s*([0-9]+(?:,[0-9]{3})*(?:\\.[0-9]+)?)");
     private static final Pattern GSTIN = Pattern.compile("\\b([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z])\\b");
 
     private final AiProperties properties;
@@ -28,7 +29,8 @@ public class WorkflowSuggestionService {
             return new AiDtos.WorkflowSuggestResponse(
                     false, "Document AI not configured. Set flowledger.ai.document-ai-enabled=true.", Map.of());
         }
-        String text = request == null || request.text() == null ? "" : request.text().trim();
+        String text =
+                request == null || request.text() == null ? "" : request.text().trim();
         if (text.isBlank()) {
             return new AiDtos.WorkflowSuggestResponse(false, "Text is required", Map.of());
         }

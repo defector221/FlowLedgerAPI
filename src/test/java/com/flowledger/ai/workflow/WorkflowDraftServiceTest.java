@@ -66,8 +66,6 @@ class WorkflowDraftServiceTest {
         AiProperties props = new AiProperties();
         props.setWorkflowBuilderEnabled(false);
         WorkflowDraftService disabled = new WorkflowDraftService(props, drafts, textSuggestions);
-        assertThrows(
-                ResponseStatusException.class,
-                () -> disabled.list());
+        assertThrows(ResponseStatusException.class, () -> disabled.list());
     }
 }

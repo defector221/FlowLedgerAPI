@@ -12,9 +12,9 @@ import com.flowledger.transport.entity.ApprovalRequest;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -131,11 +131,9 @@ public class AiWorkflowController {
     @GetMapping("/approvals")
     @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('AI_WORKFLOW') or hasRole('ORGANIZATION_ADMIN')")
     public List<AiDtos.WorkflowApprovalResponse> listApprovals(
-            @AuthenticationPrincipal UserPrincipal principal,
-            @RequestParam(defaultValue = "pending") String status) {
+            @AuthenticationPrincipal UserPrincipal principal, @RequestParam(defaultValue = "pending") String status) {
         ensureTenant(principal);
-        List<ApprovalRequest> rows =
-                "all".equalsIgnoreCase(status) ? gate.listRecent() : gate.listPending();
+        List<ApprovalRequest> rows = "all".equalsIgnoreCase(status) ? gate.listRecent() : gate.listPending();
         return rows.stream().map(this::toApproval).toList();
     }
 

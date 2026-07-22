@@ -9,7 +9,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class IntegrationOutboxService {
     private final IntegrationOutboxRepository repository;
-    public IntegrationOutboxService(IntegrationOutboxRepository repository) { this.repository = repository; }
+
+    public IntegrationOutboxService(IntegrationOutboxRepository repository) {
+        this.repository = repository;
+    }
 
     public IntegrationOutbox enqueue(String eventType, String aggregateType, UUID aggregateId, String payloadJson) {
         IntegrationOutbox outbox = new IntegrationOutbox();

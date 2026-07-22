@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface ShipmentLegRepository extends JpaRepository<ShipmentLeg, UUID> {
     List<ShipmentLeg> findByShipmentIdOrderBySequenceNo(UUID shipmentId);
+
     @Modifying
     @Query("delete from ShipmentLeg l where l.shipmentId = :shipmentId")
     void deleteByShipmentId(UUID shipmentId);

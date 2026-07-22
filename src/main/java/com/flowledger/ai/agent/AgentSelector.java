@@ -18,9 +18,7 @@ public class AgentSelector {
      */
     public AiAgent select(String agentField, String message) {
         if (agentField != null && !agentField.isBlank()) {
-            return AiAgentType.tryFrom(agentField)
-                    .map(registry::get)
-                    .orElseGet(() -> registry.get(AiAgentType.ASK));
+            return AiAgentType.tryFrom(agentField).map(registry::get).orElseGet(() -> registry.get(AiAgentType.ASK));
         }
         // Default product behavior: Global Ask Agent (multi-agent capable)
         return registry.get(AiAgentType.ASK);

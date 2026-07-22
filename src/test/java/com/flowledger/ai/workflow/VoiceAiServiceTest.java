@@ -17,8 +17,7 @@ class VoiceAiServiceTest {
         props.setVoiceEnabled(true);
         props.getOpenai().setApiKey("");
         VoiceAiService service = new VoiceAiService(props, new ObjectMapper(), RestClient.builder());
-        AiDtos.VoiceAiResponse res =
-                service.transcribe(new AiDtos.VoiceAiRequest("audio/webm", "AAAA"));
+        AiDtos.VoiceAiResponse res = service.transcribe(new AiDtos.VoiceAiRequest("audio/webm", "AAAA"));
         assertTrue(res.configured());
         assertTrue(res.transcript() != null && res.transcript().contains("Mock transcript"));
     }
@@ -28,8 +27,7 @@ class VoiceAiServiceTest {
         AiProperties props = new AiProperties();
         props.setVoiceEnabled(false);
         VoiceAiService service = new VoiceAiService(props, new ObjectMapper(), RestClient.builder());
-        AiDtos.VoiceAiResponse res =
-                service.transcribe(new AiDtos.VoiceAiRequest("audio/webm", "AAAA"));
+        AiDtos.VoiceAiResponse res = service.transcribe(new AiDtos.VoiceAiRequest("audio/webm", "AAAA"));
         assertFalse(res.configured());
         assertEquals(null, res.transcript());
     }

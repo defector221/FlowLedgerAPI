@@ -34,7 +34,12 @@ public final class AiDtos {
             boolean supportsCollaboration) {}
 
     public record ConversationResponse(
-            UUID id, String title, String agentType, String status, OffsetDateTime createdAt, OffsetDateTime updatedAt) {}
+            UUID id,
+            String title,
+            String agentType,
+            String status,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt) {}
 
     public record MessageResponse(
             UUID id,
@@ -86,7 +91,12 @@ public final class AiDtos {
     public record KnowledgeCreateRequest(String title, String docType, String content) {}
 
     public record KnowledgeResponse(
-            UUID id, String title, String docType, String content, OffsetDateTime createdAt, OffsetDateTime updatedAt) {}
+            UUID id,
+            String title,
+            String docType,
+            String content,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt) {}
 
     public record RecommendationResponse(
             UUID id,
@@ -140,8 +150,7 @@ public final class AiDtos {
 
     public record VoiceAiRequest(String contentType, String audioBase64) {}
 
-    public record VoiceAiResponse(
-            boolean configured, String message, String transcript, Map<String, Object> result) {
+    public record VoiceAiResponse(boolean configured, String message, String transcript, Map<String, Object> result) {
         public VoiceAiResponse(boolean configured, String message, Map<String, Object> result) {
             this(configured, message, result == null ? null : (String) result.get("transcript"), result);
         }
