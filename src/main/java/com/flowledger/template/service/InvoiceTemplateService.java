@@ -86,16 +86,16 @@ public class InvoiceTemplateService {
                 existing = findActiveByName(org, meta.name());
             }
             if (existing == null) {
-                InvoiceTemplate t = new InvoiceTemplate();
-                t.setOrganizationId(org);
-                t.setTemplateName(meta.name());
-                t.setPresetKey(key);
-                t.setDocumentType("SALES_INVOICE");
-                t.setEditorMode("SECTION");
-                t.setActive(true);
-                t.setDefault(false);
-                t.setConfigJson(fixedConfig(key, meta.accent(), meta.defaultTerms()));
-                em.persist(t);
+                InvoiceTemplate template = new InvoiceTemplate();
+                template.setOrganizationId(org);
+                template.setTemplateName(meta.name());
+                template.setPresetKey(key);
+                template.setDocumentType("SALES_INVOICE");
+                template.setEditorMode("SECTION");
+                template.setActive(true);
+                template.setDefault(false);
+                template.setConfigJson(fixedConfig(key, meta.accent(), meta.defaultTerms()));
+                em.persist(template);
                 continue;
             }
             // Re-attach preset key / layout for templates saved earlier under the same display name
@@ -262,66 +262,67 @@ public class InvoiceTemplateService {
                 .setParameter("name", r.templateName())
                 .getResultList()
                 .isEmpty()) throw new ResponseStatusException(HttpStatus.CONFLICT, "Template name already exists");
-        InvoiceTemplate t = new InvoiceTemplate();
-        t.setOrganizationId(TenantContext.getOrganizationId());
-        t.setTemplateName(r.templateName());
-        t.setPresetKey(resolvePresetKey(r));
-        t.setDocumentType(normalizeType(r.documentType()));
-        t.setEditorMode(mode);
-        t.setActive(true);
-        applyContent(t, mode, r);
-        em.persist(t);
-        return t;
+        InvoiceTemplate template = new InvoiceTemplate();
+        template.setOrganizationId(TenantContext.getOrganizationId());
+        template.setTemplateName(r.templateName());
+        template.setPresetKey(resolvePresetKey(r));
+        template.setDocumentType(normalizeType(r.documentType()));
+        template.setEditorMode(mode);
+        template.setActive(true);
+        applyContent(template, mode, r);
+        em.persist(template);
+        return template;
     }
 
     public InvoiceTemplate update(UUID id, TemplateRequest r) {
-        InvoiceTemplate t = getActive(id);
-        String mode =
-                r.editorMode() == null || r.editorMode().isBlank() ? t.getEditorMode() : normalizeMode(r.editorMode());
+        InvoiceTemplate template = getActive(id);
+        String mode = r.editorMode() == null || r.editorMode().isBlank()
+                ? template.getEditorMode()
+                : normalizeMode(r.editorMode());
         validateContent(mode, r);
-        t.setTemplateName(r.templateName());
+        template.setTemplateName(r.templateName());
         String presetKey = resolvePresetKey(r);
-        if (presetKey != null) t.setPresetKey(presetKey);
-        else if (r.presetKey() != null) t.setPresetKey(r.presetKey());
+        if (presetKey != null) template.setPresetKey(presetKey);
+        else if (r.presetKey() != null) template.setPresetKey(r.presetKey());
         if (r.documentType() != null && !r.documentType().isBlank()) {
-            t.setDocumentType(normalizeType(r.documentType()));
+            template.setDocumentType(normalizeType(r.documentType()));
         }
-        t.setEditorMode(mode);
-        applyContent(t, mode, r);
-        return t;
+        template.setEditorMode(mode);
+        applyContent(template, mode, r);
+        return template;
     }
 
     public InvoiceTemplate setDefault(UUID id) {
-        InvoiceTemplate t = getActive(id);
+        InvoiceTemplate template = getActive(id);
         em.createQuery(
                         """
                         update InvoiceTemplate t set t.isDefault=false
                         where t.organizationId=:org and t.documentType=:type and t.active=true
                         """)
                 .setParameter("org", TenantContext.getOrganizationId())
-                .setParameter("type", t.getDocumentType())
+                .setParameter("type", template.getDocumentType())
                 .executeUpdate();
-        t.setDefault(true);
-        return t;
+        template.setDefault(true);
+        return template;
     }
 
     public void delete(UUID id) {
-        InvoiceTemplate t = getActive(id);
-        t.setActive(false);
-        t.setDefault(false);
+        InvoiceTemplate template = getActive(id);
+        template.setActive(false);
+        template.setDefault(false);
     }
 
     public InvoiceTemplate get(UUID id) {
-        InvoiceTemplate t = em.find(InvoiceTemplate.class, id);
-        if (t == null || !t.getOrganizationId().equals(TenantContext.getOrganizationId()))
+        InvoiceTemplate template = em.find(InvoiceTemplate.class, id);
+        if (template == null || !template.getOrganizationId().equals(TenantContext.getOrganizationId()))
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found");
-        return t;
+        return template;
     }
 
     private InvoiceTemplate getActive(UUID id) {
-        InvoiceTemplate t = get(id);
-        if (!t.isActive()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found");
-        return t;
+        InvoiceTemplate template = get(id);
+        if (!template.isActive()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found");
+        return template;
     }
 
     public byte[] preview(TemplatePreviewRequest r) {
@@ -351,22 +352,22 @@ public class InvoiceTemplateService {
         }
     }
 
-    private void applyContent(InvoiceTemplate t, String mode, TemplateRequest r) {
+    private void applyContent(InvoiceTemplate template, String mode, TemplateRequest r) {
         if ("UNLAYER".equals(mode)) {
-            t.setDesignJson(r.designJson());
-            t.setHtml(r.html());
+            template.setDesignJson(r.designJson());
+            template.setHtml(r.html());
             if (r.configJson() != null) {
-                t.setConfigJson(r.configJson());
-            } else if (t.getConfigJson() == null) {
-                t.setConfigJson(json.valueToTree(Map.of("header", Map.of("title", "INVOICE"))));
+                template.setConfigJson(r.configJson());
+            } else if (template.getConfigJson() == null) {
+                template.setConfigJson(json.valueToTree(Map.of("header", Map.of("title", "INVOICE"))));
             }
         } else {
-            t.setConfigJson(r.configJson());
+            template.setConfigJson(r.configJson());
             if (r.designJson() != null) {
-                t.setDesignJson(r.designJson());
+                template.setDesignJson(r.designJson());
             }
             if (r.html() != null) {
-                t.setHtml(r.html());
+                template.setHtml(r.html());
             }
         }
     }

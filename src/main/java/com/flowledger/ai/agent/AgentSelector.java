@@ -26,32 +26,34 @@ public class AgentSelector {
 
     /** Keyword → specialist for multi-agent fan-out (not for primary selection when Ask is default). */
     public AiAgentType suggestSpecialist(String message) {
-        String m = message == null ? "" : message.toLowerCase();
-        if (containsAny(m, "gst", "tax", "cgst", "sgst", "igst", "hsn")) {
+        String normalizedMessage = message == null ? "" : message.toLowerCase();
+        if (containsAny(normalizedMessage, "gst", "tax", "cgst", "sgst", "igst", "hsn")) {
             return AiAgentType.GST_EXPERT;
         }
-        if (containsAny(m, "collect", "overdue", "follow-up", "follow up", "dunning", "aging")) {
+        if (containsAny(normalizedMessage, "collect", "overdue", "follow-up", "follow up", "dunning", "aging")) {
             return AiAgentType.COLLECTIONS;
         }
-        if (containsAny(m, "stock", "inventory", "reorder", "warehouse", "sku")) {
+        if (containsAny(normalizedMessage, "stock", "inventory", "reorder", "warehouse", "sku")) {
             return AiAgentType.INVENTORY_PLANNER;
         }
-        if (containsAny(m, "purchase", "po ", "supplier", "vendor", "procurement", "grn")) {
+        if (containsAny(normalizedMessage, "purchase", "po ", "supplier", "vendor", "procurement", "grn")) {
             return AiAgentType.PROCUREMENT;
         }
-        if (containsAny(m, "pipeline", "coach", "upsell", "cross-sell", "quota")) {
+        if (containsAny(normalizedMessage, "pipeline", "coach", "upsell", "cross-sell", "quota")) {
             return AiAgentType.SALES_COACH;
         }
-        if (containsAny(m, "invoice", "sales", "revenue", "quotation")) {
+        if (containsAny(normalizedMessage, "invoice", "sales", "revenue", "quotation")) {
             return AiAgentType.SALES_COACH;
         }
-        if (containsAny(m, "journal", "reconcile", "reconciliation", "trial balance", "ledger", "p&l")) {
+        if (containsAny(
+                normalizedMessage, "journal", "reconcile", "reconciliation", "trial balance", "ledger", "p&l")) {
             return AiAgentType.ACCOUNTANT;
         }
-        if (containsAny(m, "cash", "budget", "profit", "cfo", "working capital", "receivable", "payable")) {
+        if (containsAny(
+                normalizedMessage, "cash", "budget", "profit", "cfo", "working capital", "receivable", "payable")) {
             return AiAgentType.CFO;
         }
-        if (containsAny(m, "customer", "crm", "lead")) {
+        if (containsAny(normalizedMessage, "customer", "crm", "lead")) {
             return AiAgentType.CRM;
         }
         return AiAgentType.BUSINESS_ADVISOR;

@@ -33,9 +33,9 @@ class PromptTemplateServiceTest {
 
     @Test
     void cachesByName() {
-        String a = service.load("inventory-analysis");
-        String b = service.load("inventory-analysis.md");
-        assertEquals(a, b);
+        String contentA = service.load("inventory-analysis");
+        String contentB = service.load("inventory-analysis.md");
+        assertEquals(contentA, contentB);
     }
 
     @Test

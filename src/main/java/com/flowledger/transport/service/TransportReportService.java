@@ -40,13 +40,14 @@ public class TransportReportService {
         if (!REPORTS.contains(name))
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown transport report");
         return shipments.findAll().stream()
-                .filter(s -> s.getOrganizationId().equals(TenantContext.getOrganizationId()) && !s.isDeleted())
-                .filter(s -> include(name, s))
-                .flatMap(s -> rows(name, s).stream())
+                .filter(shipment ->
+                        shipment.getOrganizationId().equals(TenantContext.getOrganizationId()) && !shipment.isDeleted())
+                .filter(shipment -> include(name, shipment))
+                .flatMap(shipment -> rows(name, shipment).stream())
                 .toList();
     }
 
-    private boolean include(String name, Shipment s) {
+    private boolean include(String name, Shipment shipment) {
         return switch (name) {
             case "pending-dispatch" ->
                 EnumSet.of(
@@ -54,45 +55,45 @@ public class TransportReportService {
                                 ShipmentStatus.ASSIGNED,
                                 ShipmentStatus.LOADING,
                                 ShipmentStatus.LOADED)
-                        .contains(s.getStatus());
-            case "in-transit" -> s.getStatus() == ShipmentStatus.IN_TRANSIT;
+                        .contains(shipment.getStatus());
+            case "in-transit" -> shipment.getStatus() == ShipmentStatus.IN_TRANSIT;
             case "delayed-deliveries" ->
-                s.getExpectedDeliveryDate() != null
-                        && s.getExpectedDeliveryDate().isBefore(OffsetDateTime.now())
+                shipment.getExpectedDeliveryDate() != null
+                        && shipment.getExpectedDeliveryDate().isBefore(OffsetDateTime.now())
                         && !EnumSet.of(ShipmentStatus.DELIVERED, ShipmentStatus.CLOSED, ShipmentStatus.CANCELLED)
-                                .contains(s.getStatus());
+                                .contains(shipment.getStatus());
             default -> true;
         };
     }
 
-    private List<Map<String, Object>> rows(String name, Shipment s) {
-        List<ShipmentLeg> shipmentLegs = legs.findByShipmentIdOrderBySequenceNo(s.getId());
-        if (shipmentLegs.isEmpty()) return List.of(base(name, s, null));
-        return shipmentLegs.stream().map(l -> base(name, s, l)).toList();
+    private List<Map<String, Object>> rows(String name, Shipment shipment) {
+        List<ShipmentLeg> shipmentLegs = legs.findByShipmentIdOrderBySequenceNo(shipment.getId());
+        if (shipmentLegs.isEmpty()) return List.of(base(name, shipment, null));
+        return shipmentLegs.stream().map(leg -> base(name, shipment, leg)).toList();
     }
 
-    private Map<String, Object> base(String report, Shipment s, ShipmentLeg l) {
+    private Map<String, Object> base(String report, Shipment shipment, ShipmentLeg leg) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("report", report);
-        row.put("shipmentId", s.getId());
-        row.put("shipmentNumber", s.getShipmentNumber());
-        row.put("status", s.getStatus());
-        row.put("sourceDocumentType", s.getSourceDocumentType());
-        row.put("sourceDocumentId", s.getSourceDocumentId());
-        row.put("warehouseId", s.getFromWarehouseId());
-        row.put("customerId", s.getShipToPartyId());
-        row.put("expectedDispatchDate", s.getExpectedDispatchDate());
-        row.put("actualDispatchDate", s.getActualDispatchDate());
-        row.put("expectedDeliveryDate", s.getExpectedDeliveryDate());
-        row.put("actualDeliveryDate", s.getActualDeliveryDate());
-        row.put("freightCharges", s.getFreightCharges());
-        row.put("transportCompanyId", l == null ? s.getTransportCompanyId() : l.getTransportCompanyId());
-        row.put("vehicleId", l == null ? null : l.getVehicleId());
-        row.put("vehicleNumber", l == null ? null : l.getVehicleNumberSnapshot());
-        row.put("driverId", l == null ? null : l.getDriverId());
-        row.put("driverName", l == null ? null : l.getDriverNameSnapshot());
-        row.put("driverMobile", l == null ? null : l.getDriverMobileSnapshot());
-        row.put("lrNumber", l == null ? null : l.getLrNumber());
+        row.put("shipmentId", shipment.getId());
+        row.put("shipmentNumber", shipment.getShipmentNumber());
+        row.put("status", shipment.getStatus());
+        row.put("sourceDocumentType", shipment.getSourceDocumentType());
+        row.put("sourceDocumentId", shipment.getSourceDocumentId());
+        row.put("warehouseId", shipment.getFromWarehouseId());
+        row.put("customerId", shipment.getShipToPartyId());
+        row.put("expectedDispatchDate", shipment.getExpectedDispatchDate());
+        row.put("actualDispatchDate", shipment.getActualDispatchDate());
+        row.put("expectedDeliveryDate", shipment.getExpectedDeliveryDate());
+        row.put("actualDeliveryDate", shipment.getActualDeliveryDate());
+        row.put("freightCharges", shipment.getFreightCharges());
+        row.put("transportCompanyId", leg == null ? shipment.getTransportCompanyId() : leg.getTransportCompanyId());
+        row.put("vehicleId", leg == null ? null : leg.getVehicleId());
+        row.put("vehicleNumber", leg == null ? null : leg.getVehicleNumberSnapshot());
+        row.put("driverId", leg == null ? null : leg.getDriverId());
+        row.put("driverName", leg == null ? null : leg.getDriverNameSnapshot());
+        row.put("driverMobile", leg == null ? null : leg.getDriverMobileSnapshot());
+        row.put("lrNumber", leg == null ? null : leg.getLrNumber());
         return row;
     }
 }

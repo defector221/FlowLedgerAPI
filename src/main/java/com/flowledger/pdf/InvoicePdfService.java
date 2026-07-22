@@ -185,7 +185,7 @@ public class InvoicePdfService {
                 .setParameter("org", org.getId())
                 .getResultList();
         if (rows.isEmpty()) throw new IllegalArgumentException("Quotation not found");
-        Object[] q = rows.get(0);
+        Object[] row = rows.get(0);
         String html = resolveHtml(null, null, "QUOTATION");
         if (html != null) {
             return htmlRenderer.render(html, quotationHtmlTags(org, quotationId));
@@ -203,26 +203,26 @@ public class InvoicePdfService {
                 .setParameter("id", quotationId)
                 .getResultList();
 
-        String billTo = firstNonBlank(str(q[6]), str(q[8]));
-        String cityState = joinNonBlank(", ", str(q[10]), str(q[11]), str(q[12]));
+        String billTo = firstNonBlank(str(row[6]), str(row[8]));
+        String cityState = joinNonBlank(", ", str(row[10]), str(row[11]), str(row[12]));
         if (!cityState.isBlank()) billTo = billTo.isBlank() ? cityState : billTo + "\n" + cityState;
 
         DocumentModel model = new DocumentModel(
                 cfg.titleOr("QUOTATION"),
                 "Quotation No",
-                str(q[0]),
+                str(row[0]),
                 "Date",
-                str(q[1]),
-                str(q[7]),
+                str(row[1]),
+                str(row[7]),
                 billTo,
-                str(q[9]),
+                str(row[9]),
                 lines,
-                (BigDecimal) q[2],
+                (BigDecimal) row[2],
                 null,
                 null,
-                q[3],
-                str(q[4]),
-                str(q[5]),
+                row[3],
+                str(row[4]),
+                str(row[5]),
                 false);
         return buildPdf(org, cfg, model);
     }
@@ -379,7 +379,7 @@ public class InvoicePdfService {
             PdfPTable table = new PdfPTable(widths);
             table.setWidthPercentage(100);
             table.setSpacingBefore(6);
-            for (String h : headers) table.addCell(header(h, cfg.accentColor));
+            for (String headerText : headers) table.addCell(header(headerText, cfg.accentColor));
 
             int n = 1;
             for (Object[] line : model.lines) {
@@ -598,7 +598,7 @@ public class InvoicePdfService {
         if (rows.isEmpty()) {
             throw new IllegalArgumentException("Quotation not found");
         }
-        Object[] q = rows.get(0);
+        Object[] row = rows.get(0);
         @SuppressWarnings("unchecked")
         List<Object[]> lineRows = em.createNativeQuery(
                         """
@@ -610,32 +610,32 @@ public class InvoicePdfService {
                         """)
                 .setParameter("id", quotationId)
                 .getResultList();
-        BigDecimal grand = (BigDecimal) q[2];
-        BigDecimal tax = q[3] instanceof BigDecimal t ? t : BigDecimal.ZERO;
+        BigDecimal grand = (BigDecimal) row[2];
+        BigDecimal tax = row[3] instanceof BigDecimal taxTotal ? taxTotal : BigDecimal.ZERO;
         return documentTags(
                 org,
                 "QUOTATION",
-                str(q[0]),
-                str(q[1]),
+                str(row[0]),
+                str(row[1]),
                 grand,
                 tax,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
-                str(q[4]),
-                str(q[5]),
-                firstNonBlank(str(q[6]), str(q[10])),
-                str(q[12]),
-                str(q[7]),
-                str(q[8]),
-                str(q[9]),
-                str(q[11]),
-                str(q[13]),
-                str(q[14]),
-                str(q[15]),
-                str(q[16]),
-                str(q[17]),
-                str(q[18]),
-                str(q[19]),
+                str(row[4]),
+                str(row[5]),
+                firstNonBlank(str(row[6]), str(row[10])),
+                str(row[12]),
+                str(row[7]),
+                str(row[8]),
+                str(row[9]),
+                str(row[11]),
+                str(row[13]),
+                str(row[14]),
+                str(row[15]),
+                str(row[16]),
+                str(row[17]),
+                str(row[18]),
+                str(row[19]),
                 lineRows,
                 true,
                 grand.subtract(tax),
@@ -887,18 +887,19 @@ public class InvoicePdfService {
     }
 
     private PdfPCell cell(String text, int alignment) {
-        PdfPCell c = new PdfPCell(new Phrase(text == null ? "" : text, FontFactory.getFont(FontFactory.HELVETICA, 9)));
-        c.setPadding(6);
-        c.setHorizontalAlignment(alignment);
-        c.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        return c;
+        PdfPCell pdfCell =
+                new PdfPCell(new Phrase(text == null ? "" : text, FontFactory.getFont(FontFactory.HELVETICA, 9)));
+        pdfCell.setPadding(6);
+        pdfCell.setHorizontalAlignment(alignment);
+        pdfCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        return pdfCell;
     }
 
     private PdfPCell header(String text, Color accent) {
-        PdfPCell c = cell(text);
-        c.setBackgroundColor(accent);
-        c.setPhrase(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.WHITE)));
-        return c;
+        PdfPCell pdfCell = cell(text);
+        pdfCell.setBackgroundColor(accent);
+        pdfCell.setPhrase(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.WHITE)));
+        return pdfCell;
     }
 
     private static String str(Object value) {
@@ -1008,18 +1009,19 @@ public class InvoicePdfService {
         private static String text(JsonNode node, String field, String fallback) {
             JsonNode value = node.path(field);
             if (value.isMissingNode() || value.isNull()) return fallback;
-            String s = value.asText();
-            return s == null || s.isBlank() ? fallback : s;
+            String text = value.asText();
+            return text == null || text.isBlank() ? fallback : text;
         }
 
         private static Color parseColor(String hex) {
             try {
-                String h = hex == null ? "#1F4E78" : hex.trim();
-                if (h.startsWith("#")) h = h.substring(1);
-                if (h.length() == 3) {
-                    h = "" + h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+                String hexColor = hex == null ? "#1F4E78" : hex.trim();
+                if (hexColor.startsWith("#")) hexColor = hexColor.substring(1);
+                if (hexColor.length() == 3) {
+                    hexColor = "" + hexColor.charAt(0) + hexColor.charAt(0) + hexColor.charAt(1) + hexColor.charAt(1)
+                            + hexColor.charAt(2) + hexColor.charAt(2);
                 }
-                return new Color(Integer.parseInt(h, 16));
+                return new Color(Integer.parseInt(hexColor, 16));
             } catch (Exception e) {
                 return new Color(31, 78, 120);
             }
@@ -1027,13 +1029,13 @@ public class InvoicePdfService {
     }
 
     static class Footer extends PdfPageEventHelper {
-        public void onEndPage(PdfWriter w, Document d) {
+        public void onEndPage(PdfWriter writer, Document document) {
             ColumnText.showTextAligned(
-                    w.getDirectContent(),
+                    writer.getDirectContent(),
                     Element.ALIGN_CENTER,
-                    new Phrase("Page " + w.getPageNumber()),
-                    (d.right() + d.left()) / 2,
-                    d.bottom() - 20,
+                    new Phrase("Page " + writer.getPageNumber()),
+                    (document.right() + document.left()) / 2,
+                    document.bottom() - 20,
                     0);
         }
     }

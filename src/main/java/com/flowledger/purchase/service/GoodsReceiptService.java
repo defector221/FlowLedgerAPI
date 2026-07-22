@@ -33,14 +33,17 @@ public class GoodsReceiptService {
     private final InventoryService inventory;
 
     public GoodsReceiptService(
-            PurchaseOrderService o, DocumentNumberService n, OrganizationRepository r, InventoryService i) {
-        orders = o;
-        numbers = n;
-        organizations = r;
-        inventory = i;
+            PurchaseOrderService purchaseOrderService,
+            DocumentNumberService documentNumberService,
+            OrganizationRepository organizationRepository,
+            InventoryService inventoryService) {
+        orders = purchaseOrderService;
+        numbers = documentNumberService;
+        organizations = organizationRepository;
+        inventory = inventoryService;
     }
 
-    public GoodsReceipt fromPurchaseOrder(UUID poId, GrnRequest r) {
+    public GoodsReceipt fromPurchaseOrder(UUID poId, GrnRequest request) {
         PurchaseOrder po = orders.get(poId);
         GoodsReceipt existing = em.createQuery(
                         "from GoodsReceipt g where g.organizationId=:org and g.purchaseOrderId=:po", GoodsReceipt.class)
@@ -50,23 +53,23 @@ public class GoodsReceiptService {
                 .findFirst()
                 .orElse(null);
         if (existing != null) return existing;
-        GoodsReceipt g = new GoodsReceipt();
-        g.setOrganizationId(TenantContext.getOrganizationId());
-        g.setPurchaseOrderId(poId);
-        g.setSupplierId(po.getSupplierId());
-        g.setWarehouseId(r.warehouseId());
-        g.setReceiptDate(r.receiptDate());
-        g.setNotes(r.notes());
-        g.setGrnNumber(number(r.receiptDate()));
-        List<Line> source = r.items() == null || r.items().isEmpty()
+        GoodsReceipt goodsReceipt = new GoodsReceipt();
+        goodsReceipt.setOrganizationId(TenantContext.getOrganizationId());
+        goodsReceipt.setPurchaseOrderId(poId);
+        goodsReceipt.setSupplierId(po.getSupplierId());
+        goodsReceipt.setWarehouseId(request.warehouseId());
+        goodsReceipt.setReceiptDate(request.receiptDate());
+        goodsReceipt.setNotes(request.notes());
+        goodsReceipt.setGrnNumber(number(request.receiptDate()));
+        List<Line> source = request.items() == null || request.items().isEmpty()
                 ? po.getItems().stream()
-                        .map(x -> new Line(
-                                x.getProductId(),
-                                x.getUnitId(),
-                                x.getDescription(),
+                        .map(line -> new Line(
+                                line.getProductId(),
+                                line.getUnitId(),
+                                line.getDescription(),
                                 null,
-                                x.getQuantity(),
-                                x.getRate(),
+                                line.getQuantity(),
+                                line.getRate(),
                                 null,
                                 null,
                                 null,
@@ -74,67 +77,67 @@ public class GoodsReceiptService {
                                 null,
                                 null))
                         .toList()
-                : r.items();
+                : request.items();
         int ix = 0;
-        for (Line x : source) {
+        for (Line line : source) {
             GoodsReceiptItem item = new GoodsReceiptItem();
-            item.setReceipt(g);
-            item.setProductId(x.productId());
-            item.setUnitId(x.unitId());
-            item.setDescription(x.description());
-            item.setQuantity(x.quantity());
+            item.setReceipt(goodsReceipt);
+            item.setProductId(line.productId());
+            item.setUnitId(line.unitId());
+            item.setDescription(line.description());
+            item.setQuantity(line.quantity());
             item.setLineOrder(ix++);
-            g.getItems().add(item);
+            goodsReceipt.getItems().add(item);
         }
-        em.persist(g);
-        return g;
+        em.persist(goodsReceipt);
+        return goodsReceipt;
     }
 
     public GoodsReceipt confirm(UUID id) {
-        GoodsReceipt g = get(id);
-        if ("CANCELLED".equals(g.getStatus()))
+        GoodsReceipt goodsReceipt = get(id);
+        if ("CANCELLED".equals(goodsReceipt.getStatus()))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled GRN cannot be confirmed");
-        if (g.isInventoryPosted()) return g;
-        for (GoodsReceiptItem item : g.getItems())
+        if (goodsReceipt.isInventoryPosted()) return goodsReceipt;
+        for (GoodsReceiptItem item : goodsReceipt.getItems())
             inventory.postPurchase(
-                    g.getWarehouseId(),
+                    goodsReceipt.getWarehouseId(),
                     item.getProductId(),
                     item.getQuantity(),
                     BigDecimal.ZERO,
-                    g.getReceiptDate(),
-                    g.getId(),
-                    g.getGrnNumber(),
-                    "grn:" + g.getId() + ":" + item.getId());
-        g.setInventoryPosted(true);
-        g.setStatus("CONFIRMED");
-        return g;
+                    goodsReceipt.getReceiptDate(),
+                    goodsReceipt.getId(),
+                    goodsReceipt.getGrnNumber(),
+                    "grn:" + goodsReceipt.getId() + ":" + item.getId());
+        goodsReceipt.setInventoryPosted(true);
+        goodsReceipt.setStatus("CONFIRMED");
+        return goodsReceipt;
     }
 
     public GoodsReceipt cancel(UUID id) {
-        GoodsReceipt g = get(id);
-        if ("CANCELLED".equals(g.getStatus())) return g;
-        if (g.isInventoryPosted() || "CONFIRMED".equals(g.getStatus())) {
-            for (GoodsReceiptItem item : g.getItems())
+        GoodsReceipt goodsReceipt = get(id);
+        if ("CANCELLED".equals(goodsReceipt.getStatus())) return goodsReceipt;
+        if (goodsReceipt.isInventoryPosted() || "CONFIRMED".equals(goodsReceipt.getStatus())) {
+            for (GoodsReceiptItem item : goodsReceipt.getItems())
                 inventory.postPurchaseReturn(
-                        g.getWarehouseId(),
+                        goodsReceipt.getWarehouseId(),
                         item.getProductId(),
                         item.getQuantity(),
                         BigDecimal.ZERO,
                         LocalDate.now(),
-                        g.getId(),
-                        g.getGrnNumber(),
-                        "grn-cancel:" + g.getId() + ":" + item.getId());
-            g.setInventoryPosted(false);
+                        goodsReceipt.getId(),
+                        goodsReceipt.getGrnNumber(),
+                        "grn-cancel:" + goodsReceipt.getId() + ":" + item.getId());
+            goodsReceipt.setInventoryPosted(false);
         }
-        g.setStatus("CANCELLED");
-        return g;
+        goodsReceipt.setStatus("CANCELLED");
+        return goodsReceipt;
     }
 
     public GoodsReceipt get(UUID id) {
-        GoodsReceipt g = em.find(GoodsReceipt.class, id);
-        if (g == null || !g.getOrganizationId().equals(TenantContext.getOrganizationId()))
+        GoodsReceipt goodsReceipt = em.find(GoodsReceipt.class, id);
+        if (goodsReceipt == null || !goodsReceipt.getOrganizationId().equals(TenantContext.getOrganizationId()))
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "GRN not found");
-        return g;
+        return goodsReceipt;
     }
 
     public List<GoodsReceipt> list() {
@@ -144,9 +147,15 @@ public class GoodsReceiptService {
                 .getResultList();
     }
 
-    private String number(LocalDate d) {
-        Organization o =
+    private String number(LocalDate date) {
+        Organization organization =
                 organizations.findById(TenantContext.getOrganizationId()).orElseThrow();
-        return numbers.next(o.getId(), "GOODS_RECEIPT", "GRN", "{PREFIX}/{FY}/{SEQ:6}", o.getFinancialYearStart(), d);
+        return numbers.next(
+                organization.getId(),
+                "GOODS_RECEIPT",
+                "GRN",
+                "{PREFIX}/{FY}/{SEQ:6}",
+                organization.getFinancialYearStart(),
+                date);
     }
 }

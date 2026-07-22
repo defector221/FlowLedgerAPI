@@ -241,11 +241,11 @@ public class ProductService extends OrganizationScopedService {
             spec = spec.and((root, query, builder) -> builder.equal(root.get("active"), filter.active()));
         }
         if (filter.search() != null && !filter.search().isBlank()) {
-            String q = "%" + filter.search().trim().toLowerCase(Locale.ROOT) + "%";
+            String likePattern = "%" + filter.search().trim().toLowerCase(Locale.ROOT) + "%";
             spec = spec.and((root, query, builder) -> builder.or(
-                    builder.like(builder.lower(root.get("name")), q),
-                    builder.like(builder.lower(root.get("sku")), q),
-                    builder.like(builder.lower(root.get("barcode")), q)));
+                    builder.like(builder.lower(root.get("name")), likePattern),
+                    builder.like(builder.lower(root.get("sku")), likePattern),
+                    builder.like(builder.lower(root.get("barcode")), likePattern)));
         }
         return repo.findAll(spec, pageable).map(this::toResponse);
     }

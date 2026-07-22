@@ -24,20 +24,20 @@ public class RecommendationService {
 
     @Transactional
     public AiDtos.RecommendationResponse create(AiDtos.RecommendationCreateRequest request) {
-        AiRecommendation r = new AiRecommendation();
-        r.setOrganizationId(TenantContext.getOrganizationId());
-        r.setType(request.type());
-        r.setPriority(request.priority() == null ? "MEDIUM" : request.priority());
-        r.setTitle(request.title());
-        r.setDescription(request.description());
-        r.setConfidence(request.confidence());
-        r.setReason(request.reason());
-        r.setEvidence(request.evidence());
-        r.setSuggestedAction(request.suggestedAction());
-        r.setRelatedEntityType(request.relatedEntityType());
-        r.setRelatedEntityId(request.relatedEntityId());
-        r.setStatus("NEW");
-        return toDto(repository.save(r));
+        AiRecommendation recommendation = new AiRecommendation();
+        recommendation.setOrganizationId(TenantContext.getOrganizationId());
+        recommendation.setType(request.type());
+        recommendation.setPriority(request.priority() == null ? "MEDIUM" : request.priority());
+        recommendation.setTitle(request.title());
+        recommendation.setDescription(request.description());
+        recommendation.setConfidence(request.confidence());
+        recommendation.setReason(request.reason());
+        recommendation.setEvidence(request.evidence());
+        recommendation.setSuggestedAction(request.suggestedAction());
+        recommendation.setRelatedEntityType(request.relatedEntityType());
+        recommendation.setRelatedEntityId(request.relatedEntityId());
+        recommendation.setStatus("NEW");
+        return toDto(repository.save(recommendation));
     }
 
     @Transactional(readOnly = true)
@@ -52,7 +52,7 @@ public class RecommendationService {
 
     @Transactional
     public AiDtos.RecommendationResponse patch(UUID id, AiDtos.RecommendationPatchRequest request) {
-        AiRecommendation r = repository
+        AiRecommendation recommendation = repository
                 .findByIdAndOrganizationId(id, TenantContext.getOrganizationId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Recommendation not found"));
         if (request.status() != null && !request.status().isBlank()) {
@@ -60,9 +60,9 @@ public class RecommendationService {
             if (!List.of("NEW", "OPEN", "ACKNOWLEDGED", "DISMISSED", "DONE").contains(status)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid status");
             }
-            r.setStatus(status);
+            recommendation.setStatus(status);
         }
-        return toDto(repository.save(r));
+        return toDto(repository.save(recommendation));
     }
 
     /** Accept NEW (canonical) and OPEN (legacy synonym). */
@@ -83,21 +83,21 @@ public class RecommendationService {
         return patch(id, new AiDtos.RecommendationPatchRequest("DISMISSED"));
     }
 
-    private AiDtos.RecommendationResponse toDto(AiRecommendation r) {
+    private AiDtos.RecommendationResponse toDto(AiRecommendation recommendation) {
         return new AiDtos.RecommendationResponse(
-                r.getId(),
-                r.getType(),
-                r.getPriority(),
-                r.getTitle(),
-                r.getDescription(),
-                r.getConfidence(),
-                r.getReason(),
-                r.getEvidence(),
-                r.getSuggestedAction(),
-                r.getStatus(),
-                r.getRelatedEntityType(),
-                r.getRelatedEntityId(),
-                r.getCreatedAt(),
-                r.getUpdatedAt());
+                recommendation.getId(),
+                recommendation.getType(),
+                recommendation.getPriority(),
+                recommendation.getTitle(),
+                recommendation.getDescription(),
+                recommendation.getConfidence(),
+                recommendation.getReason(),
+                recommendation.getEvidence(),
+                recommendation.getSuggestedAction(),
+                recommendation.getStatus(),
+                recommendation.getRelatedEntityType(),
+                recommendation.getRelatedEntityId(),
+                recommendation.getCreatedAt(),
+                recommendation.getUpdatedAt());
     }
 }

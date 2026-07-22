@@ -148,8 +148,8 @@ public class SearchIndexService {
         requireAvailable();
         try {
             ensureIndexExists();
-            String q = query.trim();
-            String wildcard = "*" + escapeWildcard(q.toLowerCase()) + "*";
+            String trimmedQuery = query.trim();
+            String wildcard = "*" + escapeWildcard(trimmedQuery.toLowerCase()) + "*";
             SearchResponse<SearchDocument> response = holder.client()
                     .search(
                             s -> s.index(holder.index())
@@ -167,25 +167,26 @@ public class SearchIndexService {
                                         }
                                         // Exact hits
                                         b.should(sh -> sh.term(t -> t.field("referenceNumber")
-                                                .value(FieldValue.of(q))
+                                                .value(FieldValue.of(trimmedQuery))
                                                 .boost(12.0f)));
                                         b.should(sh -> sh.term(t -> t.field("title.keyword")
-                                                .value(FieldValue.of(q))
+                                                .value(FieldValue.of(trimmedQuery))
                                                 .boost(10.0f)));
                                         // Typeahead / partial tokens: "paw" → "Pawan"
-                                        b.should(sh -> sh.multiMatch(mm -> mm.query(q)
+                                        b.should(sh -> sh.multiMatch(mm -> mm.query(trimmedQuery)
                                                 .fields("title^8", "searchText^3", "subtitle")
                                                 .type(TextQueryType.BoolPrefix)
                                                 .operator(Operator.Or)
                                                 .boost(6.0f)));
-                                        b.should(sh -> sh.matchPhrasePrefix(mpp ->
-                                                mpp.field("title").query(q).boost(5.0f)));
+                                        b.should(sh -> sh.matchPhrasePrefix(mpp -> mpp.field("title")
+                                                .query(trimmedQuery)
+                                                .boost(5.0f)));
                                         b.should(sh -> sh.prefix(p -> p.field("title.keyword")
-                                                .value(q)
+                                                .value(trimmedQuery)
                                                 .caseInsensitive(true)
                                                 .boost(4.0f)));
                                         b.should(sh -> sh.prefix(p -> p.field("referenceNumber")
-                                                .value(q)
+                                                .value(trimmedQuery)
                                                 .caseInsensitive(true)
                                                 .boost(4.0f)));
                                         // Codes / mid-string: "paw" in CUST-PAWAN-...

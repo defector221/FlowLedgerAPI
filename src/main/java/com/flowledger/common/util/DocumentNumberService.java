@@ -9,27 +9,27 @@ import org.springframework.transaction.annotation.Transactional;
 public class DocumentNumberService {
     private final DocumentSequenceRepository repo;
 
-    public DocumentNumberService(DocumentSequenceRepository r) {
-        repo = r;
+    public DocumentNumberService(DocumentSequenceRepository repo) {
+        this.repo = repo;
     }
 
     @Transactional
     public String next(UUID org, String type, String prefix, String template, String fyStart, LocalDate date) {
         String fy = FinancialYearUtil.financialYear(date, fyStart);
-        DocumentSequence s = repo.findLocked(org, type, fy).orElseGet(() -> {
-            DocumentSequence n = new DocumentSequence();
-            n.setOrganizationId(org);
-            n.setDocumentType(type);
-            n.setFinancialYear(fy);
-            n.setPrefix(prefix);
-            return repo.saveAndFlush(n);
+        DocumentSequence sequence = repo.findLocked(org, type, fy).orElseGet(() -> {
+            DocumentSequence created = new DocumentSequence();
+            created.setOrganizationId(org);
+            created.setDocumentType(type);
+            created.setFinancialYear(fy);
+            created.setPrefix(prefix);
+            return repo.saveAndFlush(created);
         });
-        long n = s.getNextValue();
-        s.setNextValue(n + 1);
-        return template.replace("{PREFIX}", s.getPrefix())
+        long nextValue = sequence.getNextValue();
+        sequence.setNextValue(nextValue + 1);
+        return template.replace("{PREFIX}", sequence.getPrefix())
                 .replace("{FY}", fy)
                 .replaceAll(
                         "\\{SEQ:(\\d+)}",
-                        String.format("%0" + template.replaceAll(".*\\{SEQ:(\\d+)}.*", "$1") + "d", n));
+                        String.format("%0" + template.replaceAll(".*\\{SEQ:(\\d+)}.*", "$1") + "d", nextValue));
     }
 }

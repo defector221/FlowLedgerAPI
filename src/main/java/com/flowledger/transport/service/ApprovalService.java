@@ -79,24 +79,24 @@ public class ApprovalService {
     }
 
     private void action(UUID requestId, String value, String remarks) {
-        ApprovalAction a = new ApprovalAction();
-        a.setRequestId(requestId);
-        a.setAction(value);
-        a.setActorId(user());
-        a.setActedAt(OffsetDateTime.now());
-        a.setRemarks(remarks);
-        actions.save(a);
+        ApprovalAction action = new ApprovalAction();
+        action.setRequestId(requestId);
+        action.setAction(value);
+        action.setActorId(user());
+        action.setActedAt(OffsetDateTime.now());
+        action.setRemarks(remarks);
+        actions.save(action);
     }
 
     private void event(UUID shipmentId, String type, String remarks) {
-        ShipmentEvent e = new ShipmentEvent();
-        e.setShipmentId(shipmentId);
-        e.setEventType(type);
-        e.setOccurredAt(OffsetDateTime.now());
-        e.setActorUserId(user());
-        e.setActorType(ShipmentActorType.USER);
-        e.setRemarks(remarks);
-        events.save(e);
+        ShipmentEvent event = new ShipmentEvent();
+        event.setShipmentId(shipmentId);
+        event.setEventType(type);
+        event.setOccurredAt(OffsetDateTime.now());
+        event.setActorUserId(user());
+        event.setActorType(ShipmentActorType.USER);
+        event.setRemarks(remarks);
+        events.save(event);
     }
 
     private UUID user() {

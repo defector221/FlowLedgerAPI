@@ -19,23 +19,23 @@ public class DashboardService {
         UUID org = TenantContext.getOrganizationId();
         LocalDate today = LocalDate.now();
         LocalDate month = today.withDayOfMonth(1);
-        Map<String, Object> r = new LinkedHashMap<>();
-        r.put("todaySales", sumConfirmed("sales_invoices", "invoice_date", today, today, org));
-        r.put("monthSales", sumConfirmed("sales_invoices", "invoice_date", month, today, org));
-        r.put("todayPurchases", sumConfirmed("purchase_invoices", "invoice_date", today, today, org));
-        r.put("monthPurchases", sumConfirmed("purchase_invoices", "invoice_date", month, today, org));
-        r.put("todaySalesDiscount", sumDiscount("sales_invoices", "invoice_date", today, today, org));
-        r.put("monthSalesDiscount", sumDiscount("sales_invoices", "invoice_date", month, today, org));
-        r.put("receivables", outstandingOpen("sales_invoices", org));
-        r.put("payables", outstandingOpen("purchase_invoices", org));
-        r.put(
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("todaySales", sumConfirmed("sales_invoices", "invoice_date", today, today, org));
+        summary.put("monthSales", sumConfirmed("sales_invoices", "invoice_date", month, today, org));
+        summary.put("todayPurchases", sumConfirmed("purchase_invoices", "invoice_date", today, today, org));
+        summary.put("monthPurchases", sumConfirmed("purchase_invoices", "invoice_date", month, today, org));
+        summary.put("todaySalesDiscount", sumDiscount("sales_invoices", "invoice_date", today, today, org));
+        summary.put("monthSalesDiscount", sumDiscount("sales_invoices", "invoice_date", month, today, org));
+        summary.put("receivables", outstandingOpen("sales_invoices", org));
+        summary.put("payables", outstandingOpen("purchase_invoices", org));
+        summary.put(
                 "overdueInvoices",
                 count(
                         "sales_invoices",
                         "status not in ('DRAFT','CANCELLED') and due_date is not null "
                                 + "and due_date < current_date and outstanding_amount > 0",
                         org));
-        r.put(
+        summary.put(
                 "outOfStock",
                 count(
                         "products",
@@ -45,12 +45,12 @@ public class DashboardService {
                                 + org
                                 + "' group by product_id having sum(inward_qty-outward_qty)>0)",
                         org));
-        r.put("lowStock", countLowStock(org));
-        r.put("salesTrend", trend("sales_invoices", org));
-        r.put("purchaseTrend", trend("purchase_invoices", org));
-        r.put("topProducts", topProducts(org));
-        r.put("topCustomers", topCustomers(org));
-        return r;
+        summary.put("lowStock", countLowStock(org));
+        summary.put("salesTrend", trend("sales_invoices", org));
+        summary.put("purchaseTrend", trend("purchase_invoices", org));
+        summary.put("topProducts", topProducts(org));
+        summary.put("topCustomers", topCustomers(org));
+        return summary;
     }
 
     /** Posted invoice statuses that should count toward sales/purchase totals and trends. */

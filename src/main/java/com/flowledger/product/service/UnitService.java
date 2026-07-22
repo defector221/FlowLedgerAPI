@@ -14,27 +14,27 @@ import org.springframework.web.server.*;
 @Service
 @Transactional
 public class UnitService extends OrganizationScopedService {
-    private final UnitRepository r;
-    private final UnitMapper m;
+    private final UnitRepository repo;
+    private final UnitMapper mapper;
 
-    public UnitService(UnitRepository r, UnitMapper m) {
-        this.r = r;
-        this.m = m;
+    public UnitService(UnitRepository repo, UnitMapper mapper) {
+        this.repo = repo;
+        this.mapper = mapper;
     }
 
     @Transactional(readOnly = true)
     public List<Response> list() {
-        return r.findBySystemUnitTrueOrOrganizationId(orgId()).stream()
-                .map(m::toResponse)
+        return repo.findBySystemUnitTrueOrOrganizationId(orgId()).stream()
+                .map(mapper::toResponse)
                 .toList();
     }
 
-    public Response create(Create d) {
-        if (r.existsByOrganizationIdAndCode(orgId(), d.code()))
+    public Response create(Create request) {
+        if (repo.existsByOrganizationIdAndCode(orgId(), request.code()))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Unit code already exists");
-        Unit e = m.toEntity(d);
-        e.setOrganizationId(orgId());
-        e.setSystemUnit(false);
-        return m.toResponse(r.save(e));
+        Unit unit = mapper.toEntity(request);
+        unit.setOrganizationId(orgId());
+        unit.setSystemUnit(false);
+        return mapper.toResponse(repo.save(unit));
     }
 }

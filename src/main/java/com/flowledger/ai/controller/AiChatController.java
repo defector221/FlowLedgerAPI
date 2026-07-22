@@ -119,20 +119,25 @@ public class AiChatController {
         TenantContext.set(principal.getOrgId(), principal.getId());
     }
 
-    private AiDtos.ConversationResponse toConversation(AiConversation c) {
+    private AiDtos.ConversationResponse toConversation(AiConversation conversation) {
         return new AiDtos.ConversationResponse(
-                c.getId(), c.getTitle(), c.getAgentType(), c.getStatus(), c.getCreatedAt(), c.getUpdatedAt());
+                conversation.getId(),
+                conversation.getTitle(),
+                conversation.getAgentType(),
+                conversation.getStatus(),
+                conversation.getCreatedAt(),
+                conversation.getUpdatedAt());
     }
 
-    private AiDtos.MessageResponse toMessage(AiMessage m) {
+    private AiDtos.MessageResponse toMessage(AiMessage message) {
         return new AiDtos.MessageResponse(
-                m.getId(),
-                m.getRole(),
-                m.getContent(),
-                m.getModel(),
-                m.getPromptTokens(),
-                m.getCompletionTokens(),
-                m.getLatencyMs(),
-                m.getCreatedAt());
+                message.getId(),
+                message.getRole(),
+                message.getContent(),
+                message.getModel(),
+                message.getPromptTokens(),
+                message.getCompletionTokens(),
+                message.getLatencyMs(),
+                message.getCreatedAt());
     }
 }

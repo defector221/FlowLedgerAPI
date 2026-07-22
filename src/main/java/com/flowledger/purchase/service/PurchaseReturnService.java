@@ -119,8 +119,14 @@ public class PurchaseReturnService {
     }
 
     private String number(LocalDate d) {
-        Organization o =
+        Organization organization =
                 organizations.findById(TenantContext.getOrganizationId()).orElseThrow();
-        return numbers.next(o.getId(), "PURCHASE_RETURN", "PR", "{PREFIX}/{FY}/{SEQ:6}", o.getFinancialYearStart(), d);
+        return numbers.next(
+                organization.getId(),
+                "PURCHASE_RETURN",
+                "PR",
+                "{PREFIX}/{FY}/{SEQ:6}",
+                organization.getFinancialYearStart(),
+                d);
     }
 }

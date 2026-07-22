@@ -38,11 +38,11 @@ public class PromptTemplateService {
     }
 
     private String normalize(String name) {
-        String n = name == null ? "" : name.trim();
-        if (n.endsWith(".md")) {
-            n = n.substring(0, n.length() - 3);
+        String trimmedName = name == null ? "" : name.trim();
+        if (trimmedName.endsWith(".md")) {
+            trimmedName = trimmedName.substring(0, trimmedName.length() - 3);
         }
-        return n;
+        return trimmedName;
     }
 
     private String readClasspath(String name) {

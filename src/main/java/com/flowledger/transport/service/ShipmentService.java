@@ -90,51 +90,51 @@ public class ShipmentService {
     public List<TimelineEvent> timeline(UUID id) {
         load(id);
         return events.findByShipmentIdOrderByOccurredAtAsc(id).stream()
-                .map(e -> new TimelineEvent(
-                        e.getId(),
-                        e.getEventType(),
-                        e.getOccurredAt(),
-                        e.getActorUserId(),
-                        e.getActorType(),
-                        e.getRemarks(),
-                        e.getLocationJson(),
-                        e.getPayloadJson()))
+                .map(event -> new TimelineEvent(
+                        event.getId(),
+                        event.getEventType(),
+                        event.getOccurredAt(),
+                        event.getActorUserId(),
+                        event.getActorType(),
+                        event.getRemarks(),
+                        event.getLocationJson(),
+                        event.getPayloadJson()))
                 .toList();
     }
 
     public ShipmentResponse create(ShipmentRequest request) {
-        Shipment s = new Shipment();
-        s.setOrganizationId(org());
-        s.setShipmentNumber(nextNumber());
-        s.setStatus(ShipmentStatus.DRAFT);
-        apply(s, request);
-        audit(s, true);
-        s = shipments.save(s);
-        replaceLines(s.getId(), request.lines());
-        replaceLegs(s.getId(), request.legs());
-        event(s, "CREATED", request.remarks(), null, null);
-        indexShipment(s);
-        return map(s);
+        Shipment shipment = new Shipment();
+        shipment.setOrganizationId(org());
+        shipment.setShipmentNumber(nextNumber());
+        shipment.setStatus(ShipmentStatus.DRAFT);
+        apply(shipment, request);
+        audit(shipment, true);
+        shipment = shipments.save(shipment);
+        replaceLines(shipment.getId(), request.lines());
+        replaceLegs(shipment.getId(), request.legs());
+        event(shipment, "CREATED", request.remarks(), null, null);
+        indexShipment(shipment);
+        return map(shipment);
     }
 
     public ShipmentResponse update(UUID id, ShipmentRequest request) {
-        Shipment s = load(id);
-        requireStatus(s, ShipmentStatus.DRAFT);
-        apply(s, request);
-        audit(s, false);
+        Shipment shipment = load(id);
+        requireStatus(shipment, ShipmentStatus.DRAFT);
+        apply(shipment, request);
+        audit(shipment, false);
         replaceLines(id, request.lines());
         replaceLegs(id, request.legs());
-        event(s, "UPDATED", request.remarks(), null, null);
-        s = shipments.save(s);
-        indexShipment(s);
-        return map(s);
+        event(shipment, "UPDATED", request.remarks(), null, null);
+        shipment = shipments.save(shipment);
+        indexShipment(shipment);
+        return map(shipment);
     }
 
     public ShipmentResponse createFromChallan(UUID challanId, List<LineRequest> requestedLines) {
-        DeliveryChallan c = challans.findByIdAndOrganizationId(challanId, org())
+        DeliveryChallan challan = challans.findByIdAndOrganizationId(challanId, org())
                 .orElseThrow(() -> notFound("Delivery challan not found"));
         List<LineRequest> selected = requestedLines == null || requestedLines.isEmpty()
-                ? c.getItems().stream()
+                ? challan.getItems().stream()
                         .filter(i -> i.getQuantityRemaining().signum() > 0)
                         .map(i -> new LineRequest(
                                 i.getId(),
@@ -147,17 +147,17 @@ public class ShipmentService {
                                 i.getLineOrder()))
                         .toList()
                 : requestedLines;
-        validateChallanLines(c, selected, false);
+        validateChallanLines(challan, selected, false);
         ShipmentRequest request = new ShipmentRequest(
                 "DELIVERY_CHALLAN",
-                c.getId(),
-                c.isTransportRequired(),
+                challan.getId(),
+                challan.isTransportRequired(),
                 null,
                 null,
                 null,
-                c.getWarehouseId(),
+                challan.getWarehouseId(),
                 "CUSTOMER",
-                c.getCustomerId(),
+                challan.getCustomerId(),
                 null,
                 null,
                 null,
@@ -167,43 +167,43 @@ public class ShipmentService {
                 null,
                 null,
                 null,
-                c.getNotes(),
+                challan.getNotes(),
                 List.of(),
                 selected);
         return create(request);
     }
 
     public ShipmentResponse submit(UUID id, DecisionRequest r) {
-        Shipment s = load(id);
-        requireStatus(s, ShipmentStatus.DRAFT);
-        transition(s, ShipmentStatus.SUBMITTED, r == null ? null : r.remarks(), null, null);
-        if (approvals.approvalRequired()) approvals.submit(s, r == null ? null : r.remarks());
-        else transition(s, ShipmentStatus.APPROVED, "Approval not required", null, null);
-        return map(s);
+        Shipment shipment = load(id);
+        requireStatus(shipment, ShipmentStatus.DRAFT);
+        transition(shipment, ShipmentStatus.SUBMITTED, r == null ? null : r.remarks(), null, null);
+        if (approvals.approvalRequired()) approvals.submit(shipment, r == null ? null : r.remarks());
+        else transition(shipment, ShipmentStatus.APPROVED, "Approval not required", null, null);
+        return map(shipment);
     }
 
     public ShipmentResponse approve(UUID id, DecisionRequest r) {
-        Shipment s = load(id);
-        requireStatus(s, ShipmentStatus.SUBMITTED);
-        if (approvals.approvalRequired()) approvals.approve(s, r == null ? null : r.remarks());
-        transition(s, ShipmentStatus.APPROVED, r == null ? null : r.remarks(), null, null);
-        return map(s);
+        Shipment shipment = load(id);
+        requireStatus(shipment, ShipmentStatus.SUBMITTED);
+        if (approvals.approvalRequired()) approvals.approve(shipment, r == null ? null : r.remarks());
+        transition(shipment, ShipmentStatus.APPROVED, r == null ? null : r.remarks(), null, null);
+        return map(shipment);
     }
 
     public ShipmentResponse reject(UUID id, DecisionRequest r) {
-        Shipment s = load(id);
-        requireStatus(s, ShipmentStatus.SUBMITTED);
-        if (approvals.approvalRequired()) approvals.reject(s, r == null ? null : r.remarks());
-        transition(s, ShipmentStatus.REJECTED, r == null ? null : r.remarks(), null, null);
-        return map(s);
+        Shipment shipment = load(id);
+        requireStatus(shipment, ShipmentStatus.SUBMITTED);
+        if (approvals.approvalRequired()) approvals.reject(shipment, r == null ? null : r.remarks());
+        transition(shipment, ShipmentStatus.REJECTED, r == null ? null : r.remarks(), null, null);
+        return map(shipment);
     }
 
     public ShipmentResponse assign(UUID id, AssignmentRequest r) {
-        Shipment s = load(id);
-        requireStatus(s, ShipmentStatus.APPROVED);
+        Shipment shipment = load(id);
+        requireStatus(shipment, ShipmentStatus.APPROVED);
         replaceLegs(id, r.legs());
-        transition(s, ShipmentStatus.ASSIGNED, r.remarks(), null, null);
-        return map(s);
+        transition(shipment, ShipmentStatus.ASSIGNED, r.remarks(), null, null);
+        return map(shipment);
     }
 
     public ShipmentResponse startLoading(UUID id, TransitionRequest r) {
@@ -215,39 +215,43 @@ public class ShipmentService {
     }
 
     public ShipmentResponse dispatch(UUID id, TransitionRequest r) {
-        Shipment s = load(id);
-        requireStatus(s, ShipmentStatus.LOADED);
-        validateDispatch(s);
-        ShipmentStatus target = postChallanDispatch(s);
-        s.setActualDispatchDate(OffsetDateTime.now());
-        transition(s, target, remarks(r), location(r), payload(r));
-        maybePostInventoryOnDispatch(s);
+        Shipment shipment = load(id);
+        requireStatus(shipment, ShipmentStatus.LOADED);
+        validateDispatch(shipment);
+        ShipmentStatus target = postChallanDispatch(shipment);
+        shipment.setActualDispatchDate(OffsetDateTime.now());
+        transition(shipment, target, remarks(r), location(r), payload(r));
+        maybePostInventoryOnDispatch(shipment);
         outbox.enqueue(
                 "SHIPMENT_DISPATCHED",
                 "SHIPMENT",
-                s.getId(),
-                "{\"shipmentNumber\":\"" + s.getShipmentNumber() + "\",\"status\":\"" + target + "\"}");
-        return map(s);
+                shipment.getId(),
+                "{\"shipmentNumber\":\"" + shipment.getShipmentNumber() + "\",\"status\":\"" + target + "\"}");
+        return map(shipment);
     }
 
     public ShipmentResponse checkpoint(UUID id, TransitionRequest r) {
-        Shipment s = load(id);
-        if (s.getStatus() != ShipmentStatus.DISPATCHED
-                && s.getStatus() != ShipmentStatus.PARTIALLY_DISPATCHED
-                && s.getStatus() != ShipmentStatus.IN_TRANSIT) conflict("Shipment is not dispatched");
-        if (s.getStatus() == ShipmentStatus.IN_TRANSIT) event(s, "CHECKPOINT", remarks(r), location(r), payload(r));
-        else transition(s, ShipmentStatus.IN_TRANSIT, remarks(r), location(r), payload(r));
-        return map(s);
+        Shipment shipment = load(id);
+        if (shipment.getStatus() != ShipmentStatus.DISPATCHED
+                && shipment.getStatus() != ShipmentStatus.PARTIALLY_DISPATCHED
+                && shipment.getStatus() != ShipmentStatus.IN_TRANSIT) conflict("Shipment is not dispatched");
+        if (shipment.getStatus() == ShipmentStatus.IN_TRANSIT)
+            event(shipment, "CHECKPOINT", remarks(r), location(r), payload(r));
+        else transition(shipment, ShipmentStatus.IN_TRANSIT, remarks(r), location(r), payload(r));
+        return map(shipment);
     }
 
     public ShipmentResponse deliver(UUID id, TransitionRequest r) {
-        Shipment s = load(id);
-        requireStatus(s, ShipmentStatus.IN_TRANSIT);
-        s.setActualDeliveryDate(OffsetDateTime.now());
-        transition(s, ShipmentStatus.DELIVERED, remarks(r), location(r), payload(r));
+        Shipment shipment = load(id);
+        requireStatus(shipment, ShipmentStatus.IN_TRANSIT);
+        shipment.setActualDeliveryDate(OffsetDateTime.now());
+        transition(shipment, ShipmentStatus.DELIVERED, remarks(r), location(r), payload(r));
         outbox.enqueue(
-                "SHIPMENT_DELIVERED", "SHIPMENT", s.getId(), "{\"shipmentNumber\":\"" + s.getShipmentNumber() + "\"}");
-        return map(s);
+                "SHIPMENT_DELIVERED",
+                "SHIPMENT",
+                shipment.getId(),
+                "{\"shipmentNumber\":\"" + shipment.getShipmentNumber() + "\"}");
+        return map(shipment);
     }
 
     public ShipmentResponse close(UUID id, TransitionRequest r) {
@@ -255,39 +259,40 @@ public class ShipmentService {
     }
 
     public ShipmentResponse cancel(UUID id, TransitionRequest r) {
-        Shipment s = load(id);
+        Shipment shipment = load(id);
         if (EnumSet.of(ShipmentStatus.CLOSED, ShipmentStatus.CANCELLED, ShipmentStatus.DELIVERED)
-                .contains(s.getStatus())) conflict("Shipment cannot be cancelled in " + s.getStatus());
-        transition(s, ShipmentStatus.CANCELLED, remarks(r), location(r), payload(r));
-        return map(s);
+                .contains(shipment.getStatus())) conflict("Shipment cannot be cancelled in " + shipment.getStatus());
+        transition(shipment, ShipmentStatus.CANCELLED, remarks(r), location(r), payload(r));
+        return map(shipment);
     }
 
     @Transactional(readOnly = true)
     public Page<ShipmentResponse> search(SearchRequest r, Pageable pageable) {
         Specification<Shipment> spec = baseSpec().and((root, query, cb) -> {
-            List<Predicate> p = new ArrayList<>();
+            List<Predicate> predicates = new ArrayList<>();
             if (text(r.q())) {
-                String q = like(r.q());
-                p.add(cb.or(
-                        cb.like(cb.lower(root.get("shipmentNumber")), q),
-                        cb.like(cb.lower(root.get("shipToAddress")), q),
-                        cb.like(cb.lower(root.get("remarks")), q)));
+                String searchQuery = like(r.q());
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("shipmentNumber")), searchQuery),
+                        cb.like(cb.lower(root.get("shipToAddress")), searchQuery),
+                        cb.like(cb.lower(root.get("remarks")), searchQuery)));
             }
-            if (r.status() != null) p.add(cb.equal(root.get("status"), r.status()));
-            if (r.customerId() != null) p.add(cb.equal(root.get("shipToPartyId"), r.customerId()));
-            if (r.warehouseId() != null) p.add(cb.equal(root.get("fromWarehouseId"), r.warehouseId()));
+            if (r.status() != null) predicates.add(cb.equal(root.get("status"), r.status()));
+            if (r.customerId() != null) predicates.add(cb.equal(root.get("shipToPartyId"), r.customerId()));
+            if (r.warehouseId() != null) predicates.add(cb.equal(root.get("fromWarehouseId"), r.warehouseId()));
             if (text(r.sourceDocumentType()))
-                p.add(cb.equal(
+                predicates.add(cb.equal(
                         cb.upper(root.get("sourceDocumentType")),
                         r.sourceDocumentType().toUpperCase()));
-            if (r.sourceDocumentId() != null) p.add(cb.equal(root.get("sourceDocumentId"), r.sourceDocumentId()));
+            if (r.sourceDocumentId() != null)
+                predicates.add(cb.equal(root.get("sourceDocumentId"), r.sourceDocumentId()));
             if (text(r.ewayBillNumber()))
-                p.add(cb.like(cb.lower(root.get("ewayBillNumber")), like(r.ewayBillNumber())));
+                predicates.add(cb.like(cb.lower(root.get("ewayBillNumber")), like(r.ewayBillNumber())));
             if (r.fromDate() != null)
-                p.add(cb.greaterThanOrEqualTo(
+                predicates.add(cb.greaterThanOrEqualTo(
                         root.get("createdAt"), r.fromDate().atStartOfDay().atOffset(ZoneOffset.UTC)));
             if (r.toDate() != null)
-                p.add(cb.lessThan(
+                predicates.add(cb.lessThan(
                         root.get("createdAt"),
                         r.toDate().plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC)));
             if (text(r.lrNumber())) {
@@ -297,7 +302,7 @@ public class ShipmentService {
                         .where(
                                 cb.equal(leg.get("shipmentId"), root.get("id")),
                                 cb.like(cb.lower(leg.get("lrNumber")), like(r.lrNumber())));
-                p.add(cb.exists(sq));
+                predicates.add(cb.exists(sq));
             }
             if (text(r.vehicleNumber())) {
                 Subquery<UUID> snapshot = query.subquery(UUID.class);
@@ -314,7 +319,7 @@ public class ShipmentService {
                                 cb.equal(masterLeg.get("shipmentId"), root.get("id")),
                                 cb.equal(masterLeg.get("vehicleId"), vehicle.get("id")),
                                 cb.like(cb.lower(vehicle.get("vehicleNumber")), like(r.vehicleNumber())));
-                p.add(cb.or(cb.exists(snapshot), cb.exists(master)));
+                predicates.add(cb.or(cb.exists(snapshot), cb.exists(master)));
             }
             if (text(r.driverName()) || text(r.driverMobile())) {
                 Subquery<UUID> snapshot = query.subquery(UUID.class);
@@ -337,7 +342,7 @@ public class ShipmentService {
                 if (text(r.driverMobile()))
                     masterPredicates.add(cb.like(cb.lower(driver.get("mobile")), like(r.driverMobile())));
                 master.select(masterLeg.get("shipmentId")).where(masterPredicates.toArray(Predicate[]::new));
-                p.add(cb.or(cb.exists(snapshot), cb.exists(master)));
+                predicates.add(cb.or(cb.exists(snapshot), cb.exists(master)));
             }
             if (text(r.company())) {
                 Subquery<UUID> direct = query.subquery(UUID.class);
@@ -355,7 +360,7 @@ public class ShipmentService {
                                 cb.equal(leg.get("shipmentId"), root.get("id")),
                                 cb.equal(leg.get("transportCompanyId"), nestedCompany.get("id")),
                                 cb.like(cb.lower(nestedCompany.get("name")), like(r.company())));
-                p.add(cb.or(cb.exists(direct), cb.exists(legCompany)));
+                predicates.add(cb.or(cb.exists(direct), cb.exists(legCompany)));
             }
             if (text(r.sku())) {
                 Subquery<UUID> sq = query.subquery(UUID.class);
@@ -366,55 +371,55 @@ public class ShipmentService {
                                 cb.equal(line.get("shipmentId"), root.get("id")),
                                 cb.equal(line.get("productId"), product.get("id")),
                                 cb.like(cb.lower(product.get("sku")), like(r.sku())));
-                p.add(cb.exists(sq));
+                predicates.add(cb.exists(sq));
             }
-            return cb.and(p.toArray(Predicate[]::new));
+            return cb.and(predicates.toArray(Predicate[]::new));
         });
         return shipments.findAll(spec, pageable).map(this::map);
     }
 
     private ShipmentResponse simple(UUID id, ShipmentStatus from, ShipmentStatus to, TransitionRequest r) {
-        Shipment s = load(id);
-        requireStatus(s, from);
-        transition(s, to, remarks(r), location(r), payload(r));
-        return map(s);
+        Shipment shipment = load(id);
+        requireStatus(shipment, from);
+        transition(shipment, to, remarks(r), location(r), payload(r));
+        return map(shipment);
     }
 
-    private void validateDispatch(Shipment s) {
-        if (!s.isTransportRequired()) return;
-        if (s.getTransportMode() == null || s.getTransportType() == null)
+    private void validateDispatch(Shipment shipment) {
+        if (!shipment.isTransportRequired()) return;
+        if (shipment.getTransportMode() == null || shipment.getTransportType() == null)
             conflict("Transport mode and type are required");
-        List<ShipmentLeg> assigned = legs.findByShipmentIdOrderBySequenceNo(s.getId());
+        List<ShipmentLeg> assigned = legs.findByShipmentIdOrderBySequenceNo(shipment.getId());
         if (assigned.isEmpty()) conflict("At least one shipment leg is required");
         boolean invalid = assigned.stream()
-                .anyMatch(l -> l.getTransportCompanyId() == null
-                        || (l.getVehicleId() == null && !text(l.getVehicleNumberSnapshot()))
-                        || l.getDriverId() == null);
+                .anyMatch(leg -> leg.getTransportCompanyId() == null
+                        || (leg.getVehicleId() == null && !text(leg.getVehicleNumberSnapshot()))
+                        || leg.getDriverId() == null);
         if (invalid) conflict("Each leg requires transporter, driver, and vehicle or vehicle number");
     }
 
-    private ShipmentStatus postChallanDispatch(Shipment s) {
-        if (!"DELIVERY_CHALLAN".equalsIgnoreCase(s.getSourceDocumentType()) || s.getSourceDocumentId() == null)
-            return ShipmentStatus.DISPATCHED;
-        DeliveryChallan c = challans.findByIdAndOrganizationId(s.getSourceDocumentId(), org())
+    private ShipmentStatus postChallanDispatch(Shipment shipment) {
+        if (!"DELIVERY_CHALLAN".equalsIgnoreCase(shipment.getSourceDocumentType())
+                || shipment.getSourceDocumentId() == null) return ShipmentStatus.DISPATCHED;
+        DeliveryChallan challan = challans.findByIdAndOrganizationId(shipment.getSourceDocumentId(), org())
                 .orElseThrow(() -> notFound("Delivery challan not found"));
-        List<ShipmentLine> shipmentLines = lines.findByShipmentIdOrderByLineOrder(s.getId());
-        validateChallanLines(c, shipmentLines.stream().map(this::request).toList(), true);
+        List<ShipmentLine> shipmentLines = lines.findByShipmentIdOrderByLineOrder(shipment.getId());
+        validateChallanLines(challan, shipmentLines.stream().map(this::request).toList(), true);
         Map<UUID, DeliveryChallanItem> byId = new HashMap<>();
-        c.getItems().forEach(i -> byId.put(i.getId(), i));
+        challan.getItems().forEach(i -> byId.put(i.getId(), i));
         shipmentLines.forEach(line -> {
             DeliveryChallanItem item = byId.get(line.getSourceLineId());
             item.setQuantityDispatched(z(item.getQuantityDispatched()).add(line.getQuantity()));
         });
-        challans.saveAndFlush(c);
-        boolean remaining =
-                c.getItems().stream().anyMatch(i -> i.getQuantityRemaining().signum() > 0);
+        challans.saveAndFlush(challan);
+        boolean remaining = challan.getItems().stream()
+                .anyMatch(i -> i.getQuantityRemaining().signum() > 0);
         return remaining ? ShipmentStatus.PARTIALLY_DISPATCHED : ShipmentStatus.DISPATCHED;
     }
 
-    private void validateChallanLines(DeliveryChallan c, List<LineRequest> requested, boolean dispatch) {
+    private void validateChallanLines(DeliveryChallan challan, List<LineRequest> requested, boolean dispatch) {
         Map<UUID, DeliveryChallanItem> byId = new HashMap<>();
-        c.getItems().forEach(i -> byId.put(i.getId(), i));
+        challan.getItems().forEach(i -> byId.put(i.getId(), i));
         for (LineRequest line : requested) {
             DeliveryChallanItem item = byId.get(line.sourceLineId());
             if (item == null || !item.getProductId().equals(line.productId()))
@@ -424,69 +429,69 @@ public class ShipmentService {
         }
     }
 
-    public void maybePostInventoryOnDispatch(Shipment s) {
+    public void maybePostInventoryOnDispatch(Shipment shipment) {
         String event = settings.findByOrganizationId(org())
                 .map(x -> x.getInventoryDeductionEvent())
                 .orElse("");
         if (!Set.of("DELIVERY_CHALLAN", "CHALLAN_DISPATCH").contains(event.toUpperCase(Locale.ROOT))) return;
-        if (s.getFromWarehouseId() == null) conflict("Warehouse is required for inventory deduction");
-        for (ShipmentLine line : lines.findByShipmentIdOrderByLineOrder(s.getId())) {
+        if (shipment.getFromWarehouseId() == null) conflict("Warehouse is required for inventory deduction");
+        for (ShipmentLine line : lines.findByShipmentIdOrderByLineOrder(shipment.getId())) {
             inventory.postTransaction(new PostTransaction(
                     Type.SALE,
                     line.getProductId(),
-                    s.getFromWarehouseId(),
+                    shipment.getFromWarehouseId(),
                     BigDecimal.ZERO,
                     line.getQuantity(),
                     "SHIPMENT",
-                    s.getId(),
-                    s.getShipmentNumber(),
-                    "shipment:" + s.getId() + ":" + line.getId(),
+                    shipment.getId(),
+                    shipment.getShipmentNumber(),
+                    "shipment:" + shipment.getId() + ":" + line.getId(),
                     line.getBatchNumber(),
                     line.getSerialNumber(),
                     null,
                     BigDecimal.ZERO,
-                    s.getRemarks(),
+                    shipment.getRemarks(),
                     LocalDate.now()));
         }
     }
 
-    private void apply(Shipment s, ShipmentRequest r) {
-        s.setSourceDocumentType(r.sourceDocumentType());
-        s.setSourceDocumentId(r.sourceDocumentId());
-        s.setTransportRequired(r.transportRequired());
-        s.setTransportMode(r.transportMode());
-        s.setTransportType(r.transportType());
-        s.setTransportCompanyId(r.transportCompanyId());
-        s.setFromWarehouseId(r.fromWarehouseId());
-        s.setShipToPartyType(r.shipToPartyType());
-        s.setShipToPartyId(r.shipToPartyId());
-        s.setShipToAddress(r.shipToAddress());
-        s.setExpectedDispatchDate(r.expectedDispatchDate());
-        s.setExpectedDeliveryDate(r.expectedDeliveryDate());
-        s.setFreightCharges(z(r.freightCharges()));
-        s.setFreightPaidBy(r.freightPaidBy());
-        s.setInsuranceDetails(r.insuranceDetails());
-        s.setGpsTrackingUrl(r.gpsTrackingUrl());
-        s.setEwayBillNumber(r.ewayBillNumber());
-        s.setEinvoiceReference(r.einvoiceReference());
-        s.setRemarks(r.remarks());
+    private void apply(Shipment shipment, ShipmentRequest r) {
+        shipment.setSourceDocumentType(r.sourceDocumentType());
+        shipment.setSourceDocumentId(r.sourceDocumentId());
+        shipment.setTransportRequired(r.transportRequired());
+        shipment.setTransportMode(r.transportMode());
+        shipment.setTransportType(r.transportType());
+        shipment.setTransportCompanyId(r.transportCompanyId());
+        shipment.setFromWarehouseId(r.fromWarehouseId());
+        shipment.setShipToPartyType(r.shipToPartyType());
+        shipment.setShipToPartyId(r.shipToPartyId());
+        shipment.setShipToAddress(r.shipToAddress());
+        shipment.setExpectedDispatchDate(r.expectedDispatchDate());
+        shipment.setExpectedDeliveryDate(r.expectedDeliveryDate());
+        shipment.setFreightCharges(z(r.freightCharges()));
+        shipment.setFreightPaidBy(r.freightPaidBy());
+        shipment.setInsuranceDetails(r.insuranceDetails());
+        shipment.setGpsTrackingUrl(r.gpsTrackingUrl());
+        shipment.setEwayBillNumber(r.ewayBillNumber());
+        shipment.setEinvoiceReference(r.einvoiceReference());
+        shipment.setRemarks(r.remarks());
     }
 
     private void replaceLines(UUID shipmentId, List<LineRequest> requested) {
         lines.deleteByShipmentId(shipmentId);
         int n = 0;
         for (LineRequest r : requested) {
-            ShipmentLine e = new ShipmentLine();
-            e.setShipmentId(shipmentId);
-            e.setSourceLineId(r.sourceLineId());
-            e.setProductId(r.productId());
-            e.setDescription(r.description());
-            e.setQuantity(r.quantity());
-            e.setUnitId(r.unitId());
-            e.setBatchNumber(r.batchNumber());
-            e.setSerialNumber(r.serialNumber());
-            e.setLineOrder(r.lineOrder() == null ? n++ : r.lineOrder());
-            lines.save(e);
+            ShipmentLine line = new ShipmentLine();
+            line.setShipmentId(shipmentId);
+            line.setSourceLineId(r.sourceLineId());
+            line.setProductId(r.productId());
+            line.setDescription(r.description());
+            line.setQuantity(r.quantity());
+            line.setUnitId(r.unitId());
+            line.setBatchNumber(r.batchNumber());
+            line.setSerialNumber(r.serialNumber());
+            line.setLineOrder(r.lineOrder() == null ? n++ : r.lineOrder());
+            lines.save(line);
         }
     }
 
@@ -494,47 +499,47 @@ public class ShipmentService {
         legs.deleteByShipmentId(shipmentId);
         int n = 1;
         for (LegRequest r : requested == null ? List.<LegRequest>of() : requested) {
-            ShipmentLeg e = new ShipmentLeg();
-            e.setShipmentId(shipmentId);
-            e.setSequenceNo(r.sequenceNo() == null ? n++ : r.sequenceNo());
-            e.setTransportCompanyId(r.transportCompanyId());
-            e.setVehicleId(r.vehicleId());
-            e.setDriverId(r.driverId());
-            e.setLrNumber(r.lrNumber());
-            e.setConsignmentNumber(r.consignmentNumber());
-            e.setVehicleNumberSnapshot(r.vehicleNumberSnapshot());
-            e.setDriverNameSnapshot(r.driverNameSnapshot());
-            e.setDriverMobileSnapshot(r.driverMobileSnapshot());
-            e.setExpectedDeparture(r.expectedDeparture());
-            e.setExpectedArrival(r.expectedArrival());
-            e.setRemarks(r.remarks());
-            legs.save(e);
+            ShipmentLeg leg = new ShipmentLeg();
+            leg.setShipmentId(shipmentId);
+            leg.setSequenceNo(r.sequenceNo() == null ? n++ : r.sequenceNo());
+            leg.setTransportCompanyId(r.transportCompanyId());
+            leg.setVehicleId(r.vehicleId());
+            leg.setDriverId(r.driverId());
+            leg.setLrNumber(r.lrNumber());
+            leg.setConsignmentNumber(r.consignmentNumber());
+            leg.setVehicleNumberSnapshot(r.vehicleNumberSnapshot());
+            leg.setDriverNameSnapshot(r.driverNameSnapshot());
+            leg.setDriverMobileSnapshot(r.driverMobileSnapshot());
+            leg.setExpectedDeparture(r.expectedDeparture());
+            leg.setExpectedArrival(r.expectedArrival());
+            leg.setRemarks(r.remarks());
+            legs.save(leg);
         }
     }
 
-    private void transition(Shipment s, ShipmentStatus status, String remarks, String location, String payload) {
-        s.setStatus(status);
-        audit(s, false);
-        shipments.save(s);
-        event(s, status.name(), remarks, location, payload);
-        indexShipment(s);
+    private void transition(Shipment shipment, ShipmentStatus status, String remarks, String location, String payload) {
+        shipment.setStatus(status);
+        audit(shipment, false);
+        shipments.save(shipment);
+        event(shipment, status.name(), remarks, location, payload);
+        indexShipment(shipment);
     }
 
-    private void indexShipment(Shipment s) {
-        searchEvents.upsert(s.getOrganizationId(), SearchEntityType.SHIPMENT, s.getId());
+    private void indexShipment(Shipment shipment) {
+        searchEvents.upsert(shipment.getOrganizationId(), SearchEntityType.SHIPMENT, shipment.getId());
     }
 
-    private void event(Shipment s, String type, String remarks, String location, String payload) {
-        ShipmentEvent e = new ShipmentEvent();
-        e.setShipmentId(s.getId());
-        e.setEventType(type);
-        e.setOccurredAt(OffsetDateTime.now());
-        e.setActorUserId(TenantContext.userId().orElse(null));
-        e.setActorType(TenantContext.userId().isPresent() ? ShipmentActorType.USER : ShipmentActorType.SYSTEM);
-        e.setRemarks(remarks);
-        e.setLocationJson(location);
-        e.setPayloadJson(payload);
-        events.save(e);
+    private void event(Shipment shipment, String type, String remarks, String location, String payload) {
+        ShipmentEvent event = new ShipmentEvent();
+        event.setShipmentId(shipment.getId());
+        event.setEventType(type);
+        event.setOccurredAt(OffsetDateTime.now());
+        event.setActorUserId(TenantContext.userId().orElse(null));
+        event.setActorType(TenantContext.userId().isPresent() ? ShipmentActorType.USER : ShipmentActorType.SYSTEM);
+        event.setRemarks(remarks);
+        event.setLocationJson(location);
+        event.setPayloadJson(payload);
+        events.save(event);
     }
 
     private Shipment load(UUID id) {
@@ -543,13 +548,14 @@ public class ShipmentService {
                 .orElseThrow(() -> notFound("Shipment not found"));
     }
 
-    private void requireStatus(Shipment s, ShipmentStatus expected) {
-        if (s.getStatus() != expected) conflict("Expected " + expected + " but shipment is " + s.getStatus());
+    private void requireStatus(Shipment shipment, ShipmentStatus expected) {
+        if (shipment.getStatus() != expected)
+            conflict("Expected " + expected + " but shipment is " + shipment.getStatus());
     }
 
     private Specification<Shipment> baseSpec() {
         UUID org = org();
-        return (root, q, cb) -> cb.and(cb.equal(root.get("organizationId"), org), cb.isFalse(root.get("deleted")));
+        return (root, query, cb) -> cb.and(cb.equal(root.get("organizationId"), org), cb.isFalse(root.get("deleted")));
     }
 
     private String nextNumber() {
@@ -558,87 +564,87 @@ public class ShipmentService {
                 org(), "SHIPMENT", "SHP", NUMBER_FORMAT, organization.getFinancialYearStart(), LocalDate.now());
     }
 
-    private ShipmentResponse map(Shipment s) {
-        List<LegResponse> lr = legs.findByShipmentIdOrderBySequenceNo(s.getId()).stream()
-                .map(l -> new LegResponse(
-                        l.getId(),
-                        l.getSequenceNo(),
-                        l.getTransportCompanyId(),
-                        l.getVehicleId(),
-                        l.getDriverId(),
-                        l.getLrNumber(),
-                        l.getConsignmentNumber(),
-                        l.getVehicleNumberSnapshot(),
-                        l.getDriverNameSnapshot(),
-                        l.getDriverMobileSnapshot(),
-                        l.getExpectedDeparture(),
-                        l.getExpectedArrival(),
-                        l.getActualDeparture(),
-                        l.getActualArrival(),
-                        l.getRemarks()))
+    private ShipmentResponse map(Shipment shipment) {
+        List<LegResponse> lr = legs.findByShipmentIdOrderBySequenceNo(shipment.getId()).stream()
+                .map(leg -> new LegResponse(
+                        leg.getId(),
+                        leg.getSequenceNo(),
+                        leg.getTransportCompanyId(),
+                        leg.getVehicleId(),
+                        leg.getDriverId(),
+                        leg.getLrNumber(),
+                        leg.getConsignmentNumber(),
+                        leg.getVehicleNumberSnapshot(),
+                        leg.getDriverNameSnapshot(),
+                        leg.getDriverMobileSnapshot(),
+                        leg.getExpectedDeparture(),
+                        leg.getExpectedArrival(),
+                        leg.getActualDeparture(),
+                        leg.getActualArrival(),
+                        leg.getRemarks()))
                 .toList();
-        List<LineResponse> li = lines.findByShipmentIdOrderByLineOrder(s.getId()).stream()
-                .map(l -> new LineResponse(
-                        l.getId(),
-                        l.getSourceLineId(),
-                        l.getProductId(),
-                        l.getDescription(),
-                        l.getQuantity(),
-                        l.getUnitId(),
-                        l.getBatchNumber(),
-                        l.getSerialNumber(),
-                        l.getLineOrder()))
+        List<LineResponse> li = lines.findByShipmentIdOrderByLineOrder(shipment.getId()).stream()
+                .map(line -> new LineResponse(
+                        line.getId(),
+                        line.getSourceLineId(),
+                        line.getProductId(),
+                        line.getDescription(),
+                        line.getQuantity(),
+                        line.getUnitId(),
+                        line.getBatchNumber(),
+                        line.getSerialNumber(),
+                        line.getLineOrder()))
                 .toList();
         return new ShipmentResponse(
-                s.getId(),
-                s.getShipmentNumber(),
-                s.getStatus(),
-                s.getSourceDocumentType(),
-                s.getSourceDocumentId(),
-                s.isTransportRequired(),
-                s.getTransportMode(),
-                s.getTransportType(),
-                s.getTransportCompanyId(),
-                s.getFromWarehouseId(),
-                s.getShipToPartyType(),
-                s.getShipToPartyId(),
-                s.getShipToAddress(),
-                s.getExpectedDispatchDate(),
-                s.getExpectedDeliveryDate(),
-                s.getActualDispatchDate(),
-                s.getActualDeliveryDate(),
-                s.getFreightCharges(),
-                s.getFreightPaidBy(),
-                s.getInsuranceDetails(),
-                s.getGpsTrackingUrl(),
-                s.getEwayBillNumber(),
-                s.getEinvoiceReference(),
-                s.getRemarks(),
+                shipment.getId(),
+                shipment.getShipmentNumber(),
+                shipment.getStatus(),
+                shipment.getSourceDocumentType(),
+                shipment.getSourceDocumentId(),
+                shipment.isTransportRequired(),
+                shipment.getTransportMode(),
+                shipment.getTransportType(),
+                shipment.getTransportCompanyId(),
+                shipment.getFromWarehouseId(),
+                shipment.getShipToPartyType(),
+                shipment.getShipToPartyId(),
+                shipment.getShipToAddress(),
+                shipment.getExpectedDispatchDate(),
+                shipment.getExpectedDeliveryDate(),
+                shipment.getActualDispatchDate(),
+                shipment.getActualDeliveryDate(),
+                shipment.getFreightCharges(),
+                shipment.getFreightPaidBy(),
+                shipment.getInsuranceDetails(),
+                shipment.getGpsTrackingUrl(),
+                shipment.getEwayBillNumber(),
+                shipment.getEinvoiceReference(),
+                shipment.getRemarks(),
                 lr,
                 li,
-                s.getVersion());
+                shipment.getVersion());
     }
 
-    private LineRequest request(ShipmentLine l) {
+    private LineRequest request(ShipmentLine line) {
         return new LineRequest(
-                l.getSourceLineId(),
-                l.getProductId(),
-                l.getDescription(),
-                l.getQuantity(),
-                l.getUnitId(),
-                l.getBatchNumber(),
-                l.getSerialNumber(),
-                l.getLineOrder());
+                line.getSourceLineId(),
+                line.getProductId(),
+                line.getDescription(),
+                line.getQuantity(),
+                line.getUnitId(),
+                line.getBatchNumber(),
+                line.getSerialNumber(),
+                line.getLineOrder());
     }
 
     private UUID org() {
         return TenantContext.getOrganizationId();
     }
 
-    private void audit(Shipment s, boolean c) {
+    private void audit(Shipment shipment, boolean created) {
         TenantContext.userId().ifPresent(u -> {
-            if (c) s.setCreatedBy(u);
-            s.setUpdatedBy(u);
+            if (created) shipment.setCreatedBy(u);
+            shipment.setUpdatedBy(u);
         });
     }
 

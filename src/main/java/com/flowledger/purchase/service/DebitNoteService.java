@@ -81,8 +81,14 @@ public class DebitNoteService {
     }
 
     private String number(LocalDate d) {
-        Organization o =
+        Organization organization =
                 organizations.findById(TenantContext.getOrganizationId()).orElseThrow();
-        return numbers.next(o.getId(), "DEBIT_NOTE", "DN", "{PREFIX}/{FY}/{SEQ:6}", o.getFinancialYearStart(), d);
+        return numbers.next(
+                organization.getId(),
+                "DEBIT_NOTE",
+                "DN",
+                "{PREFIX}/{FY}/{SEQ:6}",
+                organization.getFinancialYearStart(),
+                d);
     }
 }

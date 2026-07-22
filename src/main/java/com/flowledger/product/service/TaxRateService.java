@@ -22,70 +22,80 @@ public class TaxRateService extends OrganizationScopedService {
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private static final BigDecimal SHARE_TOLERANCE = new BigDecimal("0.01");
 
-    private final TaxRateRepository r;
-    private final TaxRateMapper m;
+    private final TaxRateRepository repo;
+    private final TaxRateMapper mapper;
 
-    public TaxRateService(TaxRateRepository r, TaxRateMapper m) {
-        this.r = r;
-        this.m = m;
+    public TaxRateService(TaxRateRepository repo, TaxRateMapper mapper) {
+        this.repo = repo;
+        this.mapper = mapper;
     }
 
-    public Response create(Create d) {
-        if (r.existsByOrganizationIdAndNameIgnoreCase(orgId(), d.name().trim())) {
+    public Response create(Create request) {
+        if (repo.existsByOrganizationIdAndNameIgnoreCase(orgId(), request.name().trim())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Tax rate name already exists in this organization");
         }
-        TaxRate e = m.toEntity(d);
-        e.setName(d.name().trim());
-        applyTypeAndSplit(e, d.taxType(), d.splitStrategy(), d.cgstSharePercent(), d.sgstSharePercent());
-        e.setOrganizationId(orgId());
-        calculate(e);
-        return m.toResponse(r.save(e));
+        TaxRate taxRate = mapper.toEntity(request);
+        taxRate.setName(request.name().trim());
+        applyTypeAndSplit(
+                taxRate,
+                request.taxType(),
+                request.splitStrategy(),
+                request.cgstSharePercent(),
+                request.sgstSharePercent());
+        taxRate.setOrganizationId(orgId());
+        calculate(taxRate);
+        return mapper.toResponse(repo.save(taxRate));
     }
 
     @Transactional(readOnly = true)
     public List<Response> list() {
-        return r.findByOrganizationIdAndActiveTrue(orgId()).stream()
-                .map(m::toResponse)
+        return repo.findByOrganizationIdAndActiveTrue(orgId()).stream()
+                .map(mapper::toResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public Response get(UUID id) {
-        return m.toResponse(load(id));
+        return mapper.toResponse(load(id));
     }
 
-    public Response update(UUID id, Update d) {
-        TaxRate e = load(id);
-        m.update(d, e);
-        e.setName(d.name().trim());
-        applyTypeAndSplit(e, d.taxType(), d.splitStrategy(), d.cgstSharePercent(), d.sgstSharePercent());
-        calculate(e);
-        return m.toResponse(r.save(e));
+    public Response update(UUID id, Update request) {
+        TaxRate taxRate = load(id);
+        mapper.update(request, taxRate);
+        taxRate.setName(request.name().trim());
+        applyTypeAndSplit(
+                taxRate,
+                request.taxType(),
+                request.splitStrategy(),
+                request.cgstSharePercent(),
+                request.sgstSharePercent());
+        calculate(taxRate);
+        return mapper.toResponse(repo.save(taxRate));
     }
 
     public void delete(UUID id) {
-        TaxRate e = load(id);
-        e.setActive(false);
-        r.save(e);
+        TaxRate taxRate = load(id);
+        taxRate.setActive(false);
+        repo.save(taxRate);
     }
 
     private void applyTypeAndSplit(
-            TaxRate e, TaxType taxType, SplitStrategy splitStrategy, BigDecimal cgstShare, BigDecimal sgstShare) {
-        TaxType type = taxType == null ? (e.getTaxType() == null ? TaxType.GST : e.getTaxType()) : taxType;
-        e.setTaxType(type);
+            TaxRate taxRate, TaxType taxType, SplitStrategy splitStrategy, BigDecimal cgstShare, BigDecimal sgstShare) {
+        TaxType type = taxType == null ? (taxRate.getTaxType() == null ? TaxType.GST : taxRate.getTaxType()) : taxType;
+        taxRate.setTaxType(type);
 
         SplitStrategy strategy = splitStrategy != null ? splitStrategy : SplitStrategy.defaultFor(type);
-        e.setSplitStrategy(strategy);
+        taxRate.setSplitStrategy(strategy);
 
         if (strategy == SplitStrategy.NO_SPLIT_IGST || strategy == SplitStrategy.NO_SPLIT_OTHER) {
-            e.setCgstSharePercent(BigDecimal.ZERO);
-            e.setSgstSharePercent(BigDecimal.ZERO);
+            taxRate.setCgstSharePercent(BigDecimal.ZERO);
+            taxRate.setSgstSharePercent(BigDecimal.ZERO);
             return;
         }
 
-        BigDecimal cgst = cgstShare != null ? cgstShare : defaultShare(e.getCgstSharePercent());
-        BigDecimal sgst = sgstShare != null ? sgstShare : defaultShare(e.getSgstSharePercent());
-        if (cgstShare == null && sgstShare == null && e.getCgstSharePercent() == null) {
+        BigDecimal cgst = cgstShare != null ? cgstShare : defaultShare(taxRate.getCgstSharePercent());
+        BigDecimal sgst = sgstShare != null ? sgstShare : defaultShare(taxRate.getSgstSharePercent());
+        if (cgstShare == null && sgstShare == null && taxRate.getCgstSharePercent() == null) {
             cgst = new BigDecimal("50");
             sgst = new BigDecimal("50");
         } else if (cgstShare != null && sgstShare == null) {
@@ -94,8 +104,8 @@ public class TaxRateService extends OrganizationScopedService {
             cgst = HUNDRED.subtract(sgst);
         }
         validateShares(cgst, sgst);
-        e.setCgstSharePercent(cgst);
-        e.setSgstSharePercent(sgst);
+        taxRate.setCgstSharePercent(cgst);
+        taxRate.setSgstSharePercent(sgst);
     }
 
     private static BigDecimal defaultShare(BigDecimal existing) {
@@ -112,35 +122,38 @@ public class TaxRateService extends OrganizationScopedService {
         }
     }
 
-    private void calculate(TaxRate e) {
-        SplitStrategy strategy =
-                e.getSplitStrategy() == null ? SplitStrategy.defaultFor(e.getTaxType()) : e.getSplitStrategy();
-        BigDecimal rate = e.getRate() == null ? BigDecimal.ZERO : e.getRate();
+    private void calculate(TaxRate taxRate) {
+        SplitStrategy strategy = taxRate.getSplitStrategy() == null
+                ? SplitStrategy.defaultFor(taxRate.getTaxType())
+                : taxRate.getSplitStrategy();
+        BigDecimal rate = taxRate.getRate() == null ? BigDecimal.ZERO : taxRate.getRate();
         switch (strategy) {
             case NO_SPLIT_IGST -> {
-                e.setCgstRate(BigDecimal.ZERO);
-                e.setSgstRate(BigDecimal.ZERO);
-                e.setIgstRate(rate);
+                taxRate.setCgstRate(BigDecimal.ZERO);
+                taxRate.setSgstRate(BigDecimal.ZERO);
+                taxRate.setIgstRate(rate);
             }
             case NO_SPLIT_OTHER -> {
-                e.setCgstRate(BigDecimal.ZERO);
-                e.setSgstRate(BigDecimal.ZERO);
-                e.setIgstRate(BigDecimal.ZERO);
+                taxRate.setCgstRate(BigDecimal.ZERO);
+                taxRate.setSgstRate(BigDecimal.ZERO);
+                taxRate.setIgstRate(BigDecimal.ZERO);
             }
             case PLACE_OF_SUPPLY, CUSTOM_PERCENT -> {
-                BigDecimal cgstShare = e.getCgstSharePercent() == null ? new BigDecimal("50") : e.getCgstSharePercent();
-                BigDecimal sgstShare = e.getSgstSharePercent() == null ? new BigDecimal("50") : e.getSgstSharePercent();
-                e.setCgstRate(rate.multiply(cgstShare).divide(HUNDRED, 4, RoundingMode.HALF_UP));
-                e.setSgstRate(rate.multiply(sgstShare).divide(HUNDRED, 4, RoundingMode.HALF_UP));
-                e.setIgstRate(rate);
+                BigDecimal cgstShare =
+                        taxRate.getCgstSharePercent() == null ? new BigDecimal("50") : taxRate.getCgstSharePercent();
+                BigDecimal sgstShare =
+                        taxRate.getSgstSharePercent() == null ? new BigDecimal("50") : taxRate.getSgstSharePercent();
+                taxRate.setCgstRate(rate.multiply(cgstShare).divide(HUNDRED, 4, RoundingMode.HALF_UP));
+                taxRate.setSgstRate(rate.multiply(sgstShare).divide(HUNDRED, 4, RoundingMode.HALF_UP));
+                taxRate.setIgstRate(rate);
             }
         }
-        if (e.getCessRate() == null) {
-            e.setCessRate(BigDecimal.ZERO);
+        if (taxRate.getCessRate() == null) {
+            taxRate.setCessRate(BigDecimal.ZERO);
         }
     }
 
     private TaxRate load(UUID id) {
-        return required(r.findByIdAndOrganizationId(id, orgId()), "Tax rate");
+        return required(repo.findByIdAndOrganizationId(id, orgId()), "Tax rate");
     }
 }

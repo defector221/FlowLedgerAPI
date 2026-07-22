@@ -77,19 +77,19 @@ public class RagService {
         List<AiEmbedding> embeddings = embeddingPipeline.listKnowledgeEmbeddings(org);
         if (!embeddings.isEmpty() && properties.isEmbeddingsEnabled()) {
             try {
-                List<Float> q = providers.active().embed(query);
+                List<Float> queryVector = providers.active().embed(query);
                 List<Scored> scored = new ArrayList<>();
                 for (AiEmbedding emb : embeddings) {
-                    List<Float> v = objectMapper.readValue(emb.getEmbeddingJson(), new TypeReference<>() {});
-                    scored.add(new Scored(emb.getSourceId(), cosine(q, v)));
+                    List<Float> vector = objectMapper.readValue(emb.getEmbeddingJson(), new TypeReference<>() {});
+                    scored.add(new Scored(emb.getSourceId(), cosine(queryVector, vector)));
                 }
                 scored.sort(Comparator.comparingDouble(Scored::score).reversed());
                 List<AiKnowledgeDocument> out = new ArrayList<>();
-                for (Scored s : scored) {
+                for (Scored scoredItem : scored) {
                     if (out.size() >= limit) {
                         break;
                     }
-                    documents.findByIdAndOrganizationId(s.id(), org).ifPresent(out::add);
+                    documents.findByIdAndOrganizationId(scoredItem.id(), org).ifPresent(out::add);
                 }
                 if (!out.isEmpty()) {
                     return out;
@@ -98,11 +98,11 @@ public class RagService {
                 // fall through to text search
             }
         }
-        String q = query.trim();
-        List<AiKnowledgeDocument> textHits = documents.search(org, q);
+        String trimmedQuery = query.trim();
+        List<AiKnowledgeDocument> textHits = documents.search(org, trimmedQuery);
         if (textHits.isEmpty()) {
             // token fallback
-            for (String token : q.toLowerCase(Locale.ROOT).split("\\s+")) {
+            for (String token : trimmedQuery.toLowerCase(Locale.ROOT).split("\\s+")) {
                 if (token.length() < 3) {
                     continue;
                 }

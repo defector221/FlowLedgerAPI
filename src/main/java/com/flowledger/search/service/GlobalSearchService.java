@@ -58,8 +58,8 @@ public class GlobalSearchService extends OrganizationScopedService {
         if (!holder.isEnabled()) {
             throw new SearchUnavailableException("Search is disabled.");
         }
-        String q = query == null ? "" : query.trim();
-        if (q.length() < 2) {
+        String trimmedQuery = query == null ? "" : query.trim();
+        if (trimmedQuery.length() < 2) {
             throw new IllegalArgumentException("Query must be at least 2 characters");
         }
         int size = limit == null ? DEFAULT_LIMIT : limit;
@@ -72,7 +72,7 @@ public class GlobalSearchService extends OrganizationScopedService {
         }
         int from = (pageNumber - 1) * size;
         List<SearchEntityType> types = parseTypes(typesCsv);
-        var pageResult = indexService.searchPage(orgId(), q, types, from, size);
+        var pageResult = indexService.searchPage(orgId(), trimmedQuery, types, from, size);
         List<Result> results = pageResult.documents().stream()
                 .map(doc -> new Result(
                         UUID.fromString(doc.getEntityId()),
@@ -81,7 +81,7 @@ public class GlobalSearchService extends OrganizationScopedService {
                         doc.getSubtitle(),
                         doc.getReferenceNumber()))
                 .toList();
-        return new Response(q, results, pageResult.total(), pageNumber, size, pageResult.hasMore());
+        return new Response(trimmedQuery, results, pageResult.total(), pageNumber, size, pageResult.hasMore());
     }
 
     @Transactional(readOnly = true)

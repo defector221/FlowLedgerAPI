@@ -237,17 +237,17 @@ class SubscriptionBillingServiceTest {
     }
 
     private static SubscriptionPlan plan(String code, String name, BigDecimal monthly, BigDecimal yearly) {
-        SubscriptionPlan p = new SubscriptionPlan();
-        p.setId(UUID.randomUUID());
-        p.setCode(code);
-        p.setName(name);
-        p.setPriceMonthly(monthly);
-        p.setPriceYearly(yearly);
-        p.setCurrency("INR");
-        p.setActive(true);
-        p.setMaxInvoicesPerMonth(25);
-        p.setMaxOrganizations(1);
-        p.setMaxUsersPerOrg(2);
-        return p;
+        SubscriptionPlan plan = new SubscriptionPlan();
+        plan.setId(UUID.randomUUID());
+        plan.setCode(code);
+        plan.setName(name);
+        plan.setPriceMonthly(monthly);
+        plan.setPriceYearly(yearly);
+        plan.setCurrency("INR");
+        plan.setActive(true);
+        plan.setMaxInvoicesPerMonth(25);
+        plan.setMaxOrganizations(1);
+        plan.setMaxUsersPerOrg(2);
+        return plan;
     }
 }

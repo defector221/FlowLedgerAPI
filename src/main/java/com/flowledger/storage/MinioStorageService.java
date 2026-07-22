@@ -13,27 +13,29 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class MinioStorageService implements StorageService {
     private final MinioClient client;
-    private final MinioStorageProperties p;
+    private final MinioStorageProperties properties;
 
-    public MinioStorageService(MinioClient c, MinioStorageProperties p) {
-        client = c;
-        this.p = p;
+    public MinioStorageService(MinioClient client, MinioStorageProperties properties) {
+        this.client = client;
+        this.properties = properties;
     }
 
     @PostConstruct
     @SneakyThrows
     public void ensureBucket() {
         if (!client.bucketExists(
-                BucketExistsArgs.builder().bucket(p.getBucket()).build()))
-            client.makeBucket(MakeBucketArgs.builder().bucket(p.getBucket()).build());
+                BucketExistsArgs.builder().bucket(properties.getBucket()).build()))
+            client.makeBucket(
+                    MakeBucketArgs.builder().bucket(properties.getBucket()).build());
     }
 
     @SneakyThrows
-    public String store(String key, MultipartFile f) {
-        try (InputStream in = f.getInputStream()) {
-            client.putObject(PutObjectArgs.builder().bucket(p.getBucket()).object(key).stream(in, f.getSize(), -1)
-                    .contentType(f.getContentType())
-                    .build());
+    public String store(String key, MultipartFile file) {
+        try (InputStream in = file.getInputStream()) {
+            client.putObject(
+                    PutObjectArgs.builder().bucket(properties.getBucket()).object(key).stream(in, file.getSize(), -1)
+                            .contentType(file.getContentType())
+                            .build());
             return key;
         }
     }
@@ -41,8 +43,10 @@ public class MinioStorageService implements StorageService {
     @SneakyThrows
     public InputStream get(String key) {
         try {
-            return client.getObject(
-                    GetObjectArgs.builder().bucket(p.getBucket()).object(key).build());
+            return client.getObject(GetObjectArgs.builder()
+                    .bucket(properties.getBucket())
+                    .object(key)
+                    .build());
         } catch (Exception e) {
             throw new ResourceNotFoundException("Object not found");
         }
@@ -50,17 +54,19 @@ public class MinioStorageService implements StorageService {
 
     @SneakyThrows
     public void delete(String key) {
-        client.removeObject(
-                RemoveObjectArgs.builder().bucket(p.getBucket()).object(key).build());
+        client.removeObject(RemoveObjectArgs.builder()
+                .bucket(properties.getBucket())
+                .object(key)
+                .build());
     }
 
     @SneakyThrows
-    public String getPresignedUrl(String key, Duration d) {
+    public String getPresignedUrl(String key, Duration expiry) {
         return client.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
-                .bucket(p.getBucket())
+                .bucket(properties.getBucket())
                 .object(key)
                 .method(Method.GET)
-                .expiry((int) d.toSeconds())
+                .expiry((int) expiry.toSeconds())
                 .build());
     }
 }

@@ -34,13 +34,13 @@ public class ConversationMemoryService {
                     .findByIdAndOrganizationId(conversationId, org)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found"));
         }
-        AiConversation c = new AiConversation();
-        c.setOrganizationId(org);
-        c.setUserId(userId);
-        c.setAgentType(agentType);
-        c.setTitle(titleFrom(titleSeed));
-        c.setStatus("ACTIVE");
-        return conversations.save(c);
+        AiConversation aiConversation = new AiConversation();
+        aiConversation.setOrganizationId(org);
+        aiConversation.setUserId(userId);
+        aiConversation.setAgentType(agentType);
+        aiConversation.setTitle(titleFrom(titleSeed));
+        aiConversation.setStatus("ACTIVE");
+        return conversations.save(aiConversation);
     }
 
     @Transactional(readOnly = true)
@@ -64,16 +64,16 @@ public class ConversationMemoryService {
             Integer promptTokens,
             Integer completionTokens,
             Integer latencyMs) {
-        AiMessage m = new AiMessage();
-        m.setConversationId(conversation.getId());
-        m.setOrganizationId(conversation.getOrganizationId());
-        m.setRole(role);
-        m.setContent(content);
-        m.setModel(model);
-        m.setPromptTokens(promptTokens);
-        m.setCompletionTokens(completionTokens);
-        m.setLatencyMs(latencyMs);
-        AiMessage saved = messages.save(m);
+        AiMessage message = new AiMessage();
+        message.setConversationId(conversation.getId());
+        message.setOrganizationId(conversation.getOrganizationId());
+        message.setRole(role);
+        message.setContent(content);
+        message.setModel(model);
+        message.setPromptTokens(promptTokens);
+        message.setCompletionTokens(completionTokens);
+        message.setLatencyMs(latencyMs);
+        AiMessage saved = messages.save(message);
         conversation.setUpdatedAt(java.time.OffsetDateTime.now());
         if (conversation.getTitle() == null || conversation.getTitle().isBlank()) {
             conversation.setTitle(titleFrom(content));
@@ -87,8 +87,8 @@ public class ConversationMemoryService {
         List<AiMessage> all = messages(conversationId);
         int from = Math.max(0, all.size() - limit);
         List<AIProvider.ChatMessage> out = new ArrayList<>();
-        for (AiMessage m : all.subList(from, all.size())) {
-            out.add(new AIProvider.ChatMessage(m.getRole(), m.getContent()));
+        for (AiMessage message : all.subList(from, all.size())) {
+            out.add(new AIProvider.ChatMessage(message.getRole(), message.getContent()));
         }
         return out;
     }
@@ -97,7 +97,7 @@ public class ConversationMemoryService {
         if (seed == null || seed.isBlank()) {
             return "New conversation";
         }
-        String t = seed.trim().replaceAll("\\s+", " ");
-        return t.length() <= 80 ? t : t.substring(0, 80) + "...";
+        String trimmed = seed.trim().replaceAll("\\s+", " ");
+        return trimmed.length() <= 80 ? trimmed : trimmed.substring(0, 80) + "...";
     }
 }

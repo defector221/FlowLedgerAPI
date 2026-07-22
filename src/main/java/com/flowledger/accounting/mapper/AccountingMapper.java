@@ -13,41 +13,46 @@ import java.util.UUID;
 public final class AccountingMapper {
     private AccountingMapper() {}
 
-    public static AccountResponse toAccount(Account a) {
+    public static AccountResponse toAccount(Account account) {
         return new AccountResponse(
-                a.getId(),
-                a.getOrganizationId(),
-                a.getAccountCode(),
-                a.getAccountName(),
-                a.getDescription(),
-                a.getAccountType(),
-                a.getAccountSubType(),
-                a.getParentAccountId(),
-                a.getSystemAccountKey(),
-                a.isSystemAccount(),
-                a.isEditable(),
-                a.isDeletable(),
-                a.getStatus(),
-                a.isActive(),
-                a.isAllowManualPosting(),
-                a.getOpeningDebit(),
-                a.getOpeningCredit());
+                account.getId(),
+                account.getOrganizationId(),
+                account.getAccountCode(),
+                account.getAccountName(),
+                account.getDescription(),
+                account.getAccountType(),
+                account.getAccountSubType(),
+                account.getParentAccountId(),
+                account.getSystemAccountKey(),
+                account.isSystemAccount(),
+                account.isEditable(),
+                account.isDeletable(),
+                account.getStatus(),
+                account.isActive(),
+                account.isAllowManualPosting(),
+                account.getOpeningDebit(),
+                account.getOpeningCredit());
     }
 
-    public static FiscalYearResponse toFiscalYear(FiscalYear f) {
+    public static FiscalYearResponse toFiscalYear(FiscalYear fiscalYear) {
         return new FiscalYearResponse(
-                f.getId(), f.getName(), f.getStartDate(), f.getEndDate(), f.getStatus(), f.isCurrent());
+                fiscalYear.getId(),
+                fiscalYear.getName(),
+                fiscalYear.getStartDate(),
+                fiscalYear.getEndDate(),
+                fiscalYear.getStatus(),
+                fiscalYear.isCurrent());
     }
 
-    public static PeriodResponse toPeriod(AccountingPeriod p) {
+    public static PeriodResponse toPeriod(AccountingPeriod period) {
         return new PeriodResponse(
-                p.getId(),
-                p.getFiscalYearId(),
-                p.getPeriodNumber(),
-                p.getName(),
-                p.getStartDate(),
-                p.getEndDate(),
-                p.getStatus());
+                period.getId(),
+                period.getFiscalYearId(),
+                period.getPeriodNumber(),
+                period.getName(),
+                period.getStartDate(),
+                period.getEndDate(),
+                period.getStatus());
     }
 
     public static JournalLineResponse toLine(JournalEntryLine line, Account account) {
@@ -68,7 +73,7 @@ public final class AccountingMapper {
     public static JournalResponse toJournal(
             JournalEntry entry, List<JournalEntryLine> lines, Map<UUID, Account> accounts) {
         List<JournalLineResponse> lineResponses = lines.stream()
-                .map(l -> toLine(l, accounts.get(l.getAccountId())))
+                .map(line -> toLine(line, accounts.get(line.getAccountId())))
                 .toList();
         return new JournalResponse(
                 entry.getId(),

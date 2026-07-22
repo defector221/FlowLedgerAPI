@@ -37,40 +37,40 @@ public class TransportDriverService {
     public DriverResponse create(DriverRequest r) {
         if (repository.existsByOrganizationIdAndLicenseNumberIgnoreCaseAndDeletedFalse(org(), r.licenseNumber()))
             conflict();
-        TransportDriver e = new TransportDriver();
-        e.setOrganizationId(org());
-        apply(e, r);
-        audit(e, true);
-        return map(repository.save(e));
+        TransportDriver driver = new TransportDriver();
+        driver.setOrganizationId(org());
+        apply(driver, r);
+        audit(driver, true);
+        return map(repository.save(driver));
     }
 
     public DriverResponse update(UUID id, DriverRequest r) {
-        TransportDriver e = load(id);
-        if (!e.getLicenseNumber().equalsIgnoreCase(r.licenseNumber())
+        TransportDriver driver = load(id);
+        if (!driver.getLicenseNumber().equalsIgnoreCase(r.licenseNumber())
                 && repository.existsByOrganizationIdAndLicenseNumberIgnoreCaseAndDeletedFalse(org(), r.licenseNumber()))
             conflict();
-        apply(e, r);
-        audit(e, false);
-        return map(repository.save(e));
+        apply(driver, r);
+        audit(driver, false);
+        return map(repository.save(driver));
     }
 
     public void delete(UUID id) {
-        TransportDriver e = load(id);
-        e.setDeleted(true);
-        e.setCurrentStatus(DriverStatus.INACTIVE);
-        audit(e, false);
+        TransportDriver driver = load(id);
+        driver.setDeleted(true);
+        driver.setCurrentStatus(DriverStatus.INACTIVE);
+        audit(driver, false);
     }
 
-    private void apply(TransportDriver e, DriverRequest r) {
-        e.setCompanyId(r.companyId());
-        e.setName(r.name());
-        e.setLicenseNumber(r.licenseNumber());
-        e.setLicenseExpiry(r.licenseExpiry());
-        e.setMobile(r.mobile());
-        e.setEmergencyContact(r.emergencyContact());
-        e.setAssignedVehicleId(r.assignedVehicleId());
-        e.setCurrentStatus(r.currentStatus() == null ? DriverStatus.AVAILABLE : r.currentStatus());
-        e.setNotes(r.notes());
+    private void apply(TransportDriver driver, DriverRequest r) {
+        driver.setCompanyId(r.companyId());
+        driver.setName(r.name());
+        driver.setLicenseNumber(r.licenseNumber());
+        driver.setLicenseExpiry(r.licenseExpiry());
+        driver.setMobile(r.mobile());
+        driver.setEmergencyContact(r.emergencyContact());
+        driver.setAssignedVehicleId(r.assignedVehicleId());
+        driver.setCurrentStatus(r.currentStatus() == null ? DriverStatus.AVAILABLE : r.currentStatus());
+        driver.setNotes(r.notes());
     }
 
     private TransportDriver load(UUID id) {
@@ -79,29 +79,29 @@ public class TransportDriverService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Driver not found"));
     }
 
-    private DriverResponse map(TransportDriver e) {
+    private DriverResponse map(TransportDriver driver) {
         return new DriverResponse(
-                e.getId(),
-                e.getCompanyId(),
-                e.getName(),
-                e.getLicenseNumber(),
-                e.getLicenseExpiry(),
-                e.getMobile(),
-                e.getEmergencyContact(),
-                e.getAssignedVehicleId(),
-                e.getCurrentStatus(),
-                e.getNotes(),
-                e.getVersion());
+                driver.getId(),
+                driver.getCompanyId(),
+                driver.getName(),
+                driver.getLicenseNumber(),
+                driver.getLicenseExpiry(),
+                driver.getMobile(),
+                driver.getEmergencyContact(),
+                driver.getAssignedVehicleId(),
+                driver.getCurrentStatus(),
+                driver.getNotes(),
+                driver.getVersion());
     }
 
     private UUID org() {
         return TenantContext.getOrganizationId();
     }
 
-    private void audit(TransportDriver e, boolean c) {
+    private void audit(TransportDriver driver, boolean created) {
         TenantContext.userId().ifPresent(u -> {
-            if (c) e.setCreatedBy(u);
-            e.setUpdatedBy(u);
+            if (created) driver.setCreatedBy(u);
+            driver.setUpdatedBy(u);
         });
     }
 

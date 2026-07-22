@@ -96,11 +96,11 @@ class JournalValidationServiceTest {
     }
 
     private static Account account(UUID id, boolean active) {
-        Account a = new Account();
-        a.setId(id);
-        a.setActive(active);
-        a.setAllowManualPosting(true);
-        a.setAccountName("Test");
-        return a;
+        Account account = new Account();
+        account.setId(id);
+        account.setActive(active);
+        account.setAllowManualPosting(true);
+        account.setAccountName("Test");
+        return account;
     }
 }

@@ -35,7 +35,7 @@ public class WorkflowDraftService {
         ensureBuilder();
         UUID org = TenantContext.getOrganizationId();
         return drafts.findByOrganizationIdOrderByUpdatedAtDesc(org).stream()
-                .filter(d -> !isDeleted(d))
+                .filter(draft -> !isDeleted(draft))
                 .map(this::toDto)
                 .toList();
     }
@@ -46,47 +46,47 @@ public class WorkflowDraftService {
         if (request == null || request.name() == null || request.name().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "name is required");
         }
-        AiWorkflowDraft d = new AiWorkflowDraft();
-        d.setOrganizationId(TenantContext.getOrganizationId());
-        d.setCreatedBy(TenantContext.userId().orElse(null));
-        apply(d, request);
-        d.setStatus("DRAFT");
-        return toDto(drafts.save(d));
+        AiWorkflowDraft draft = new AiWorkflowDraft();
+        draft.setOrganizationId(TenantContext.getOrganizationId());
+        draft.setCreatedBy(TenantContext.userId().orElse(null));
+        apply(draft, request);
+        draft.setStatus("DRAFT");
+        return toDto(drafts.save(draft));
     }
 
     @Transactional
     public AiDtos.WorkflowDraftResponse update(UUID id, AiDtos.WorkflowDraftRequest request) {
         ensureBuilder();
-        AiWorkflowDraft d = requireAlive(id);
-        if ("ACTIVE".equalsIgnoreCase(d.getStatus())) {
+        AiWorkflowDraft draft = requireAlive(id);
+        if ("ACTIVE".equalsIgnoreCase(draft.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Deactivate before editing an active workflow");
         }
-        apply(d, request);
-        return toDto(drafts.save(d));
+        apply(draft, request);
+        return toDto(drafts.save(draft));
     }
 
     @Transactional
     public AiDtos.WorkflowDraftResponse activate(UUID id) {
         ensureBuilder();
-        AiWorkflowDraft d = requireAlive(id);
-        d.setStatus("ACTIVE");
-        return toDto(drafts.save(d));
+        AiWorkflowDraft draft = requireAlive(id);
+        draft.setStatus("ACTIVE");
+        return toDto(drafts.save(draft));
     }
 
     @Transactional
     public AiDtos.WorkflowDraftResponse deactivate(UUID id) {
         ensureBuilder();
-        AiWorkflowDraft d = requireAlive(id);
-        d.setStatus("DRAFT");
-        return toDto(drafts.save(d));
+        AiWorkflowDraft draft = requireAlive(id);
+        draft.setStatus("DRAFT");
+        return toDto(drafts.save(draft));
     }
 
     @Transactional
     public void softDelete(UUID id) {
         ensureBuilder();
-        AiWorkflowDraft d = requireAlive(id);
-        d.setStatus("DELETED");
-        drafts.save(d);
+        AiWorkflowDraft draft = requireAlive(id);
+        draft.setStatus("DELETED");
+        drafts.save(draft);
     }
 
     /** NL → draft suggestion fields + optional persisted draft shell. */
@@ -101,17 +101,17 @@ public class WorkflowDraftService {
         }
 
         Map<String, Object> plan = buildApprovalPlan(prompt);
-        AiWorkflowDraft d = new AiWorkflowDraft();
-        d.setOrganizationId(TenantContext.getOrganizationId());
-        d.setCreatedBy(TenantContext.userId().orElse(null));
-        d.setName(String.valueOf(plan.getOrDefault("name", "AI suggested workflow")));
-        d.setTriggerType(String.valueOf(plan.getOrDefault("triggerType", "DOCUMENT_APPROVAL")));
-        d.setDescription(String.valueOf(plan.getOrDefault("description", prompt)));
-        d.setConditionsJson(String.valueOf(plan.getOrDefault("conditionsJson", "{}")));
-        d.setStepsJson(String.valueOf(plan.getOrDefault("stepsJson", "[]")));
-        d.setSuggestedApprovers(String.valueOf(plan.getOrDefault("suggestedApprovers", "ORGANIZATION_ADMIN")));
-        d.setStatus("DRAFT");
-        return toDto(drafts.save(d));
+        AiWorkflowDraft draft = new AiWorkflowDraft();
+        draft.setOrganizationId(TenantContext.getOrganizationId());
+        draft.setCreatedBy(TenantContext.userId().orElse(null));
+        draft.setName(String.valueOf(plan.getOrDefault("name", "AI suggested workflow")));
+        draft.setTriggerType(String.valueOf(plan.getOrDefault("triggerType", "DOCUMENT_APPROVAL")));
+        draft.setDescription(String.valueOf(plan.getOrDefault("description", prompt)));
+        draft.setConditionsJson(String.valueOf(plan.getOrDefault("conditionsJson", "{}")));
+        draft.setStepsJson(String.valueOf(plan.getOrDefault("stepsJson", "[]")));
+        draft.setSuggestedApprovers(String.valueOf(plan.getOrDefault("suggestedApprovers", "ORGANIZATION_ADMIN")));
+        draft.setStatus("DRAFT");
+        return toDto(drafts.save(draft));
     }
 
     public AiDtos.WorkflowSuggestResponse suggestFields(AiDtos.WorkflowSuggestRequest request) {
@@ -164,16 +164,16 @@ public class WorkflowDraftService {
         // simpler JSON-ish string for UI
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < steps.size(); i++) {
-            Map<String, String> s = steps.get(i);
+            Map<String, String> step = steps.get(i);
             if (i > 0) {
                 sb.append(',');
             }
             sb.append("{\"order\":")
-                    .append(s.get("order"))
+                    .append(step.get("order"))
                     .append(",\"role\":\"")
-                    .append(s.get("role"))
+                    .append(step.get("role"))
                     .append("\",\"action\":\"")
-                    .append(s.get("action"))
+                    .append(step.get("action"))
                     .append("\"}");
         }
         sb.append(']');
@@ -182,24 +182,24 @@ public class WorkflowDraftService {
         return plan;
     }
 
-    private void apply(AiWorkflowDraft d, AiDtos.WorkflowDraftRequest request) {
+    private void apply(AiWorkflowDraft draft, AiDtos.WorkflowDraftRequest request) {
         if (request.name() != null && !request.name().isBlank()) {
-            d.setName(request.name().trim());
+            draft.setName(request.name().trim());
         }
         if (request.triggerType() != null && !request.triggerType().isBlank()) {
-            d.setTriggerType(request.triggerType().trim());
+            draft.setTriggerType(request.triggerType().trim());
         }
         if (request.description() != null) {
-            d.setDescription(request.description());
+            draft.setDescription(request.description());
         }
         if (request.conditionsJson() != null) {
-            d.setConditionsJson(request.conditionsJson());
+            draft.setConditionsJson(request.conditionsJson());
         }
         if (request.stepsJson() != null) {
-            d.setStepsJson(request.stepsJson());
+            draft.setStepsJson(request.stepsJson());
         }
         if (request.suggestedApprovers() != null) {
-            d.setSuggestedApprovers(request.suggestedApprovers());
+            draft.setSuggestedApprovers(request.suggestedApprovers());
         }
     }
 
@@ -209,15 +209,15 @@ public class WorkflowDraftService {
     }
 
     private AiWorkflowDraft requireAlive(UUID id) {
-        AiWorkflowDraft d = require(id);
-        if (isDeleted(d)) {
+        AiWorkflowDraft draft = require(id);
+        if (isDeleted(draft)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Workflow draft not found");
         }
-        return d;
+        return draft;
     }
 
-    private static boolean isDeleted(AiWorkflowDraft d) {
-        return "DELETED".equalsIgnoreCase(d.getStatus());
+    private static boolean isDeleted(AiWorkflowDraft draft) {
+        return "DELETED".equalsIgnoreCase(draft.getStatus());
     }
 
     private void ensureBuilder() {
@@ -228,17 +228,17 @@ public class WorkflowDraftService {
         }
     }
 
-    private AiDtos.WorkflowDraftResponse toDto(AiWorkflowDraft d) {
+    private AiDtos.WorkflowDraftResponse toDto(AiWorkflowDraft draft) {
         return new AiDtos.WorkflowDraftResponse(
-                d.getId(),
-                d.getName(),
-                d.getTriggerType(),
-                d.getDescription(),
-                d.getConditionsJson(),
-                d.getStepsJson(),
-                d.getSuggestedApprovers(),
-                d.getStatus(),
-                d.getCreatedAt(),
-                d.getUpdatedAt());
+                draft.getId(),
+                draft.getName(),
+                draft.getTriggerType(),
+                draft.getDescription(),
+                draft.getConditionsJson(),
+                draft.getStepsJson(),
+                draft.getSuggestedApprovers(),
+                draft.getStatus(),
+                draft.getCreatedAt(),
+                draft.getUpdatedAt());
     }
 }
