@@ -14,7 +14,7 @@ public interface ProductMapper {
 
     @BeanMapping(
             nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
-            ignoreUnmappedSourceProperties = {"warehouseId"})
+            ignoreUnmappedSourceProperties = {"warehouseId", "supplierPrices"})
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "organizationId", ignore = true)
     @Mapping(target = "active", ignore = true)
@@ -28,6 +28,8 @@ public interface ProductMapper {
     @Mapping(target = "unitName", ignore = true)
     @Mapping(target = "taxRateName", ignore = true)
     @Mapping(target = "taxType", ignore = true)
+    @Mapping(target = "supplierCount", ignore = true)
+    @Mapping(target = "preferredSupplierName", ignore = true)
     Response toResponse(Product e);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)

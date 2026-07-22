@@ -8,7 +8,7 @@ public final class SupplierDtos {
     private SupplierDtos() {}
 
     public record Create(
-            @NotBlank String supplierCode,
+            String supplierCode,
             @NotBlank String supplierName,
             String companyName,
             String gstin,

@@ -2,12 +2,15 @@ package com.flowledger.product.service;
 
 import com.flowledger.common.service.OrganizationScopedService;
 import com.flowledger.common.tenant.TenantContext;
+import com.flowledger.common.util.EntityCodeGenerator;
 import com.flowledger.product.dto.SupplierCatalogDtos.Create;
 import com.flowledger.product.dto.SupplierCatalogDtos.Response;
 import com.flowledger.product.dto.SupplierCatalogDtos.Update;
+import com.flowledger.product.entity.Product;
 import com.flowledger.product.entity.SupplierCatalogItem;
 import com.flowledger.product.repository.ProductRepository;
 import com.flowledger.product.repository.SupplierCatalogItemRepository;
+import com.flowledger.supplier.entity.Supplier;
 import com.flowledger.supplier.repository.SupplierRepository;
 import java.time.LocalDate;
 import java.util.List;
@@ -91,7 +94,15 @@ public class SupplierCatalogService extends OrganizationScopedService {
         if (willBePreferred && willBeActive) {
             clearOtherPreferred(item.getProductId(), item.getId());
         }
-        if (dto.supplierSku() != null) item.setSupplierSku(dto.supplierSku());
+        if (dto.supplierSku() != null) {
+            if (dto.supplierSku().isBlank()) {
+                Product product = products.findByIdAndOrganizationId(item.getProductId(), orgId()).orElseThrow();
+                Supplier supplier = suppliers.findByIdAndOrganizationId(item.getSupplierId(), orgId()).orElseThrow();
+                item.setSupplierSku(resolveSupplierSku(orgId(), null, product.getSku(), supplier.getSupplierCode()));
+            } else {
+                item.setSupplierSku(dto.supplierSku().trim().toUpperCase(Locale.ROOT));
+            }
+        }
         if (dto.supplierProductName() != null) item.setSupplierProductName(dto.supplierProductName());
         if (dto.purchasePrice() != null) item.setPurchasePrice(dto.purchasePrice());
         if (dto.currency() != null) item.setCurrency(normalizeCurrency(dto.currency()));
@@ -148,8 +159,13 @@ public class SupplierCatalogService extends OrganizationScopedService {
         item.setOrganizationId(org);
         item.setProductId(productId);
         item.setSupplierId(supplierId);
-        item.setSupplierSku(dto.supplierSku());
-        item.setSupplierProductName(dto.supplierProductName());
+        Product product = products.findByIdAndOrganizationId(productId, org).orElseThrow();
+        Supplier supplier = suppliers.findByIdAndOrganizationId(supplierId, org).orElseThrow();
+        item.setSupplierSku(resolveSupplierSku(org, dto.supplierSku(), product.getSku(), supplier.getSupplierCode()));
+        item.setSupplierProductName(
+                dto.supplierProductName() == null || dto.supplierProductName().isBlank()
+                        ? product.getName()
+                        : dto.supplierProductName());
         item.setPurchasePrice(dto.purchasePrice());
         item.setCurrency(normalizeCurrency(dto.currency()));
         item.setMoq(dto.moq());
@@ -167,6 +183,19 @@ public class SupplierCatalogService extends OrganizationScopedService {
             clearOtherPreferred(productId, null);
         }
         return toResponse(repository.save(item));
+    }
+
+    private String resolveSupplierSku(UUID org, String provided, String productSku, String supplierCode) {
+        if (provided != null && !provided.isBlank()) {
+            return provided.trim().toUpperCase(Locale.ROOT);
+        }
+        String seed = (productSku == null || productSku.isBlank() ? "SKU" : productSku)
+                + "-"
+                + (supplierCode == null || supplierCode.isBlank() ? "SUP" : supplierCode);
+        return EntityCodeGenerator.uniqueFromName(
+                seed,
+                "SSKU",
+                candidate -> repository.existsByOrganizationIdAndSupplierSkuIgnoreCaseAndDeletedFalse(org, candidate));
     }
 
     private void clearOtherPreferred(UUID productId, UUID currentId) {
@@ -217,6 +246,8 @@ public class SupplierCatalogService extends OrganizationScopedService {
                 item.getProductId(),
                 product == null ? null : product.getName(),
                 product == null ? null : product.getSku(),
+                product == null ? null : product.getItemType(),
+                product == null ? null : product.getTaxRateId(),
                 item.getSupplierId(),
                 supplier == null ? null : supplier.getSupplierName(),
                 item.getSupplierSku(),

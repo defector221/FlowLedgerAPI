@@ -16,7 +16,7 @@ public final class TransportDtos {
     private TransportDtos() {}
 
     public record CompanyRequest(
-            @NotBlank String name, @NotBlank String code, String gstin, String pan, String email,
+            @NotBlank String name, String code, String gstin, String pan, String email,
             String phone, String address, String city, String state, String stateCode, String country,
             String status, String notes) {}
 

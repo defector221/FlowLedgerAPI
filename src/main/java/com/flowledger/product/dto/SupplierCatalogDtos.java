@@ -42,6 +42,8 @@ public final class SupplierCatalogDtos {
             UUID productId,
             String productName,
             String productSku,
+            String itemType,
+            UUID taxRateId,
             UUID supplierId,
             String supplierName,
             String supplierSku,

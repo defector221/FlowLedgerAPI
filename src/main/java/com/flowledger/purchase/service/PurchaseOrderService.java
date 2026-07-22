@@ -115,7 +115,7 @@ public class PurchaseOrderService {
     private void applyOrderLines(PurchaseOrder po, List<Line> lines) {
         int i = 0;
         for (Line line : lines) {
-            supplierCatalog.requireActiveCatalogItem(
+            var catalogItem = supplierCatalog.requireActiveCatalogItem(
                     TenantContext.getOrganizationId(), po.getSupplierId(), line.productId());
             PurchaseOrderItem item = new PurchaseOrderItem();
             item.setOrder(po);
@@ -124,7 +124,11 @@ public class PurchaseOrderService {
             item.setDescription(line.description());
             item.setHsnSacCode(line.hsnSacCode());
             item.setQuantity(line.quantity());
-            item.setRate(line.rate());
+            BigDecimal rate = line.rate();
+            if (rate == null || rate.signum() == 0) {
+                rate = catalogItem.getPurchasePrice();
+            }
+            item.setRate(rate);
             item.setDiscountPercent(z(line.discountPercent()));
             item.setTaxRate(z(line.taxRate()));
             String taxType = TaxSplitDefaults.normalizeTaxType(line.taxType());

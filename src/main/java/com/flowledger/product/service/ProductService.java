@@ -11,10 +11,12 @@ import com.flowledger.product.entity.Unit;
 import com.flowledger.product.mapper.ProductMapper;
 import com.flowledger.product.repository.CategoryRepository;
 import com.flowledger.product.repository.ProductRepository;
+import com.flowledger.product.repository.SupplierCatalogItemRepository;
 import com.flowledger.product.repository.TaxRateRepository;
 import com.flowledger.product.repository.UnitRepository;
 import com.flowledger.search.event.SearchIndexEventPublisher;
 import com.flowledger.search.model.SearchEntityType;
+import com.flowledger.supplier.repository.SupplierRepository;
 import com.flowledger.warehouse.entity.Warehouse;
 import com.flowledger.warehouse.repository.WarehouseRepository;
 import java.math.BigDecimal;
@@ -40,6 +42,9 @@ public class ProductService extends OrganizationScopedService {
     private final OrganizationSettingsRepository orgSettings;
     private final InventoryService inventory;
     private final SearchIndexEventPublisher searchEvents;
+    private final SupplierCatalogService supplierCatalog;
+    private final SupplierCatalogItemRepository catalogItems;
+    private final SupplierRepository suppliers;
 
     public ProductService(
             ProductRepository repo,
@@ -50,7 +55,10 @@ public class ProductService extends OrganizationScopedService {
             WarehouseRepository warehouses,
             OrganizationSettingsRepository orgSettings,
             InventoryService inventory,
-            SearchIndexEventPublisher searchEvents) {
+            SearchIndexEventPublisher searchEvents,
+            SupplierCatalogService supplierCatalog,
+            SupplierCatalogItemRepository catalogItems,
+            SupplierRepository suppliers) {
         this.repo = repo;
         this.mapper = mapper;
         this.categories = categories;
@@ -60,6 +68,9 @@ public class ProductService extends OrganizationScopedService {
         this.orgSettings = orgSettings;
         this.inventory = inventory;
         this.searchEvents = searchEvents;
+        this.supplierCatalog = supplierCatalog;
+        this.catalogItems = catalogItems;
+        this.suppliers = suppliers;
     }
 
     public Response create(Create dto) {
@@ -92,6 +103,26 @@ public class ProductService extends OrganizationScopedService {
         }
         Product saved = repo.save(product);
         postOpeningStockIfNeeded(saved, dto);
+        if (dto.supplierPrices() != null) {
+            for (SupplierPrice price : dto.supplierPrices()) {
+                supplierCatalog.createForProduct(
+                        saved.getId(),
+                        new com.flowledger.product.dto.SupplierCatalogDtos.Create(
+                                saved.getId(),
+                                price.supplierId(),
+                                price.supplierSku(),
+                                saved.getName(),
+                                price.purchasePrice(),
+                                "INR",
+                                price.moq(),
+                                price.leadTimeDays(),
+                                price.preferred(),
+                                null,
+                                null,
+                                null,
+                                true));
+            }
+        }
         searchEvents.upsert(org, SearchEntityType.PRODUCT, saved.getId());
         return toResponse(saved);
     }
@@ -269,6 +300,13 @@ public class ProductService extends OrganizationScopedService {
                 taxType,
                 base.minimumStockLevel(),
                 base.reorderLevel(),
-                base.active());
+                base.active(),
+                catalogItems.countByOrganizationIdAndProductIdAndDeletedFalse(org, product.getId()),
+                catalogItems
+                        .findByOrganizationIdAndProductIdAndPreferredTrueAndActiveTrueAndDeletedFalse(
+                                org, product.getId())
+                        .flatMap(item -> suppliers.findByIdAndOrganizationId(item.getSupplierId(), org))
+                        .map(s -> s.getSupplierName())
+                        .orElse(null));
     }
 }
