@@ -12,7 +12,10 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("hasAuthority('TRANSPORT_VIEW')")
 public class TransportReportController {
     private final TransportReportService service;
-    public TransportReportController(TransportReportService service) { this.service = service; }
+
+    public TransportReportController(TransportReportService service) {
+        this.service = service;
+    }
 
     @GetMapping("/{name}")
     public ResponseEntity<?> report(@PathVariable String name, @RequestParam(defaultValue = "json") String format) {
@@ -30,9 +33,16 @@ public class TransportReportController {
         List<String> headers = new ArrayList<>(rows.get(0).keySet());
         StringBuilder out = new StringBuilder(String.join(",", headers)).append('\n');
         for (Map<String, Object> row : rows) {
-            out.append(headers.stream().map(h -> quote(row.get(h))).reduce((a, b) -> a + "," + b).orElse("")).append('\n');
+            out.append(headers.stream()
+                            .map(h -> quote(row.get(h)))
+                            .reduce((a, b) -> a + "," + b)
+                            .orElse(""))
+                    .append('\n');
         }
         return out.toString();
     }
-    private String quote(Object value) { return "\"" + String.valueOf(value == null ? "" : value).replace("\"", "\"\"") + "\""; }
+
+    private String quote(Object value) {
+        return "\"" + String.valueOf(value == null ? "" : value).replace("\"", "\"\"") + "\"";
+    }
 }

@@ -61,8 +61,7 @@ public class ShipmentController {
     @PostMapping("/from-challan/{challanId}")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('TRANSPORT_CREATE')")
-    public ShipmentResponse fromChallan(
-            @PathVariable UUID challanId, @Valid @RequestBody ChallanShipmentRequest r) {
+    public ShipmentResponse fromChallan(@PathVariable UUID challanId, @Valid @RequestBody ChallanShipmentRequest r) {
         return service.createFromChallan(challanId, r.lines());
     }
 

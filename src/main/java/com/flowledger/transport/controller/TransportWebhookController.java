@@ -22,25 +22,38 @@ public class TransportWebhookController {
     private final ShipmentRepository shipments;
     private final ShipmentExternalRefRepository refs;
     private final ObjectMapper objectMapper;
-    public TransportWebhookController(ShipmentRepository shipments, ShipmentExternalRefRepository refs, ObjectMapper objectMapper) {
-        this.shipments = shipments; this.refs = refs; this.objectMapper = objectMapper;
+
+    public TransportWebhookController(
+            ShipmentRepository shipments, ShipmentExternalRefRepository refs, ObjectMapper objectMapper) {
+        this.shipments = shipments;
+        this.refs = refs;
+        this.objectMapper = objectMapper;
     }
 
     @PostMapping("/{provider}")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void webhook(@PathVariable String provider, @RequestBody Map<String, Object> payload) {
         UUID shipmentId;
-        try { shipmentId = UUID.fromString(String.valueOf(payload.get("shipmentId"))); }
-        catch (RuntimeException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "shipmentId is required"); }
-        shipments.findByIdAndOrganizationIdAndDeletedFalse(shipmentId, TenantContext.getOrganizationId())
+        try {
+            shipmentId = UUID.fromString(String.valueOf(payload.get("shipmentId")));
+        } catch (RuntimeException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "shipmentId is required");
+        }
+        shipments
+                .findByIdAndOrganizationIdAndDeletedFalse(shipmentId, TenantContext.getOrganizationId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Shipment not found"));
         String externalId = String.valueOf(payload.getOrDefault("externalId", shipmentId));
         ShipmentExternalRef ref = refs.findByShipmentIdAndProviderTypeAndExternalId(shipmentId, provider, externalId)
                 .orElseGet(ShipmentExternalRef::new);
-        ref.setShipmentId(shipmentId); ref.setProviderType(provider); ref.setExternalId(externalId);
+        ref.setShipmentId(shipmentId);
+        ref.setProviderType(provider);
+        ref.setExternalId(externalId);
         ref.setStatus(String.valueOf(payload.getOrDefault("status", "RECEIVED")));
-        try { ref.setPayloadJson(objectMapper.writeValueAsString(payload)); }
-        catch (JsonProcessingException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid webhook payload"); }
+        try {
+            ref.setPayloadJson(objectMapper.writeValueAsString(payload));
+        } catch (JsonProcessingException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid webhook payload");
+        }
         ref.setLastSyncedAt(OffsetDateTime.now());
         refs.save(ref);
         log.info("Stored transport webhook provider={} shipmentId={} externalId={}", provider, shipmentId, externalId);

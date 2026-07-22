@@ -33,9 +33,8 @@ public class SupplierService extends OrganizationScopedService {
 
     public Response create(Create dto) {
         UUID org = orgId();
-        String nameForCode = dto.companyName() != null && !dto.companyName().isBlank()
-                ? dto.companyName()
-                : dto.supplierName();
+        String nameForCode =
+                dto.companyName() != null && !dto.companyName().isBlank() ? dto.companyName() : dto.supplierName();
         String code = resolveCode(org, dto.supplierCode(), nameForCode);
         if (repo.existsByOrganizationIdAndSupplierCode(org, code)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Supplier code already exists");

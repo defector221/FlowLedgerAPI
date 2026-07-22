@@ -19,8 +19,6 @@ public class CashfreeProperties {
     }
 
     public String apiBaseUrl() {
-        return "production".equalsIgnoreCase(env)
-                ? "https://api.cashfree.com/pg"
-                : "https://sandbox.cashfree.com/pg";
+        return "production".equalsIgnoreCase(env) ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg";
     }
 }

@@ -23,16 +23,14 @@ public interface SupplierCatalogItemRepository extends JpaRepository<SupplierCat
     Optional<SupplierCatalogItem> findByIdAndOrganizationIdAndSupplierIdAndDeletedFalse(
             UUID id, UUID organizationId, UUID supplierId);
 
-    Optional<SupplierCatalogItem>
-            findByOrganizationIdAndProductIdAndSupplierIdAndActiveTrueAndDeletedFalse(
-                    UUID organizationId, UUID productId, UUID supplierId);
+    Optional<SupplierCatalogItem> findByOrganizationIdAndProductIdAndSupplierIdAndActiveTrueAndDeletedFalse(
+            UUID organizationId, UUID productId, UUID supplierId);
 
     Optional<SupplierCatalogItem> findByOrganizationIdAndProductIdAndPreferredTrueAndActiveTrueAndDeletedFalse(
             UUID organizationId, UUID productId);
 
-    List<SupplierCatalogItem>
-            findByOrganizationIdAndProductIdAndPreferredTrueAndActiveTrueAndDeletedFalseAndIdNot(
-                    UUID organizationId, UUID productId, UUID id);
+    List<SupplierCatalogItem> findByOrganizationIdAndProductIdAndPreferredTrueAndActiveTrueAndDeletedFalseAndIdNot(
+            UUID organizationId, UUID productId, UUID id);
 
     boolean existsByOrganizationIdAndSupplierSkuIgnoreCaseAndDeletedFalse(UUID organizationId, String supplierSku);
 

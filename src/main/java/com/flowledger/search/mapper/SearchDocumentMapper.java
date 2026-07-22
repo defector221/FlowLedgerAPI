@@ -114,7 +114,8 @@ public class SearchDocumentMapper {
     }
 
     public SearchDocument fromShipment(Shipment shipment) {
-        String status = shipment.getStatus() == null ? null : shipment.getStatus().name();
+        String status =
+                shipment.getStatus() == null ? null : shipment.getStatus().name();
         return base(
                         shipment.getOrganizationId(),
                         SearchEntityType.SHIPMENT,

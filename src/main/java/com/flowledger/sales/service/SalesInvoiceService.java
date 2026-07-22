@@ -3,6 +3,7 @@ package com.flowledger.sales.service;
 import com.flowledger.accounting.domain.AccountingStatus;
 import com.flowledger.accounting.domain.JournalSource;
 import com.flowledger.accounting.service.AccountingPostingService;
+import com.flowledger.ai.workflow.AiWorkflowGateService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.customer.repository.CustomerRepository;
@@ -33,6 +34,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.*;
 import org.springframework.stereotype.*;
 import org.springframework.transaction.annotation.*;
@@ -55,6 +57,7 @@ public class SalesInvoiceService {
     private final SearchIndexEventPublisher searchEvents;
     private final AccountingPostingService accounting;
     private final SubscriptionService subscriptions;
+    private final ObjectProvider<AiWorkflowGateService> workflowGate;
 
     public SalesInvoiceService(
             SalesInvoiceRepository r,
@@ -69,7 +72,8 @@ public class SalesInvoiceService {
             GstCalculationService g,
             SearchIndexEventPublisher searchEvents,
             AccountingPostingService accounting,
-            SubscriptionService subscriptions) {
+            SubscriptionService subscriptions,
+            ObjectProvider<AiWorkflowGateService> workflowGate) {
         repo = r;
         inventory = i;
         this.products = products;
@@ -83,6 +87,7 @@ public class SalesInvoiceService {
         this.searchEvents = searchEvents;
         this.accounting = accounting;
         this.subscriptions = subscriptions;
+        this.workflowGate = workflowGate;
     }
 
     @Transactional
@@ -129,6 +134,10 @@ public class SalesInvoiceService {
         if (i.getStatus() == SalesInvoice.Status.CANCELLED)
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled invoice cannot be confirmed");
         if (i.getStatus() == SalesInvoice.Status.CONFIRMED && i.isInventoryPosted()) return toDetail(i);
+        AiWorkflowGateService gate = workflowGate.getIfAvailable();
+        if (gate != null) {
+            gate.requireApproved("SALES_INVOICE", i.getId(), i.getGrandTotal(), "confirm invoice");
+        }
         Organization o = orgs.findById(i.getOrganizationId()).orElseThrow();
         if (i.getInvoiceNumber() == null || i.getInvoiceNumber().isBlank())
             i.setInvoiceNumber(numbers.next(

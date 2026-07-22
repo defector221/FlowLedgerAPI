@@ -77,7 +77,9 @@ public class SubscriptionService {
         memberships.findByUserIdAndStatus(userId, "ACTIVE").stream()
                 .filter(this::isOrgAdmin)
                 .forEach(m -> {
-                    if (organizationSubscriptions.findByOrganizationId(m.getOrganizationId()).isEmpty()) {
+                    if (organizationSubscriptions
+                            .findByOrganizationId(m.getOrganizationId())
+                            .isEmpty()) {
                         OrganizationSubscription orgSub = new OrganizationSubscription();
                         orgSub.setOrganizationId(m.getOrganizationId());
                         orgSub.setPlanId(plan.getId());
@@ -127,10 +129,11 @@ public class SubscriptionService {
 
     @Transactional(readOnly = true)
     public CurrentBilling getCurrentBilling(UUID userId, UUID organizationId) {
-        OrganizationSubscription orgSub = organizationSubscriptions.findByOrganizationId(organizationId).orElse(null);
+        OrganizationSubscription orgSub =
+                organizationSubscriptions.findByOrganizationId(organizationId).orElse(null);
         SubscriptionPlan plan;
         String status;
-        if (orgSub != null && isActiveLike(orgSub.getStatus())) {
+        if (orgSub != null && isUsableSubscription(orgSub)) {
             plan = requireOrgPlan(orgSub);
             status = orgSub.getStatus();
         } else {
@@ -164,7 +167,7 @@ public class SubscriptionService {
     @Transactional(readOnly = true)
     public SubscriptionPlan resolvePlanForOrganization(UUID organizationId) {
         var orgSub = organizationSubscriptions.findByOrganizationId(organizationId);
-        if (orgSub.isPresent() && isActiveLike(orgSub.get().getStatus())) {
+        if (orgSub.isPresent() && isUsableSubscription(orgSub.get())) {
             return requireOrgPlan(orgSub.get());
         }
         List<OrganizationMembership> admins = memberships.findByOrganizationId(organizationId).stream()
@@ -218,6 +221,19 @@ public class SubscriptionService {
 
     private boolean isActiveLike(String status) {
         return "ACTIVE".equals(status) || "TRIAL".equals(status);
+    }
+
+    private boolean isUsableSubscription(OrganizationSubscription orgSub) {
+        if (!isActiveLike(orgSub.getStatus())) {
+            return false;
+        }
+        // Period-end cancellation: keep plan until endDate, then treat as expired
+        if (!orgSub.isAutoRenew()
+                && orgSub.getEndDate() != null
+                && orgSub.getEndDate().isBefore(java.time.OffsetDateTime.now())) {
+            return false;
+        }
+        return true;
     }
 
     private boolean isOrgAdmin(OrganizationMembership membership) {

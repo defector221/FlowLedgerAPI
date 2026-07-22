@@ -21,16 +21,17 @@ com.flowledger.ai
 ├── recommendation/ # RecommendationService + RecommendationGenerator
 ├── repository/
 ├── tools/          # Domain @Tool facades (call ERP services only)
-└── workflow/       # DocumentAiService, VoiceAiStub, WorkflowSuggestionService
+└── workflow/       # DocumentAiService, VoiceAiService (Whisper), WorkflowDraftService, WorkflowSuggestionService
 ```
 
 ## Design principles
 
-1. **Toggle-off by default** — when `enabled=false`, AI beans are absent (404 on AI routes).
+1. **Toggle-off capable** — when `enabled=false`, AI beans are absent (404 on AI routes).
 2. **Tools vs RAG** — tools read live ERP via domain services; RAG retrieves tenant knowledge docs / embeddings.
 3. **Never inside business TX** — `AiSearchEventBridge` uses `@TransactionalEventListener(AFTER_COMMIT)` on search index events. Prefer bridge-only (zero ERP edits).
-4. **Advisory only** — recommendations and forecasts are heuristics; they do not post journals, invoices, or stock.
+4. **Advisory only** — recommendations, forecasts, and workflow activate store config only; they do not post journals, invoices, or stock.
 5. **Tenant isolation** — all AI persistence is `organization_id`-scoped via `TenantContext`.
+6. **Multi-agent (v2)** — `ASK` / `CEO` / `BUSINESS_ADVISOR` fan out to specialists via `MultiAgentCollaborator`, then synthesize.
 
 ## Recommendation types
 

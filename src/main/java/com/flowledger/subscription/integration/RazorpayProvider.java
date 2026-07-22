@@ -25,7 +25,8 @@ public class RazorpayProvider implements PaymentProvider {
     public RazorpayProvider(RazorpayProperties properties, ObjectMapper objectMapper) {
         this.properties = properties;
         this.objectMapper = objectMapper;
-        this.restClient = RestClient.builder().baseUrl("https://api.razorpay.com/v1").build();
+        this.restClient =
+                RestClient.builder().baseUrl("https://api.razorpay.com/v1").build();
     }
 
     @Override
@@ -36,7 +37,8 @@ public class RazorpayProvider implements PaymentProvider {
     @Override
     public CreateOrderResult createOrder(CreateOrderRequest request) {
         if (!properties.isConfigured()) {
-            String mockOrderId = "order_dev_" + UUID.randomUUID().toString().replace("-", "").substring(0, 14);
+            String mockOrderId =
+                    "order_dev_" + UUID.randomUUID().toString().replace("-", "").substring(0, 14);
             log.warn("Razorpay keys blank — returning mock order {}", mockOrderId);
             return new CreateOrderResult(mockOrderId, request.amount(), request.currency(), "{\"mock\":true}");
         }

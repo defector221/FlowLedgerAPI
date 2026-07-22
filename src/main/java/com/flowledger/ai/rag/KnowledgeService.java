@@ -29,13 +29,19 @@ public class KnowledgeService {
 
     @Transactional
     public AiDtos.KnowledgeResponse create(AiDtos.KnowledgeCreateRequest request) {
-        if (request.title() == null || request.title().isBlank() || request.content() == null || request.content().isBlank()) {
+        if (request.title() == null
+                || request.title().isBlank()
+                || request.content() == null
+                || request.content().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "title and content are required");
         }
         AiKnowledgeDocument d = new AiKnowledgeDocument();
         d.setOrganizationId(TenantContext.getOrganizationId());
         d.setTitle(request.title().trim());
-        d.setDocType(request.docType() == null || request.docType().isBlank() ? "GENERAL" : request.docType().trim());
+        d.setDocType(
+                request.docType() == null || request.docType().isBlank()
+                        ? "GENERAL"
+                        : request.docType().trim());
         d.setContent(request.content());
         d.setContentHash(EmbeddingPipeline.sha256(request.content()));
         AiKnowledgeDocument saved = documents.save(d);

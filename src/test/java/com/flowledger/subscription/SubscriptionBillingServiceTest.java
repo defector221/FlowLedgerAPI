@@ -137,13 +137,14 @@ class SubscriptionBillingServiceTest {
         when(organizationSubscriptions.findByOrganizationId(orgId)).thenReturn(Optional.empty());
         when(plans.findByCode("FREE")).thenReturn(Optional.of(free));
         when(memberships.findByOrganizationId(orgId)).thenReturn(List.of());
-        when(organizationSubscriptions.save(any(OrganizationSubscription.class))).thenAnswer(inv -> {
-            OrganizationSubscription s = inv.getArgument(0);
-            if (s.getId() == null) {
-                s.setId(UUID.randomUUID());
-            }
-            return s;
-        });
+        when(organizationSubscriptions.save(any(OrganizationSubscription.class)))
+                .thenAnswer(inv -> {
+                    OrganizationSubscription s = inv.getArgument(0);
+                    if (s.getId() == null) {
+                        s.setId(UUID.randomUUID());
+                    }
+                    return s;
+                });
         Organization org = new Organization();
         org.setFinancialYearStart("04-01");
         when(organizations.findById(orgId)).thenReturn(Optional.of(org));
@@ -151,8 +152,7 @@ class SubscriptionBillingServiceTest {
                 .thenReturn("SUB/2025-26/000001");
         when(subscriptionInvoices.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        CheckoutResponse response =
-                billingService.checkout(orgId, new CheckoutRequest("FREE", BillingCycle.MONTHLY));
+        CheckoutResponse response = billingService.checkout(orgId, new CheckoutRequest("FREE", BillingCycle.MONTHLY));
 
         assertTrue(response.activated());
         assertNull(response.orderId());
@@ -164,10 +164,14 @@ class SubscriptionBillingServiceTest {
 
     @Test
     void priceForCycleUsesYearlyWhenRequested() {
-        assertEquals(0, SubscriptionBillingService.priceForCycle(starter, BillingCycle.MONTHLY)
-                .compareTo(new BigDecimal("499")));
-        assertEquals(0, SubscriptionBillingService.priceForCycle(starter, BillingCycle.YEARLY)
-                .compareTo(new BigDecimal("4990")));
+        assertEquals(
+                0,
+                SubscriptionBillingService.priceForCycle(starter, BillingCycle.MONTHLY)
+                        .compareTo(new BigDecimal("499")));
+        assertEquals(
+                0,
+                SubscriptionBillingService.priceForCycle(starter, BillingCycle.YEARLY)
+                        .compareTo(new BigDecimal("4990")));
     }
 
     @Test
@@ -177,8 +181,7 @@ class SubscriptionBillingServiceTest {
         when(plans.findByCode("FREE")).thenReturn(Optional.of(free));
         free.setMaxInvoicesPerMonth(2);
         YearMonth month = YearMonth.now();
-        when(salesInvoices.countByOrganizationIdAndInvoiceDateBetween(
-                        orgId, month.atDay(1), month.atEndOfMonth()))
+        when(salesInvoices.countByOrganizationIdAndInvoiceDateBetween(orgId, month.atDay(1), month.atEndOfMonth()))
                 .thenReturn(2L);
 
         BusinessException ex =
@@ -209,8 +212,9 @@ class SubscriptionBillingServiceTest {
         when(plans.findByCode("FREE")).thenReturn(Optional.of(free));
         when(paymentProviders.active()).thenReturn(paymentProvider);
         when(paymentProvider.name()).thenReturn("razorpay");
-        when(paymentProvider.createOrder(any())).thenReturn(new PaymentProvider.CreateOrderResult(
-                "order_abc", new BigDecimal("499"), "INR", "{\"id\":\"order_abc\"}"));
+        when(paymentProvider.createOrder(any()))
+                .thenReturn(new PaymentProvider.CreateOrderResult(
+                        "order_abc", new BigDecimal("499"), "INR", "{\"id\":\"order_abc\"}"));
         when(paymentTransactions.save(any(PaymentTransaction.class))).thenAnswer(inv -> {
             PaymentTransaction t = inv.getArgument(0);
             if (t.getId() == null) {

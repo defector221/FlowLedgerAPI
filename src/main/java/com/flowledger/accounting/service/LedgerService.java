@@ -48,7 +48,8 @@ public class LedgerService {
     public List<LedgerLineResponse> customerLedger(UUID customerId, LocalDate from, LocalDate to) {
         UUID org = TenantContext.getOrganizationId();
         validateDateRange(from, to);
-        customers.findByIdAndOrganizationId(customerId, org)
+        customers
+                .findByIdAndOrganizationId(customerId, org)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
         return build(lines.findPostedLedgerForCustomer(org, customerId, from, to));
     }
@@ -57,7 +58,8 @@ public class LedgerService {
     public List<LedgerLineResponse> supplierLedger(UUID supplierId, LocalDate from, LocalDate to) {
         UUID org = TenantContext.getOrganizationId();
         validateDateRange(from, to);
-        suppliers.findByIdAndOrganizationId(supplierId, org)
+        suppliers
+                .findByIdAndOrganizationId(supplierId, org)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier not found"));
         return build(lines.findPostedLedgerForSupplier(org, supplierId, from, to));
     }

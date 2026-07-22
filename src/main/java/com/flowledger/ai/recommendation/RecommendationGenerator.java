@@ -122,9 +122,8 @@ public class RecommendationGenerator {
             List<Payment> payments = paymentService.list();
             Map<String, List<Payment>> groups = payments.stream()
                     .filter(p -> p.getAmount() != null && p.getPaymentDate() != null)
-                    .collect(Collectors.groupingBy(
-                            p -> p.getAmount().setScale(2, RoundingMode.HALF_UP) + "|" + p.getPaymentDate() + "|"
-                                    + String.valueOf(p.getPaymentType())));
+                    .collect(Collectors.groupingBy(p -> p.getAmount().setScale(2, RoundingMode.HALF_UP) + "|"
+                            + p.getPaymentDate() + "|" + String.valueOf(p.getPaymentType())));
             for (Map.Entry<String, List<Payment>> entry : groups.entrySet()) {
                 if (entry.getValue().size() < 2) {
                     continue;

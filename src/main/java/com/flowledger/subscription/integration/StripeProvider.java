@@ -40,13 +40,15 @@ public class StripeProvider implements PaymentProvider {
     @Override
     public CreateOrderResult createOrder(CreateOrderRequest request) {
         if (!properties.isConfigured()) {
-            String mockOrderId = "pi_dev_" + UUID.randomUUID().toString().replace("-", "").substring(0, 14);
+            String mockOrderId =
+                    "pi_dev_" + UUID.randomUUID().toString().replace("-", "").substring(0, 14);
             log.warn("Stripe keys blank — returning mock payment intent {}", mockOrderId);
             return new CreateOrderResult(
                     mockOrderId,
                     request.amount(),
                     request.currency(),
-                    "{\"mock\":true,\"id\":\"" + mockOrderId + "\",\"client_secret\":\"" + mockOrderId + "_secret_dev\"}");
+                    "{\"mock\":true,\"id\":\"" + mockOrderId + "\",\"client_secret\":\"" + mockOrderId
+                            + "_secret_dev\"}");
         }
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();

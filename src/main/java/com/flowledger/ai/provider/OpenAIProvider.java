@@ -71,13 +71,15 @@ public class OpenAIProvider implements AIProvider {
                     .body(String.class);
 
             JsonNode root = objectMapper.readTree(raw);
-            String content = root.path("choices").path(0).path("message").path("content").asText("");
+            String content =
+                    root.path("choices").path(0).path("message").path("content").asText("");
             Integer promptTokens = root.path("usage").path("prompt_tokens").isMissingNode()
                     ? null
                     : root.path("usage").path("prompt_tokens").asInt();
-            Integer completionTokens = root.path("usage").path("completion_tokens").isMissingNode()
-                    ? null
-                    : root.path("usage").path("completion_tokens").asInt();
+            Integer completionTokens =
+                    root.path("usage").path("completion_tokens").isMissingNode()
+                            ? null
+                            : root.path("usage").path("completion_tokens").asInt();
             return new ChatResult(content, model, promptTokens, completionTokens, System.currentTimeMillis() - start);
         } catch (Exception e) {
             log.warn("OpenAI chat failed: {}", e.getMessage());
@@ -91,9 +93,8 @@ public class OpenAIProvider implements AIProvider {
             return mockEmbedding(text);
         }
         try {
-            Map<String, Object> body = Map.of(
-                    "model", properties.getOpenai().getEmbeddingModel(),
-                    "input", text == null ? "" : text);
+            Map<String, Object> body =
+                    Map.of("model", properties.getOpenai().getEmbeddingModel(), "input", text == null ? "" : text);
             String raw = restClient
                     .post()
                     .uri(trimSlash(properties.getOpenai().getBaseUrl()) + "/embeddings")

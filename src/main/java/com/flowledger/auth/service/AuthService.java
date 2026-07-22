@@ -276,8 +276,7 @@ public class AuthService {
     }
 
     private void bootstrapAccounting(Organization organization) {
-        accountingBootstrap.bootstrapOrganization(
-                organization.getId(), organization.getFinancialYearStart());
+        accountingBootstrap.bootstrapOrganization(organization.getId(), organization.getFinancialYearStart());
     }
 
     private LoginResponse tokens(User user, UUID organizationId) {
