@@ -9,15 +9,22 @@ import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.service.InventoryService;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
+import com.flowledger.customer.entity.Customer;
+import com.flowledger.customer.repository.CustomerRepository;
+import com.flowledger.product.entity.Product;
+import com.flowledger.product.repository.ProductRepository;
 import com.flowledger.sales.dto.SalesDtos.*;
 import com.flowledger.sales.entity.*;
 import com.flowledger.sales.repository.*;
 import com.flowledger.tax.TaxSplitDefaults;
 import com.flowledger.tax.dto.GstCalculationDtos;
 import com.flowledger.tax.service.GstCalculationService;
+import com.flowledger.transport.domain.TransportEnums.ShipmentStatus;
+import com.flowledger.transport.repository.ShipmentRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
@@ -38,12 +45,22 @@ public class SalesDocumentService {
     private final SalesReturnRepository returns;
     private final CreditNoteRepository creditNotes;
     private final OrganizationRepository organizations;
+    private final CustomerRepository customers;
+    private final ProductRepository products;
     private final DocumentNumberService numbers;
     private final SalesInvoiceService invoiceService;
     private final GstCalculationService gst;
     private final InventoryService inventory;
     private final AccountingPostingService accounting;
     private final ObjectProvider<AiWorkflowGateService> workflowGate;
+    private final ShipmentRepository shipments;
+
+    private static final EnumSet<ShipmentStatus> DISPATCHED_OR_LATER = EnumSet.of(
+            ShipmentStatus.PARTIALLY_DISPATCHED,
+            ShipmentStatus.DISPATCHED,
+            ShipmentStatus.IN_TRANSIT,
+            ShipmentStatus.DELIVERED,
+            ShipmentStatus.CLOSED);
 
     public SalesDocumentService(
             QuotationRepository quotations,
@@ -53,12 +70,15 @@ public class SalesDocumentService {
             SalesReturnRepository returns,
             CreditNoteRepository creditNotes,
             OrganizationRepository organizations,
+            CustomerRepository customers,
+            ProductRepository products,
             DocumentNumberService numbers,
             SalesInvoiceService invoiceService,
             GstCalculationService gst,
             InventoryService inventory,
             AccountingPostingService accounting,
-            ObjectProvider<AiWorkflowGateService> workflowGate) {
+            ObjectProvider<AiWorkflowGateService> workflowGate,
+            ShipmentRepository shipments) {
         this.quotations = quotations;
         this.orders = orders;
         this.challans = challans;
@@ -66,12 +86,15 @@ public class SalesDocumentService {
         this.returns = returns;
         this.creditNotes = creditNotes;
         this.organizations = organizations;
+        this.customers = customers;
+        this.products = products;
         this.numbers = numbers;
         this.invoiceService = invoiceService;
         this.gst = gst;
         this.inventory = inventory;
         this.accounting = accounting;
         this.workflowGate = workflowGate;
+        this.shipments = shipments;
     }
 
     private void gate(String documentType, UUID entityId, BigDecimal amount, String action) {
@@ -117,9 +140,16 @@ public class SalesDocumentService {
 
     @Transactional(readOnly = true)
     public Quotation getQuotation(UUID id) {
-        return quotations
+        Quotation quotation = quotations
                 .findDetailedByIdAndOrganizationId(id, orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quotation not found"));
+        for (QuotationItem item : quotation.getItems()) {
+            if (item.getDescription() == null || item.getDescription().isBlank()) {
+                item.setDescription(resolveLineDescription(item.getProductId(), item.getDescription()));
+            }
+        }
+        fillPartyDefaults(quotation);
+        return quotation;
     }
 
     @Transactional
@@ -157,6 +187,7 @@ public class SalesDocumentService {
         order.setPlaceOfSupply(quotation.getPlaceOfSupply());
         order.setTermsAndConditions(quotation.getTermsAndConditions());
         order.setNotes(quotation.getNotes());
+        fillPartyDefaults(order);
         order.setOrderNumber(numbers.next(
                 org.getId(),
                 "SALES_ORDER",
@@ -251,8 +282,15 @@ public class SalesDocumentService {
 
     @Transactional(readOnly = true)
     public SalesOrder getOrder(UUID id) {
-        return orders.findDetailedByIdAndOrganizationId(id, orgId())
+        SalesOrder order = orders.findDetailedByIdAndOrganizationId(id, orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Sales order not found"));
+        for (SalesOrderItem item : order.getItems()) {
+            if (item.getDescription() == null || item.getDescription().isBlank()) {
+                item.setDescription(resolveLineDescription(item.getProductId(), item.getDescription()));
+            }
+        }
+        fillPartyDefaults(order);
+        return order;
     }
 
     @Transactional
@@ -298,7 +336,7 @@ public class SalesDocumentService {
             DeliveryChallanItem item = new DeliveryChallanItem();
             item.setDeliveryChallan(challan);
             item.setProductId(orderItem.getProductId());
-            item.setDescription(orderItem.getDescription());
+            item.setDescription(resolveLineDescription(orderItem.getProductId(), orderItem.getDescription()));
             item.setQuantity(orderItem.getQuantity());
             item.setUnitId(orderItem.getUnitId());
             item.setLineOrder(i++);
@@ -347,6 +385,34 @@ public class SalesDocumentService {
         return challans.save(challan);
     }
 
+    @Transactional
+    public DeliveryChallan updateChallanTransportRequired(UUID id, boolean transportRequired) {
+        DeliveryChallan challan = getChallan(id);
+        if (challan.getStatus() == DeliveryChallan.Status.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled challan cannot be updated");
+        }
+        if (!transportRequired && hasDispatchedShipment(challan.getId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Transport required cannot be turned off after a shipment has been dispatched");
+        }
+        challan.setTransportRequired(transportRequired);
+        return challans.save(challan);
+    }
+
+    private boolean hasDispatchedShipment(UUID challanId) {
+        return shipments
+                .findAll((root, query, cb) -> cb.and(
+                        cb.equal(root.get("organizationId"), orgId()),
+                        cb.isFalse(root.get("deleted")),
+                        cb.equal(cb.upper(root.get("sourceDocumentType")), "DELIVERY_CHALLAN"),
+                        cb.equal(root.get("sourceDocumentId"), challanId),
+                        root.get("status").in(DISPATCHED_OR_LATER)))
+                .stream()
+                .findAny()
+                .isPresent();
+    }
+
     @Transactional(readOnly = true)
     public List<DeliveryChallan> listChallans() {
         return challans.findByOrganizationIdOrderByChallanDateDesc(orgId());
@@ -354,8 +420,19 @@ public class SalesDocumentService {
 
     @Transactional(readOnly = true)
     public DeliveryChallan getChallan(UUID id) {
-        return challans.findByIdAndOrganizationId(id, orgId())
+        DeliveryChallan challan = challans
+                .findDetailedByIdAndOrganizationId(id, orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Challan not found"));
+        for (DeliveryChallanItem item : challan.getItems()) {
+            if (item.getDescription() == null || item.getDescription().isBlank()) {
+                item.setDescription(resolveLineDescription(item.getProductId(), item.getDescription()));
+            }
+        }
+        invoices.findByOrganizationIdAndDeliveryChallanId(orgId(), challan.getId()).ifPresent(invoice -> {
+            challan.setLinkedInvoiceId(invoice.getId());
+            challan.setLinkedInvoiceNumber(invoice.getInvoiceNumber());
+        });
+        return challan;
     }
 
     @Transactional
@@ -368,24 +445,34 @@ public class SalesDocumentService {
         return challans.save(challan);
     }
 
+    @Transactional(readOnly = true)
+    public InvoiceDetail getInvoiceForChallan(UUID challanId) {
+        getChallan(challanId); // ensure tenant + exists
+        SalesInvoice invoice = invoices
+                .findByOrganizationIdAndDeliveryChallanId(orgId(), challanId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No invoice linked to this challan"));
+        return invoiceService.get(invoice.getId());
+    }
+
     @Transactional
     public SalesInvoice convertChallanToInvoice(UUID challanId) {
         DeliveryChallan challan = getChallan(challanId);
         if (challan.getStatus() == DeliveryChallan.Status.CANCELLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled challan cannot be converted");
         }
-        return invoices.findByOrganizationIdAndDeliveryChallanId(orgId(), challanId)
-                .orElseGet(() -> {
-                    SalesOrder order = challan.getSalesOrderId() == null
-                            ? null
-                            : orders.findByIdAndOrganizationId(challan.getSalesOrderId(), orgId())
-                                    .orElse(null);
-                    if (order == null) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Challan has no linked sales order");
-                    }
-                    gate("SALES_ORDER", order.getId(), order.getGrandTotal(), "convert challan to invoice");
-                    return createInvoiceFromOrder(order, challan.getWarehouseId(), challan.getId());
-                });
+        var existing = invoices.findByOrganizationIdAndDeliveryChallanId(orgId(), challanId);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        SalesOrder order = challan.getSalesOrderId() == null
+                ? null
+                : orders.findByIdAndOrganizationId(challan.getSalesOrderId(), orgId()).orElse(null);
+        if (order == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Challan has no linked sales order");
+        }
+        // Gate on the challan (source doc), same pattern as SO → DC — not on a draft invoice id.
+        gate("DELIVERY_CHALLAN", challan.getId(), order.getGrandTotal(), "convert to invoice");
+        return createInvoiceFromOrder(order, challan.getWarehouseId(), challan.getId());
     }
 
     // ── Sales returns ───────────────────────────────────────────────────────
@@ -566,26 +653,30 @@ public class SalesDocumentService {
                 null,
                 requestItems);
         InvoiceDetail draft = invoiceService.createDraft(request);
-        invoiceService.confirm(draft.id());
+        invoiceService.confirmConverted(draft.id());
         return invoices.findDetailedByIdAndOrganizationId(draft.id(), orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
     }
 
     private void applyQuotation(Quotation quotation, QuotationRequest request, Organization org) {
+        Customer customer = requireCustomer(request.customerId());
         quotation.setCustomerId(request.customerId());
         quotation.setQuotationDate(request.quotationDate() == null ? LocalDate.now() : request.quotationDate());
         quotation.setExpiryDate(request.expiryDate());
-        quotation.setBillingAddress(request.billingAddress());
-        quotation.setShippingAddress(request.shippingAddress());
-        quotation.setPlaceOfSupply(request.placeOfSupply());
+        quotation.setBillingAddress(firstNonBlank(request.billingAddress(), customer.getBillingAddress()));
+        quotation.setShippingAddress(firstNonBlank(
+                request.shippingAddress(),
+                customer.getShippingAddress(),
+                customer.getBillingAddress()));
+        quotation.setPlaceOfSupply(firstNonBlank(request.placeOfSupply(), customer.getStateCode()));
         quotation.setNotes(request.notes());
         quotation.setTermsAndConditions(request.termsAndConditions());
         quotation.getItems().clear();
-        LineTotals totals = buildPricedItems(request.items(), request.placeOfSupply(), org, (item, line, order) -> {
+        LineTotals totals = buildPricedItems(request.items(), quotation.getPlaceOfSupply(), org, (item, line, order) -> {
             QuotationItem quotationItem = new QuotationItem();
             quotationItem.setQuotation(quotation);
             quotationItem.setProductId(item.productId());
-            quotationItem.setDescription(item.description());
+            quotationItem.setDescription(resolveLineDescription(item.productId(), item.description()));
             quotationItem.setHsnSacCode(item.hsnSacCode());
             quotationItem.setQuantity(item.quantity());
             quotationItem.setUnitId(item.unitId());
@@ -614,21 +705,25 @@ public class SalesDocumentService {
     }
 
     private void applyOrder(SalesOrder order, OrderRequest request, Organization org) {
+        Customer customer = requireCustomer(request.customerId());
         order.setCustomerId(request.customerId());
         order.setOrderDate(request.orderDate() == null ? LocalDate.now() : request.orderDate());
         order.setExpectedDeliveryDate(request.expectedDeliveryDate());
         order.setQuotationId(request.quotationId());
-        order.setBillingAddress(request.billingAddress());
-        order.setShippingAddress(request.shippingAddress());
-        order.setPlaceOfSupply(request.placeOfSupply());
+        order.setBillingAddress(firstNonBlank(request.billingAddress(), customer.getBillingAddress()));
+        order.setShippingAddress(firstNonBlank(
+                request.shippingAddress(),
+                customer.getShippingAddress(),
+                customer.getBillingAddress()));
+        order.setPlaceOfSupply(firstNonBlank(request.placeOfSupply(), customer.getStateCode()));
         order.setNotes(request.notes());
         order.setTermsAndConditions(request.termsAndConditions());
         order.getItems().clear();
-        LineTotals totals = buildPricedItems(request.items(), request.placeOfSupply(), org, (item, line, n) -> {
+        LineTotals totals = buildPricedItems(request.items(), order.getPlaceOfSupply(), org, (item, line, n) -> {
             SalesOrderItem orderItem = new SalesOrderItem();
             orderItem.setSalesOrder(order);
             orderItem.setProductId(item.productId());
-            orderItem.setDescription(item.description());
+            orderItem.setDescription(resolveLineDescription(item.productId(), item.description()));
             orderItem.setHsnSacCode(item.hsnSacCode());
             orderItem.setQuantity(item.quantity());
             orderItem.setUnitId(item.unitId());
@@ -669,7 +764,7 @@ public class SalesDocumentService {
             DeliveryChallanItem item = new DeliveryChallanItem();
             item.setDeliveryChallan(challan);
             item.setProductId(challanItem.productId());
-            item.setDescription(challanItem.description());
+            item.setDescription(resolveLineDescription(challanItem.productId(), challanItem.description()));
             item.setQuantity(challanItem.quantity());
             item.setUnitId(challanItem.unitId());
             item.setLineOrder(i++);
@@ -733,6 +828,82 @@ public class SalesDocumentService {
 
     private UUID orgId() {
         return TenantContext.getOrganizationId();
+    }
+
+    private String resolveLineDescription(UUID productId, String description) {
+        if (description != null && !description.isBlank()) {
+            return description.trim();
+        }
+        if (productId == null) {
+            return description;
+        }
+        return products
+                .findByIdAndOrganizationId(productId, orgId())
+                .map(Product::getName)
+                .orElse(description);
+    }
+
+    private Customer requireCustomer(UUID customerId) {
+        return customers
+                .findByIdAndOrganizationId(customerId, orgId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Customer not found"));
+    }
+
+    private void fillPartyDefaults(SalesOrder order) {
+        if (!needsPartyDefaults(
+                order.getBillingAddress(), order.getShippingAddress(), order.getPlaceOfSupply())) {
+            return;
+        }
+        customers.findByIdAndOrganizationId(order.getCustomerId(), orgId()).ifPresent(customer -> {
+            if (isBlank(order.getBillingAddress())) {
+                order.setBillingAddress(customer.getBillingAddress());
+            }
+            if (isBlank(order.getShippingAddress())) {
+                order.setShippingAddress(firstNonBlank(customer.getShippingAddress(), customer.getBillingAddress()));
+            }
+            if (isBlank(order.getPlaceOfSupply())) {
+                order.setPlaceOfSupply(customer.getStateCode());
+            }
+        });
+    }
+
+    private void fillPartyDefaults(Quotation quotation) {
+        if (!needsPartyDefaults(
+                quotation.getBillingAddress(), quotation.getShippingAddress(), quotation.getPlaceOfSupply())) {
+            return;
+        }
+        customers.findByIdAndOrganizationId(quotation.getCustomerId(), orgId()).ifPresent(customer -> {
+            if (isBlank(quotation.getBillingAddress())) {
+                quotation.setBillingAddress(customer.getBillingAddress());
+            }
+            if (isBlank(quotation.getShippingAddress())) {
+                quotation.setShippingAddress(
+                        firstNonBlank(customer.getShippingAddress(), customer.getBillingAddress()));
+            }
+            if (isBlank(quotation.getPlaceOfSupply())) {
+                quotation.setPlaceOfSupply(customer.getStateCode());
+            }
+        });
+    }
+
+    private static boolean needsPartyDefaults(String billing, String shipping, String placeOfSupply) {
+        return isBlank(billing) || isBlank(shipping) || isBlank(placeOfSupply);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private Organization organization() {

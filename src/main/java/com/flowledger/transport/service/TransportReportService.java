@@ -67,7 +67,7 @@ public class TransportReportService {
     }
 
     private List<Map<String, Object>> rows(String name, Shipment shipment) {
-        List<ShipmentLeg> shipmentLegs = legs.findByShipmentIdOrderBySequenceNo(shipment.getId());
+        List<ShipmentLeg> shipmentLegs = legs.findByShipmentIdAndDeletedFalseOrderBySequenceNo(shipment.getId());
         if (shipmentLegs.isEmpty()) return List.of(base(name, shipment, null));
         return shipmentLegs.stream().map(leg -> base(name, shipment, leg)).toList();
     }

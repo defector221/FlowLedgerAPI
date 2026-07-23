@@ -77,4 +77,26 @@ public final class TransportEnums {
         FAILED,
         DEAD
     }
+
+    public enum ShipmentLegStatus {
+        PLANNED,
+        READY,
+        DISPATCHED,
+        IN_TRANSIT,
+        ARRIVED,
+        COMPLETED,
+        CANCELLED
+    }
+
+    public enum ShipmentLegDocumentType {
+        LR,
+        EWAY_BILL,
+        INVOICE,
+        PACKING_LIST,
+        POD,
+        PHOTO,
+        TRANSPORT_PERMIT,
+        DRIVER_DOCUMENT,
+        OTHER
+    }
 }

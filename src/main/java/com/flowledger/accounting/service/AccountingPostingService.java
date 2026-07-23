@@ -17,6 +17,7 @@ import com.flowledger.common.exception.ResourceNotFoundException;
 import com.flowledger.common.security.SecurityUtils;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
+import com.flowledger.common.util.FinancialYearUtil;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.payment.entity.Payment;
@@ -35,8 +36,10 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AccountingPostingService {
@@ -515,8 +518,7 @@ public class AccountingPostingService {
             String voucherNumber,
             JournalStatus status) {
         Organization organization = organizations.findById(org).orElseThrow();
-        String entryNumber = numbers.next(
-                org, "JOURNAL", "JV", "{PREFIX}/{FY}/{SEQ:6}", organization.getFinancialYearStart(), entryDate);
+        String entryNumber = nextJournalEntryNumber(org, organization, entryDate);
         JournalEntry entry = new JournalEntry();
         entry.setOrganizationId(org);
         entry.setFiscalYearId(result.period().getFiscalYearId());
@@ -533,6 +535,27 @@ public class AccountingPostingService {
         entry.setTotalDebit(result.totalDebit());
         entry.setTotalCredit(result.totalCredit());
         return journals.save(entry);
+    }
+
+    private String nextJournalEntryNumber(UUID org, Organization organization, LocalDate entryDate) {
+        String fy = FinancialYearUtil.financialYear(entryDate, organization.getFinancialYearStart());
+        long maxExisting = journals.maxEntrySequence(org, "JV/" + fy + "/%");
+        numbers.ensureNextAtLeast(
+                org, "JOURNAL", "JV", organization.getFinancialYearStart(), entryDate, maxExisting + 1);
+        for (int attempt = 0; attempt < 8; attempt++) {
+            String candidate = numbers.next(
+                    org,
+                    "JOURNAL",
+                    "JV",
+                    "{PREFIX}/{FY}/{SEQ:6}",
+                    organization.getFinancialYearStart(),
+                    entryDate);
+            if (!journals.existsByOrganizationIdAndEntryNumber(org, candidate)) {
+                return candidate;
+            }
+        }
+        throw new ResponseStatusException(
+                HttpStatus.CONFLICT, "Unable to allocate a unique journal entry number. Please retry.");
     }
 
     private void persistLines(UUID org, JournalEntry entry, List<JournalLineRequest> requests) {

@@ -47,4 +47,17 @@ public interface JournalEntryRepository extends JpaRepository<JournalEntry, UUID
 
     List<JournalEntry> findByOrganizationIdAndStatusAndEntryDateBetween(
             UUID organizationId, JournalStatus status, LocalDate from, LocalDate to);
+
+    boolean existsByOrganizationIdAndEntryNumber(UUID organizationId, String entryNumber);
+
+    @Query(
+            value =
+                    """
+                    SELECT COALESCE(MAX(NULLIF(regexp_replace(entry_number, '.*/', ''), '')::bigint), 0)
+                    FROM journal_entries
+                    WHERE organization_id = :org
+                      AND entry_number LIKE :pattern
+                    """,
+            nativeQuery = true)
+    long maxEntrySequence(@Param("org") UUID org, @Param("pattern") String pattern);
 }

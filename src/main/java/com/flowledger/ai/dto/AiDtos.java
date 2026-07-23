@@ -182,14 +182,24 @@ public final class AiDtos {
 
     public record WorkflowApprovalDecideRequest(String remarks) {}
 
+    public record WorkflowApprovalActionResponse(
+            UUID id,
+            String action,
+            UUID actorId,
+            String actorName,
+            OffsetDateTime actedAt,
+            String remarks) {}
+
     public record WorkflowApprovalResponse(
             UUID id,
             String entityType,
             UUID entityId,
             String status,
             UUID requestedBy,
+            String requestedByName,
             OffsetDateTime requestedAt,
             UUID decidedBy,
+            String decidedByName,
             OffsetDateTime decidedAt,
             String remarks,
             UUID workflowDraftId,
@@ -199,5 +209,6 @@ public final class AiDtos {
             String currentStepRole,
             String currentStepAction,
             boolean canApprove,
-            String stepsSnapshotJson) {}
+            String stepsSnapshotJson,
+            List<WorkflowApprovalActionResponse> actions) {}
 }

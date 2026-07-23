@@ -114,9 +114,20 @@ public class SalesDocumentController {
         return service.updateChallan(id, request);
     }
 
+    @PatchMapping("/challans/{id}/transport-required")
+    public DeliveryChallan updateChallanTransportRequired(
+            @PathVariable UUID id, @Valid @RequestBody TransportRequiredRequest request) {
+        return service.updateChallanTransportRequired(id, request.transportRequired());
+    }
+
     @PostMapping("/challans/{id}/cancel")
     public DeliveryChallan cancelChallan(@PathVariable UUID id) {
         return service.cancelChallan(id);
+    }
+
+    @GetMapping("/challans/{id}/invoice")
+    public InvoiceDetail getChallanInvoice(@PathVariable UUID id) {
+        return service.getInvoiceForChallan(id);
     }
 
     @PostMapping("/challans/{id}/convert-to-invoice")

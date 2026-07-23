@@ -6,6 +6,7 @@ import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.transport.entity.ShipmentExternalRef;
 import com.flowledger.transport.repository.ShipmentExternalRefRepository;
 import com.flowledger.transport.repository.ShipmentRepository;
+import com.flowledger.transport.service.ShipmentService;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -21,12 +22,17 @@ public class TransportWebhookController {
     private static final Logger log = LoggerFactory.getLogger(TransportWebhookController.class);
     private final ShipmentRepository shipments;
     private final ShipmentExternalRefRepository refs;
+    private final ShipmentService shipmentService;
     private final ObjectMapper objectMapper;
 
     public TransportWebhookController(
-            ShipmentRepository shipments, ShipmentExternalRefRepository refs, ObjectMapper objectMapper) {
+            ShipmentRepository shipments,
+            ShipmentExternalRefRepository refs,
+            ShipmentService shipmentService,
+            ObjectMapper objectMapper) {
         this.shipments = shipments;
         this.refs = refs;
+        this.shipmentService = shipmentService;
         this.objectMapper = objectMapper;
     }
 
@@ -48,14 +54,18 @@ public class TransportWebhookController {
         ref.setShipmentId(shipmentId);
         ref.setProviderType(provider);
         ref.setExternalId(externalId);
-        ref.setStatus(String.valueOf(payload.getOrDefault("status", "RECEIVED")));
+        String status = String.valueOf(payload.getOrDefault("status", "RECEIVED"));
+        ref.setStatus(status);
+        String payloadJson;
         try {
-            ref.setPayloadJson(objectMapper.writeValueAsString(payload));
+            payloadJson = objectMapper.writeValueAsString(payload);
+            ref.setPayloadJson(payloadJson);
         } catch (JsonProcessingException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid webhook payload");
         }
         ref.setLastSyncedAt(OffsetDateTime.now());
         refs.save(ref);
+        shipmentService.recordProviderUpdate(shipmentId, provider, status, payloadJson);
         log.info("Stored transport webhook provider={} shipmentId={} externalId={}", provider, shipmentId, externalId);
     }
 }

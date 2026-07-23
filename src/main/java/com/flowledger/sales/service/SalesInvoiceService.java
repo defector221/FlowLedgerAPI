@@ -130,14 +130,30 @@ public class SalesInvoiceService {
 
     @Transactional
     public InvoiceDetail confirm(UUID id) {
+        return confirm(id, true);
+    }
+
+    /**
+     * Confirms an invoice created by an already-gated conversion (SO/DC → invoice).
+     * Skips the SALES_INVOICE workflow gate so approval is not re-requested on a draft that
+     * would otherwise roll back and leave a dangling approval link.
+     */
+    @Transactional
+    public InvoiceDetail confirmConverted(UUID id) {
+        return confirm(id, false);
+    }
+
+    private InvoiceDetail confirm(UUID id, boolean requireWorkflowApproval) {
         SalesInvoice invoice = load(id);
         if (invoice.getStatus() == SalesInvoice.Status.CANCELLED)
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled invoice cannot be confirmed");
         if (invoice.getStatus() == SalesInvoice.Status.CONFIRMED && invoice.isInventoryPosted())
             return toDetail(invoice);
-        AiWorkflowGateService gate = workflowGate.getIfAvailable();
-        if (gate != null) {
-            gate.requireApproved("SALES_INVOICE", invoice.getId(), invoice.getGrandTotal(), "confirm invoice");
+        if (requireWorkflowApproval) {
+            AiWorkflowGateService gate = workflowGate.getIfAvailable();
+            if (gate != null) {
+                gate.requireApproved("SALES_INVOICE", invoice.getId(), invoice.getGrandTotal(), "confirm invoice");
+            }
         }
         Organization organization = orgs.findById(invoice.getOrganizationId()).orElseThrow();
         if (invoice.getInvoiceNumber() == null || invoice.getInvoiceNumber().isBlank())
@@ -488,6 +504,8 @@ public class SalesInvoiceService {
                 invoice.getBillingAddress(),
                 invoice.getShippingAddress(),
                 invoice.getPlaceOfSupply(),
+                invoice.getSalesOrderId(),
+                invoice.getDeliveryChallanId(),
                 items);
     }
 

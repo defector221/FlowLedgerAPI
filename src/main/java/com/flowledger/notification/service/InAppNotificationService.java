@@ -69,9 +69,16 @@ public class InAppNotificationService {
     private static String buildLink(String entityType, UUID entityId) {
         if (entityType == null || entityId == null) return null;
         return switch (entityType) {
-            case "SalesInvoice" -> "/sales/invoices/" + entityId;
+            case "SalesInvoice", "SALES_INVOICE" -> "/sales/invoices/" + entityId;
             case "User" -> "/settings/users";
             case "OrganizationMembership" -> "/settings/users";
+            case "ApprovalRequest" -> "/ai/workflows?focus=" + entityId;
+            case "QUOTATION" -> "/sales/quotations/" + entityId;
+            case "SALES_ORDER" -> "/sales/orders/" + entityId;
+            case "DELIVERY_CHALLAN", "DeliveryChallan" -> "/sales/challans/" + entityId;
+            case "PURCHASE_ORDER" -> "/purchases/orders/" + entityId;
+            case "PURCHASE_INVOICE" -> "/purchases/invoices/" + entityId;
+            case "Shipment", "SHIPMENT" -> "/transport/shipments/" + entityId;
             default -> null;
         };
     }

@@ -82,6 +82,8 @@ public final class SalesDtos {
             Boolean transportRequired,
             @NotEmpty @Valid List<ChallanItem> items) {}
 
+    public record TransportRequiredRequest(@NotNull Boolean transportRequired) {}
+
     public record ReturnRequest(
             @NotNull UUID salesInvoiceId,
             LocalDate returnDate,
@@ -147,5 +149,7 @@ public final class SalesDtos {
             String billingAddress,
             String shippingAddress,
             String placeOfSupply,
+            UUID salesOrderId,
+            UUID deliveryChallanId,
             List<InvoiceItemDetail> items) {}
 }

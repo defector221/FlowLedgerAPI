@@ -69,4 +69,21 @@ public class Shipment extends TransportAuditedEntity {
 
     @Column(columnDefinition = "text")
     private String remarks;
+
+    private String priority;
+
+    @Column(precision = 19, scale = 4)
+    private BigDecimal totalDistance;
+
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal fuelChargesTotal = BigDecimal.ZERO;
+
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal tollChargesTotal = BigDecimal.ZERO;
+
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal otherChargesTotal = BigDecimal.ZERO;
+
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal grandTotal = BigDecimal.ZERO;
 }

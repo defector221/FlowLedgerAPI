@@ -19,16 +19,19 @@ public class ApprovalService {
     private final ApprovalActionRepository actions;
     private final OrganizationSettingsRepository settings;
     private final ShipmentEventRepository events;
+    private final TransportActivityNotificationService activityNotifications;
 
     public ApprovalService(
             ApprovalRequestRepository requests,
             ApprovalActionRepository actions,
             OrganizationSettingsRepository settings,
-            ShipmentEventRepository events) {
+            ShipmentEventRepository events,
+            TransportActivityNotificationService activityNotifications) {
         this.requests = requests;
         this.actions = actions;
         this.settings = settings;
         this.events = events;
+        this.activityNotifications = activityNotifications;
     }
 
     public boolean approvalRequired() {
@@ -50,7 +53,7 @@ public class ApprovalService {
         request.setUpdatedBy(user);
         request = requests.save(request);
         action(request.getId(), "SUBMITTED", remarks);
-        event(shipment.getId(), "APPROVAL_REQUESTED", remarks);
+        event(shipment, "APPROVAL_REQUESTED", remarks);
         return request;
     }
 
@@ -75,7 +78,7 @@ public class ApprovalService {
         request.setRemarks(remarks);
         request.setUpdatedBy(user);
         action(request.getId(), decision.name(), remarks);
-        event(shipment.getId(), "APPROVAL_" + decision.name(), remarks);
+        event(shipment, "APPROVAL_" + decision.name(), remarks);
     }
 
     private void action(UUID requestId, String value, String remarks) {
@@ -88,15 +91,16 @@ public class ApprovalService {
         actions.save(action);
     }
 
-    private void event(UUID shipmentId, String type, String remarks) {
+    private void event(Shipment shipment, String type, String remarks) {
         ShipmentEvent event = new ShipmentEvent();
-        event.setShipmentId(shipmentId);
+        event.setShipmentId(shipment.getId());
         event.setEventType(type);
         event.setOccurredAt(OffsetDateTime.now());
         event.setActorUserId(user());
         event.setActorType(ShipmentActorType.USER);
         event.setRemarks(remarks);
         events.save(event);
+        activityNotifications.notifyShipmentEvent(shipment, type, remarks);
     }
 
     private UUID user() {

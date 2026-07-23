@@ -58,11 +58,17 @@ public class ShipmentController {
         return service.update(id, r);
     }
 
+    @PatchMapping("/{id}/header")
+    @PreAuthorize("hasAuthority('TRANSPORT_EDIT')")
+    public ShipmentResponse updateHeader(@PathVariable UUID id, @RequestBody ShipmentHeaderRequest r) {
+        return service.updateHeader(id, r);
+    }
+
     @PostMapping("/from-challan/{challanId}")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('TRANSPORT_CREATE')")
     public ShipmentResponse fromChallan(@PathVariable UUID challanId, @Valid @RequestBody ChallanShipmentRequest r) {
-        return service.createFromChallan(challanId, r.lines());
+        return service.createFromChallan(challanId, r);
     }
 
     @PostMapping("/from-purchase-return/{returnId}")
@@ -121,6 +127,12 @@ public class ShipmentController {
         return service.checkpoint(id, r);
     }
 
+    @PostMapping("/{id}/events")
+    @PreAuthorize("hasAuthority('TRANSPORT_TRACK') or hasAuthority('TRANSPORT_EDIT')")
+    public ShipmentResponse addEvent(@PathVariable UUID id, @RequestBody(required = false) ManualEventRequest r) {
+        return service.addEvent(id, r);
+    }
+
     @PostMapping("/{id}/deliver")
     @PreAuthorize("hasAuthority('TRANSPORT_TRACK')")
     public ShipmentResponse deliver(@PathVariable UUID id, @RequestBody(required = false) TransitionRequest r) {
@@ -157,6 +169,9 @@ public class ShipmentController {
             @RequestParam(required = false) String sourceDocumentType,
             @RequestParam(required = false) UUID sourceDocumentId,
             @RequestParam(required = false) String sku,
+            @RequestParam(required = false) String origin,
+            @RequestParam(required = false) String destination,
+            @RequestParam(required = false) com.flowledger.transport.domain.TransportEnums.TransportMode transportMode,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return service.search(
                 new SearchRequest(
@@ -174,7 +189,10 @@ public class ShipmentController {
                         warehouseId,
                         sourceDocumentType,
                         sourceDocumentId,
-                        sku),
+                        sku,
+                        origin,
+                        destination,
+                        transportMode),
                 pageable);
     }
 }

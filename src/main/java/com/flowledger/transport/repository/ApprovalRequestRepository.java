@@ -19,4 +19,7 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
 
     List<ApprovalRequest> findByOrganizationIdAndEntityTypeInOrderByRequestedAtDesc(
             UUID organizationId, Collection<String> entityTypes);
+
+    List<ApprovalRequest> findByOrganizationIdAndEntityTypeAndEntityIdOrderByRequestedAtDesc(
+            UUID organizationId, String entityType, UUID entityId);
 }

@@ -69,6 +69,9 @@ public class WorkflowDraftService {
     public AiDtos.WorkflowDraftResponse activate(UUID id) {
         ensureBuilder();
         AiWorkflowDraft draft = requireAlive(id);
+        if ("ACTIVE".equalsIgnoreCase(draft.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Workflow is already active");
+        }
         draft.setStatus("ACTIVE");
         return toDto(drafts.save(draft));
     }
@@ -77,6 +80,9 @@ public class WorkflowDraftService {
     public AiDtos.WorkflowDraftResponse deactivate(UUID id) {
         ensureBuilder();
         AiWorkflowDraft draft = requireAlive(id);
+        if (!"ACTIVE".equalsIgnoreCase(draft.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Workflow is not active");
+        }
         draft.setStatus("DRAFT");
         return toDto(drafts.save(draft));
     }

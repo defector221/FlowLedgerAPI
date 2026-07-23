@@ -6,10 +6,17 @@ import com.flowledger.ai.workflow.AiWorkflowGateService;
 import com.flowledger.ai.workflow.DocumentAiService;
 import com.flowledger.ai.workflow.VoiceAiService;
 import com.flowledger.ai.workflow.WorkflowDraftService;
+import com.flowledger.auth.entity.User;
+import com.flowledger.auth.repository.UserRepository;
 import com.flowledger.common.security.UserPrincipal;
 import com.flowledger.common.tenant.TenantContext;
+import com.flowledger.transport.entity.ApprovalAction;
 import com.flowledger.transport.entity.ApprovalRequest;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,16 +41,19 @@ public class AiWorkflowController {
     private final DocumentAiService documentAi;
     private final VoiceAiService voiceAi;
     private final AiWorkflowGateService gate;
+    private final UserRepository users;
 
     public AiWorkflowController(
             WorkflowDraftService drafts,
             DocumentAiService documentAi,
             VoiceAiService voiceAi,
-            AiWorkflowGateService gate) {
+            AiWorkflowGateService gate,
+            UserRepository users) {
         this.drafts = drafts;
         this.documentAi = documentAi;
         this.voiceAi = voiceAi;
         this.gate = gate;
+        this.users = users;
     }
 
     @PostMapping("/suggest-from-text")
@@ -131,9 +141,17 @@ public class AiWorkflowController {
     @GetMapping("/approvals")
     @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('AI_WORKFLOW') or hasRole('ORGANIZATION_ADMIN')")
     public List<AiDtos.WorkflowApprovalResponse> listApprovals(
-            @AuthenticationPrincipal UserPrincipal principal, @RequestParam(defaultValue = "pending") String status) {
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(defaultValue = "pending") String status,
+            @RequestParam(required = false) String entityType,
+            @RequestParam(required = false) UUID entityId) {
         ensureTenant(principal);
-        List<ApprovalRequest> rows = "all".equalsIgnoreCase(status) ? gate.listRecent() : gate.listPending();
+        List<ApprovalRequest> rows;
+        if (entityType != null && !entityType.isBlank() && entityId != null) {
+            rows = gate.listForEntity(entityType.trim().toUpperCase(), entityId);
+        } else {
+            rows = "all".equalsIgnoreCase(status) ? gate.listRecent() : gate.listPending();
+        }
         return rows.stream().map(this::toApproval).toList();
     }
 
@@ -159,14 +177,27 @@ public class AiWorkflowController {
 
     private AiDtos.WorkflowApprovalResponse toApproval(ApprovalRequest r) {
         AiWorkflowGateService.ApprovalProgress progress = gate.progressOf(r);
+        List<ApprovalAction> actionEntities = gate.listActions(r.getId());
+        Map<UUID, String> names = resolveNames(r, actionEntities);
+        List<AiDtos.WorkflowApprovalActionResponse> actionRows = actionEntities.stream()
+                .map(action -> new AiDtos.WorkflowApprovalActionResponse(
+                        action.getId(),
+                        action.getAction(),
+                        action.getActorId(),
+                        names.get(action.getActorId()),
+                        action.getActedAt(),
+                        action.getRemarks()))
+                .toList();
         return new AiDtos.WorkflowApprovalResponse(
                 r.getId(),
                 r.getEntityType(),
                 r.getEntityId(),
                 r.getStatus() == null ? null : r.getStatus().name(),
                 r.getRequestedBy(),
+                names.get(r.getRequestedBy()),
                 r.getRequestedAt(),
                 r.getDecidedBy(),
+                names.get(r.getDecidedBy()),
                 r.getDecidedAt(),
                 r.getRemarks(),
                 progress.workflowDraftId(),
@@ -176,7 +207,41 @@ public class AiWorkflowController {
                 progress.currentStepRole(),
                 progress.currentStepAction(),
                 progress.canApprove(),
-                progress.stepsSnapshotJson());
+                progress.stepsSnapshotJson(),
+                actionRows);
+    }
+
+    private Map<UUID, String> resolveNames(ApprovalRequest request, List<ApprovalAction> actionEntities) {
+        Set<UUID> ids = new HashSet<>();
+        if (request.getRequestedBy() != null) {
+            ids.add(request.getRequestedBy());
+        }
+        if (request.getDecidedBy() != null) {
+            ids.add(request.getDecidedBy());
+        }
+        for (ApprovalAction action : actionEntities) {
+            if (action.getActorId() != null) {
+                ids.add(action.getActorId());
+            }
+        }
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> names = new HashMap<>();
+        for (User user : users.findAllById(ids)) {
+            names.put(user.getId(), displayName(user));
+        }
+        return names;
+    }
+
+    private static String displayName(User user) {
+        if (user == null) {
+            return null;
+        }
+        String first = user.getFirstName() == null ? "" : user.getFirstName().trim();
+        String last = user.getLastName() == null ? "" : user.getLastName().trim();
+        String name = (first + " " + last).trim();
+        return name.isBlank() ? user.getEmail() : name;
     }
 
     private void ensureTenant(UserPrincipal principal) {

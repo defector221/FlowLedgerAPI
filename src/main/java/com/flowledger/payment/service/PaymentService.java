@@ -5,6 +5,7 @@ import com.flowledger.accounting.domain.JournalSource;
 import com.flowledger.accounting.service.AccountingPostingService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
+import com.flowledger.common.util.FinancialYearUtil;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.payment.dto.PaymentDtos.Allocation;
@@ -279,13 +280,53 @@ public class PaymentService {
     private String number(LocalDate date) {
         Organization organization =
                 organizations.findById(TenantContext.getOrganizationId()).orElseThrow();
-        return numbers.next(
-                organization.getId(),
-                "PAYMENT",
-                organization.getPaymentPrefix(),
-                "{PREFIX}/{FY}/{SEQ:6}",
-                organization.getFinancialYearStart(),
-                date);
+        UUID org = organization.getId();
+        String fy = FinancialYearUtil.financialYear(date, organization.getFinancialYearStart());
+        String prefix = organization.getPaymentPrefix() == null || organization.getPaymentPrefix().isBlank()
+                ? "PAY"
+                : organization.getPaymentPrefix();
+        long maxExisting = maxPaymentSequence(org, prefix + "/" + fy + "/");
+        numbers.ensureNextAtLeast(
+                org, "PAYMENT", prefix, organization.getFinancialYearStart(), date, maxExisting + 1);
+        for (int attempt = 0; attempt < 8; attempt++) {
+            String candidate = numbers.next(
+                    org,
+                    "PAYMENT",
+                    prefix,
+                    "{PREFIX}/{FY}/{SEQ:6}",
+                    organization.getFinancialYearStart(),
+                    date);
+            if (!paymentNumberExists(org, candidate)) {
+                return candidate;
+            }
+        }
+        throw new ResponseStatusException(
+                HttpStatus.CONFLICT, "Unable to allocate a unique payment number. Please retry.");
+    }
+
+    private long maxPaymentSequence(UUID org, String numberPrefix) {
+        Object result = em.createNativeQuery(
+                        """
+                        SELECT COALESCE(MAX(NULLIF(regexp_replace(payment_number, '.*/', ''), '')::bigint), 0)
+                        FROM payments
+                        WHERE organization_id = :org
+                          AND payment_number LIKE :pattern
+                        """)
+                .setParameter("org", org)
+                .setParameter("pattern", numberPrefix + "%")
+                .getSingleResult();
+        if (result == null) return 0;
+        return ((Number) result).longValue();
+    }
+
+    private boolean paymentNumberExists(UUID org, String paymentNumber) {
+        Long count = em.createQuery(
+                        "select count(p) from Payment p where p.organizationId = :org and p.paymentNumber = :number",
+                        Long.class)
+                .setParameter("org", org)
+                .setParameter("number", paymentNumber)
+                .getSingleResult();
+        return count != null && count > 0;
     }
 
     private ResponseStatusException bad(String message) {

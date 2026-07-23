@@ -1,6 +1,7 @@
 package com.flowledger.sales.entity;
 
 import com.flowledger.common.entity.AuditedEntity;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.persistence.*;
 import java.time.*;
 import java.util.*;
@@ -45,4 +46,13 @@ public class DeliveryChallan extends AuditedEntity {
     @OneToMany(mappedBy = "deliveryChallan", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("lineOrder")
     private List<DeliveryChallanItem> items = new ArrayList<>();
+
+    /** Populated for API responses when an invoice already exists for this challan. */
+    @Transient
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private UUID linkedInvoiceId;
+
+    @Transient
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String linkedInvoiceNumber;
 }

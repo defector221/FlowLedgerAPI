@@ -1,5 +1,6 @@
 package com.flowledger.sales.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.math.*;
 import java.util.*;
@@ -15,6 +16,7 @@ public class DeliveryChallanItem {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "delivery_challan_id")
     private DeliveryChallan deliveryChallan;
