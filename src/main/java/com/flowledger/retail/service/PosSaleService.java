@@ -196,7 +196,10 @@ public class PosSaleService {
 
     public PosSaleResponse applyAdjustments(UUID saleId, PosAdjustmentsRequest r) {
         PosSale sale = loadEditable(saleId);
-        if (r.customerId() != null) {
+        if (Boolean.TRUE.equals(r.clearCustomer())) {
+            sale.setCustomerId(null);
+            sale.setLoyaltyPointsRedeemed(BigDecimal.ZERO);
+        } else if (r.customerId() != null) {
             customers
                     .findByIdAndOrganizationId(r.customerId(), org())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Customer not found"));
@@ -352,16 +355,35 @@ public class PosSaleService {
                 null,
                 items);
         SalesDtos.InvoiceDetail draft = salesInvoiceService.createDraft(invoice);
-        SalesDtos.InvoiceDetail confirmed = salesInvoiceService.confirm(draft.id());
+        // POS checkout is already authorized at the counter — skip AI sales-invoice approval gate.
+        SalesDtos.InvoiceDetail confirmed = salesInvoiceService.confirmConverted(draft.id());
 
         sale.setSalesInvoiceId(confirmed.id());
+        if (confirmed.invoiceNumber() != null && !confirmed.invoiceNumber().isBlank()) {
+            sale.setBillNumber(confirmed.invoiceNumber());
+        }
+        // Keep POS totals aligned with the posted invoice (tax/discount rounding can differ).
+        if (confirmed.subtotal() != null) {
+            sale.setSubtotal(confirmed.subtotal());
+        }
+        if (confirmed.discountTotal() != null) {
+            sale.setDiscountTotal(confirmed.discountTotal());
+        }
+        BigDecimal invoiceTax = nz(confirmed.cgstTotal()).add(nz(confirmed.sgstTotal())).add(nz(confirmed.igstTotal()));
+        sale.setTaxTotal(invoiceTax);
+        if (confirmed.grandTotal() != null) {
+            sale.setGrandTotal(confirmed.grandTotal());
+        }
         if (r.receiptType() != null) {
             sale.setReceiptType(r.receiptType());
         }
 
-        // Record POS payments; create RECEIPT payments with allocation for non-CREDIT modes.
+        // Record POS payments; allocate only up to invoice outstanding (never over-allocate).
         payments.deleteByPosSaleId(saleId);
-        BigDecimal remaining = sale.getGrandTotal();
+        BigDecimal remaining = confirmed.outstandingAmount() != null
+                ? confirmed.outstandingAmount()
+                : nz(confirmed.grandTotal());
+        remaining = remaining.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
         for (PaymentInput input : r.payments()) {
             PosSalePayment posPayment = new PosSalePayment();
             posPayment.setOrganizationId(org());
@@ -371,24 +393,31 @@ public class PosSaleService {
             posPayment.setReference(input.reference());
 
             if (input.paymentMode() != PaymentMode.CREDIT) {
-                BigDecimal allocation = input.amount().min(remaining.max(BigDecimal.ZERO));
+                BigDecimal allocation = nz(input.amount()).min(remaining).setScale(2, RoundingMode.HALF_UP);
+                if (allocation.signum() < 0) {
+                    allocation = BigDecimal.ZERO;
+                }
                 List<PaymentDtos.Allocation> allocations = allocation.signum() > 0
                         ? List.of(new PaymentDtos.Allocation("SALES_INVOICE", confirmed.id(), allocation))
                         : List.of();
+                // Payment amount must cover allocation; use the allocated amount when tender exceeds due.
+                BigDecimal paymentAmount = allocation.signum() > 0
+                        ? nz(input.amount()).max(allocation)
+                        : nz(input.amount());
                 Payment payment = paymentService.create(new PaymentDtos.PaymentRequest(
                         LocalDate.now(),
                         Payment.Type.RECEIPT,
                         Payment.Party.CUSTOMER,
                         customerId,
                         null,
-                        input.amount(),
+                        paymentAmount,
                         input.paymentMode().name(),
                         input.reference(),
                         null,
                         "POS sale " + saleId,
                         allocations));
                 posPayment.setPaymentId(payment.getId());
-                remaining = remaining.subtract(allocation);
+                remaining = remaining.subtract(allocation).max(BigDecimal.ZERO);
             }
             audit(posPayment, true);
             payments.save(posPayment);

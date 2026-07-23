@@ -125,6 +125,7 @@ public final class RetailDtos {
 
     public record PosAdjustmentsRequest(
             UUID customerId,
+            Boolean clearCustomer,
             BigDecimal billDiscountPercent,
             BigDecimal billDiscountAmount,
             BigDecimal loyaltyPointsRedeemed,

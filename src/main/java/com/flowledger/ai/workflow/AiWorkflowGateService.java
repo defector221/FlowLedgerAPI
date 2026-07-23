@@ -8,6 +8,8 @@ import com.flowledger.ai.config.ConditionalOnAiEnabled;
 import com.flowledger.ai.entity.AiWorkflowDraft;
 import com.flowledger.ai.repository.AiWorkflowDraftRepository;
 import com.flowledger.common.tenant.TenantContext;
+import com.flowledger.platform.domain.ModuleCodes;
+import com.flowledger.platform.service.FeatureService;
 import com.flowledger.transport.domain.TransportEnums.ApprovalStatus;
 import com.flowledger.transport.entity.ApprovalAction;
 import com.flowledger.transport.entity.ApprovalRequest;
@@ -54,6 +56,7 @@ public class AiWorkflowGateService {
     private final ObjectMapper objectMapper;
     private final TransactionTemplate requiresNewTx;
     private final AiWorkflowNotificationService workflowNotifications;
+    private final FeatureService features;
 
     public AiWorkflowGateService(
             AiWorkflowDraftRepository drafts,
@@ -61,7 +64,8 @@ public class AiWorkflowGateService {
             ApprovalActionRepository actions,
             ObjectMapper objectMapper,
             PlatformTransactionManager transactionManager,
-            AiWorkflowNotificationService workflowNotifications) {
+            AiWorkflowNotificationService workflowNotifications,
+            FeatureService features) {
         this.drafts = drafts;
         this.requests = requests;
         this.actions = actions;
@@ -69,6 +73,7 @@ public class AiWorkflowGateService {
         this.requiresNewTx = new TransactionTemplate(transactionManager);
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.workflowNotifications = workflowNotifications;
+        this.features = features;
     }
 
     /**
@@ -77,6 +82,12 @@ public class AiWorkflowGateService {
      */
     @Transactional
     public void requireApproved(String documentType, UUID entityId, BigDecimal amount, String action) {
+        // Org turned off AI (or AI automation/workflows) — do not gate ERP actions.
+        if (!features.hasModule(ModuleCodes.AI)
+                || !features.hasFeature(ModuleCodes.AI, "AUTOMATION")) {
+            return;
+        }
+
         UUID org = TenantContext.getOrganizationId();
         List<AiWorkflowDraft> matched = matchingActive(org, documentType, amount);
         if (matched.isEmpty()) {
