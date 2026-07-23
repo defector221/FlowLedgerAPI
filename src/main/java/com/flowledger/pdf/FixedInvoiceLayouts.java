@@ -104,9 +104,15 @@ public final class FixedInvoiceLayouts {
                 <div class="muted" style="margin-top:12px;"><strong style="color:#475569;">Notes:</strong> {{notes}}</div>
                 </td>
                 <td width="44%" valign="top" style="text-align:right;">
-                <div class="amount-box" style="display:inline-block;min-width:170px;">
-                <div class="label" style="color:#64748b;">Amount due</div>
-                <div style="font-size:22px;font-weight:700;color:__ACCENT__;margin-top:4px;">{{currencyPrefix}}{{grandTotal}}</div>
+                <div class="amount-box" style="display:inline-block;min-width:190px;text-align:left;">
+                <div class="muted" style="font-size:11px;line-height:1.7;">
+                <strong style="color:#64748b;">Total</strong><br/>
+                <span style="color:#0f172a;">{{currencyPrefix}}{{grandTotal}}</span><br/>
+                <strong style="color:#64748b;">Paid</strong><br/>
+                <span style="color:#0f172a;">{{currencyPrefix}}{{amountPaid}}</span>
+                </div>
+                <div class="label" style="color:#64748b;margin-top:10px;">{{amountDueLabel}}</div>
+                <div style="font-size:22px;font-weight:700;color:__ACCENT__;margin-top:4px;">{{currencyPrefix}}{{outstandingAmount}}</div>
                 </div>
                 <div style="margin-top:28px;font-size:12px;color:#94a3b8;">Authorized signature</div>
                 <div style="margin-top:10px;margin-left:auto;width:160px;border-bottom:1px solid #cbd5e1;"></div>

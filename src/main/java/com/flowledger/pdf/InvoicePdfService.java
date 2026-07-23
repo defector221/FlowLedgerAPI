@@ -701,6 +701,8 @@ public class InvoicePdfService {
         tags.put("discountTotal", DocumentHtmlTags.fmt(discountTotal));
         tags.put("amountPaid", DocumentHtmlTags.fmt(amountPaid));
         tags.put("outstandingAmount", DocumentHtmlTags.fmt(outstandingAmount));
+        BigDecimal due = outstandingAmount == null ? BigDecimal.ZERO : outstandingAmount;
+        tags.put("amountDueLabel", due.signum() <= 0 ? "Paid in full" : "Amount due");
         tags.put("notes", nullToEmpty(notes));
         tags.put("terms", nullToEmpty(terms));
         tags.put("customerName", nullToEmpty(customerName));

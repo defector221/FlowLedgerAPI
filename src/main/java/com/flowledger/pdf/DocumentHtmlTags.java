@@ -94,6 +94,7 @@ final class DocumentHtmlTags {
         tags.put("discountTotal", "35.00");
         tags.put("amountPaid", "0.00");
         tags.put("outstandingAmount", "11,800.00");
+        tags.put("amountDueLabel", "Amount due");
         tags.put("grandTotal", "11,800.00");
         tags.put("organizationAddress", "237 Business Park, Andheri East, Mumbai, Maharashtra, India");
         tags.put("notes", "Goods once sold will not be taken back.");
