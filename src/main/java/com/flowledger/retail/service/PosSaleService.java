@@ -369,7 +369,8 @@ public class PosSaleService {
         if (confirmed.discountTotal() != null) {
             sale.setDiscountTotal(confirmed.discountTotal());
         }
-        BigDecimal invoiceTax = nz(confirmed.cgstTotal()).add(nz(confirmed.sgstTotal())).add(nz(confirmed.igstTotal()));
+        BigDecimal invoiceTax =
+                nz(confirmed.cgstTotal()).add(nz(confirmed.sgstTotal())).add(nz(confirmed.igstTotal()));
         sale.setTaxTotal(invoiceTax);
         if (confirmed.grandTotal() != null) {
             sale.setGrandTotal(confirmed.grandTotal());
@@ -380,9 +381,8 @@ public class PosSaleService {
 
         // Record POS payments; allocate only up to invoice outstanding (never over-allocate).
         payments.deleteByPosSaleId(saleId);
-        BigDecimal remaining = confirmed.outstandingAmount() != null
-                ? confirmed.outstandingAmount()
-                : nz(confirmed.grandTotal());
+        BigDecimal remaining =
+                confirmed.outstandingAmount() != null ? confirmed.outstandingAmount() : nz(confirmed.grandTotal());
         remaining = remaining.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
         for (PaymentInput input : r.payments()) {
             PosSalePayment posPayment = new PosSalePayment();
@@ -401,9 +401,8 @@ public class PosSaleService {
                         ? List.of(new PaymentDtos.Allocation("SALES_INVOICE", confirmed.id(), allocation))
                         : List.of();
                 // Payment amount must cover allocation; use the allocated amount when tender exceeds due.
-                BigDecimal paymentAmount = allocation.signum() > 0
-                        ? nz(input.amount()).max(allocation)
-                        : nz(input.amount());
+                BigDecimal paymentAmount =
+                        allocation.signum() > 0 ? nz(input.amount()).max(allocation) : nz(input.amount());
                 Payment payment = paymentService.create(new PaymentDtos.PaymentRequest(
                         LocalDate.now(),
                         Payment.Type.RECEIPT,

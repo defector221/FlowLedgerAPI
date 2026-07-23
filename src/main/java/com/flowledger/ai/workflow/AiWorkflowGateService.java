@@ -83,8 +83,7 @@ public class AiWorkflowGateService {
     @Transactional
     public void requireApproved(String documentType, UUID entityId, BigDecimal amount, String action) {
         // Org turned off AI (or AI automation/workflows) — do not gate ERP actions.
-        if (!features.hasModule(ModuleCodes.AI)
-                || !features.hasFeature(ModuleCodes.AI, "AUTOMATION")) {
+        if (!features.hasModule(ModuleCodes.AI) || !features.hasFeature(ModuleCodes.AI, "AUTOMATION")) {
             return;
         }
 
