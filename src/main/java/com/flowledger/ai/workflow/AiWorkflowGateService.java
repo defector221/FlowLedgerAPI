@@ -8,6 +8,8 @@ import com.flowledger.ai.config.ConditionalOnAiEnabled;
 import com.flowledger.ai.entity.AiWorkflowDraft;
 import com.flowledger.ai.repository.AiWorkflowDraftRepository;
 import com.flowledger.common.tenant.TenantContext;
+import com.flowledger.platform.domain.ModuleCodes;
+import com.flowledger.platform.service.FeatureService;
 import com.flowledger.transport.domain.TransportEnums.ApprovalStatus;
 import com.flowledger.transport.entity.ApprovalAction;
 import com.flowledger.transport.entity.ApprovalRequest;
@@ -43,14 +45,8 @@ import org.springframework.web.server.ResponseStatusException;
 @ConditionalOnAiEnabled
 public class AiWorkflowGateService {
     private static final Logger log = LoggerFactory.getLogger(AiWorkflowGateService.class);
-    private static final List<String> DOCUMENT_TYPES =
-            List.of(
-                    "QUOTATION",
-                    "SALES_ORDER",
-                    "DELIVERY_CHALLAN",
-                    "SALES_INVOICE",
-                    "PURCHASE_ORDER",
-                    "PURCHASE_INVOICE");
+    private static final List<String> DOCUMENT_TYPES = List.of(
+            "QUOTATION", "SALES_ORDER", "DELIVERY_CHALLAN", "SALES_INVOICE", "PURCHASE_ORDER", "PURCHASE_INVOICE");
     private static final Set<String> APPROVAL_ACTIONS = Set.of("APPROVE", "REVIEW");
     private static final Set<String> SKIP_ROLES = Set.of("REQUESTER");
 
@@ -60,6 +56,7 @@ public class AiWorkflowGateService {
     private final ObjectMapper objectMapper;
     private final TransactionTemplate requiresNewTx;
     private final AiWorkflowNotificationService workflowNotifications;
+    private final FeatureService features;
 
     public AiWorkflowGateService(
             AiWorkflowDraftRepository drafts,
@@ -67,7 +64,8 @@ public class AiWorkflowGateService {
             ApprovalActionRepository actions,
             ObjectMapper objectMapper,
             PlatformTransactionManager transactionManager,
-            AiWorkflowNotificationService workflowNotifications) {
+            AiWorkflowNotificationService workflowNotifications,
+            FeatureService features) {
         this.drafts = drafts;
         this.requests = requests;
         this.actions = actions;
@@ -75,6 +73,7 @@ public class AiWorkflowGateService {
         this.requiresNewTx = new TransactionTemplate(transactionManager);
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.workflowNotifications = workflowNotifications;
+        this.features = features;
     }
 
     /**
@@ -83,6 +82,12 @@ public class AiWorkflowGateService {
      */
     @Transactional
     public void requireApproved(String documentType, UUID entityId, BigDecimal amount, String action) {
+        // Org turned off AI (or AI automation/workflows) — do not gate ERP actions.
+        if (!features.hasModule(ModuleCodes.AI)
+                || !features.hasFeature(ModuleCodes.AI, "AUTOMATION")) {
+            return;
+        }
+
         UUID org = TenantContext.getOrganizationId();
         List<AiWorkflowDraft> matched = matchingActive(org, documentType, amount);
         if (matched.isEmpty()) {
@@ -421,8 +426,7 @@ public class AiWorkflowGateService {
         return filtered;
     }
 
-    private static int mapCurrentStepAfterFilter(
-            List<WorkflowStep> raw, List<WorkflowStep> filtered, int currentStep) {
+    private static int mapCurrentStepAfterFilter(List<WorkflowStep> raw, List<WorkflowStep> filtered, int currentStep) {
         if (raw.isEmpty() || filtered.isEmpty()) {
             return 1;
         }
@@ -495,10 +499,10 @@ public class AiWorkflowGateService {
      */
     private AiWorkflowDraft selectPrimaryWorkflow(List<AiWorkflowDraft> matched) {
         return matched.stream()
-                .max(Comparator.comparingInt((AiWorkflowDraft draft) -> approvalStepsFromDraft(draft).size())
+                .max(Comparator.comparingInt((AiWorkflowDraft draft) ->
+                                approvalStepsFromDraft(draft).size())
                         .thenComparing(this::minAmountOf, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparing(
-                                AiWorkflowDraft::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                        .thenComparing(AiWorkflowDraft::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No matching workflow"));
     }
 

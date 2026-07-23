@@ -1,12 +1,13 @@
 package com.flowledger.ai.tools;
 
 import com.flowledger.ai.config.ConditionalOnAiEnabled;
-import com.flowledger.organization.repository.OrganizationSettingsRepository;
+import com.flowledger.common.tenant.TenantContext;
+import com.flowledger.platform.domain.ModuleCodes;
+import com.flowledger.platform.service.FeatureService;
 import com.flowledger.retail.dto.RetailDtos.DailySalesResponse;
 import com.flowledger.retail.dto.RetailDtos.StoreResponse;
 import com.flowledger.retail.service.RetailAnalyticsService;
 import com.flowledger.retail.service.RetailStoreService;
-import com.flowledger.common.tenant.TenantContext;
 import dev.langchain4j.agent.tool.Tool;
 import java.time.LocalDate;
 import java.util.List;
@@ -18,15 +19,13 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnAiEnabled
 public class RetailTool {
-    private final OrganizationSettingsRepository settingsRepository;
+    private final FeatureService featureService;
     private final RetailStoreService storeService;
     private final RetailAnalyticsService analyticsService;
 
     public RetailTool(
-            OrganizationSettingsRepository settingsRepository,
-            RetailStoreService storeService,
-            RetailAnalyticsService analyticsService) {
-        this.settingsRepository = settingsRepository;
+            FeatureService featureService, RetailStoreService storeService, RetailAnalyticsService analyticsService) {
+        this.featureService = featureService;
         this.storeService = storeService;
         this.analyticsService = analyticsService;
     }
@@ -34,11 +33,7 @@ public class RetailTool {
     @Tool("Summarize today's retail POS sales across stores")
     public String summarize(String query) {
         var orgId = TenantContext.getOrganizationId();
-        boolean enabled = settingsRepository
-                .findByOrganizationId(orgId)
-                .map(s -> s.isRetailEnabled())
-                .orElse(false);
-        if (!enabled) {
+        if (!featureService.hasModule(orgId, ModuleCodes.RETAIL)) {
             return "Retail module is not enabled for this organization. Query=" + query;
         }
         try {
@@ -58,8 +53,8 @@ public class RetailTool {
             }
             sb.append("Query=").append(query);
             return sb.toString();
-        } catch (Exception e) {
-            return "Retail summary unavailable: " + e.getMessage() + "; Query=" + query;
+        } catch (Exception ex) {
+            return "Unable to summarize retail sales: " + ex.getMessage();
         }
     }
 }

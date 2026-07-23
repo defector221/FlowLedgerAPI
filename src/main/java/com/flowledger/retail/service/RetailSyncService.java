@@ -37,9 +37,7 @@ public class RetailSyncService {
             return new SyncResponse(
                     e.getId(),
                     e.getStatus() == SyncStatus.PROCESSED ? SyncStatus.DUPLICATE : e.getStatus(),
-                    e.getStatus() == SyncStatus.PROCESSED
-                            ? "Already processed"
-                            : "Updated existing sync record");
+                    e.getStatus() == SyncStatus.PROCESSED ? "Already processed" : "Updated existing sync record");
         }
 
         RetailPosSyncOutbox e = new RetailPosSyncOutbox();

@@ -69,8 +69,8 @@ public class RetailLoyaltyService {
     }
 
     public TierResponse updateTier(UUID id, TierRequest r) {
-        RetailLoyaltyTier e = tiers.findByIdAndOrganizationIdAndDeletedFalse(id, org())
-                .orElseThrow(() -> notFound("Tier not found"));
+        RetailLoyaltyTier e =
+                tiers.findByIdAndOrganizationIdAndDeletedFalse(id, org()).orElseThrow(() -> notFound("Tier not found"));
         e.setName(r.name());
         if (r.minPoints() != null) {
             e.setMinPoints(r.minPoints());
@@ -83,8 +83,8 @@ public class RetailLoyaltyService {
     }
 
     public void deleteTier(UUID id) {
-        RetailLoyaltyTier e = tiers.findByIdAndOrganizationIdAndDeletedFalse(id, org())
-                .orElseThrow(() -> notFound("Tier not found"));
+        RetailLoyaltyTier e =
+                tiers.findByIdAndOrganizationIdAndDeletedFalse(id, org()).orElseThrow(() -> notFound("Tier not found"));
         e.setDeleted(true);
         audit(e, false);
     }
@@ -115,8 +115,7 @@ public class RetailLoyaltyService {
         if (r.points() == null || r.points().signum() <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Points must be positive");
         }
-        RetailLoyaltyAccount account = accounts
-                .findByOrganizationIdAndCustomerId(org(), r.customerId())
+        RetailLoyaltyAccount account = accounts.findByOrganizationIdAndCustomerId(org(), r.customerId())
                 .orElseThrow(() -> notFound("Loyalty account not found"));
         if (account.getPointsBalance().compareTo(r.points()) < 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Insufficient loyalty points");
@@ -128,8 +127,7 @@ public class RetailLoyaltyService {
     }
 
     private RetailLoyaltyAccount loadOrCreateAccount(UUID customerId, UUID tierId) {
-        return accounts
-                .findByOrganizationIdAndCustomerId(org(), customerId)
+        return accounts.findByOrganizationIdAndCustomerId(org(), customerId)
                 .map(existing -> {
                     if (tierId != null && !tierId.equals(existing.getTierId())) {
                         tiers.findByIdAndOrganizationIdAndDeletedFalse(tierId, org())
@@ -169,7 +167,12 @@ public class RetailLoyaltyService {
         TenantContext.userId().ifPresent(txn::setCreatedBy);
         txn = transactions.save(txn);
         return new LoyaltyTransactionResponse(
-                txn.getId(), txn.getAccountId(), txn.getTxnType(), txn.getPoints(), txn.getReferenceType(), txn.getReferenceId());
+                txn.getId(),
+                txn.getAccountId(),
+                txn.getTxnType(),
+                txn.getPoints(),
+                txn.getReferenceType(),
+                txn.getReferenceId());
     }
 
     // --------------------------------------------------------------- Gift cards
@@ -192,7 +195,8 @@ public class RetailLoyaltyService {
     public GiftCardResponse activate(UUID id) {
         RetailGiftCard e = loadGiftCard(id);
         if (e.getStatus() != GiftCardStatus.ISSUED && e.getStatus() != GiftCardStatus.ACTIVE) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Gift card cannot be activated from " + e.getStatus());
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "Gift card cannot be activated from " + e.getStatus());
         }
         ensureNotExpired(e);
         e.setStatus(GiftCardStatus.ACTIVE);

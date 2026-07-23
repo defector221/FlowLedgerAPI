@@ -74,8 +74,7 @@ public class RetailReturnService {
 
         PosSale originalSale = null;
         if (r.originalPosSaleId() != null) {
-            originalSale = posSales
-                    .findByIdAndOrganizationIdAndDeletedFalse(r.originalPosSaleId(), org())
+            originalSale = posSales.findByIdAndOrganizationIdAndDeletedFalse(r.originalPosSaleId(), org())
                     .orElseThrow(() -> notFound("Original POS sale not found"));
         }
 
@@ -125,8 +124,7 @@ public class RetailReturnService {
             e.setNotes(appendNote(
                     e.getNotes(), "Linked sales return " + salesReturn.getId() + "; inventory handled when linked"));
         } else {
-            e.setNotes(appendNote(
-                    e.getNotes(), "No invoice linked; inventory handled when linked to a sales return"));
+            e.setNotes(appendNote(e.getNotes(), "No invoice linked; inventory handled when linked to a sales return"));
         }
 
         audit(e, false);
@@ -170,15 +168,15 @@ public class RetailReturnService {
         credit.setBalance(credit.getBalance().add(e.getTotalAmount()));
         audit(credit, false);
         storeCredits.save(credit);
-        e.setNotes(appendNote(e.getNotes(), "Store credit " + e.getTotalAmount() + " posted for customer " + customerId));
+        e.setNotes(
+                appendNote(e.getNotes(), "Store credit " + e.getTotalAmount() + " posted for customer " + customerId));
     }
 
     private UUID resolveCustomerId(PosReturn e) {
         if (e.getOriginalPosSaleId() == null) {
             return null;
         }
-        return posSales
-                .findByIdAndOrganizationIdAndDeletedFalse(e.getOriginalPosSaleId(), org())
+        return posSales.findByIdAndOrganizationIdAndDeletedFalse(e.getOriginalPosSaleId(), org())
                 .map(PosSale::getCustomerId)
                 .orElse(null);
     }
@@ -191,15 +189,12 @@ public class RetailReturnService {
     }
 
     private PosReturn load(UUID id) {
-        return returns
-                .findByIdAndOrganizationIdAndDeletedFalse(id, org())
+        return returns.findByIdAndOrganizationIdAndDeletedFalse(id, org())
                 .orElseThrow(() -> notFound("Return not found"));
     }
 
     private ReturnResponse map(PosReturn e) {
-        List<ReturnLineResponse> lineResponses = lines
-                .findByOrganizationIdAndPosReturnId(org(), e.getId())
-                .stream()
+        List<ReturnLineResponse> lineResponses = lines.findByOrganizationIdAndPosReturnId(org(), e.getId()).stream()
                 .map(l -> new ReturnLineResponse(
                         l.getId(), l.getProductId(), l.getQuantity(), l.getRate(), l.getLineTotal()))
                 .toList();

@@ -96,11 +96,32 @@ public class CustomerService extends OrganizationScopedService {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("archived"), filter.archived()));
         }
         if (filter.search() != null && !filter.search().isBlank()) {
-            String likePattern = "%" + filter.search().toLowerCase() + "%";
-            spec = spec.and((root, query, cb) -> cb.or(
-                    cb.like(cb.lower(root.get("customerName")), likePattern),
-                    cb.like(cb.lower(root.get("customerCode")), likePattern),
-                    cb.like(cb.lower(root.get("phone")), likePattern)));
+            String raw = filter.search().trim();
+            String likePattern = "%" + raw.toLowerCase() + "%";
+            String digits = raw.replaceAll("\\D", "");
+            spec = spec.and((root, query, cb) -> {
+                var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+                predicates.add(cb.like(cb.lower(root.get("customerName")), likePattern));
+                predicates.add(cb.like(cb.lower(root.get("customerCode")), likePattern));
+                predicates.add(cb.like(cb.lower(root.get("phone")), likePattern));
+                predicates.add(cb.like(cb.lower(cb.coalesce(root.get("companyName"), "")), likePattern));
+                predicates.add(cb.like(cb.lower(cb.coalesce(root.get("email"), "")), likePattern));
+                // Mobile search: match digits even when phone is stored with spaces / +91
+                if (digits.length() >= 3) {
+                    String digitLike = "%" + digits + "%";
+                    predicates.add(cb.like(cb.coalesce(root.get("phone"), ""), digitLike));
+                    predicates.add(cb.like(
+                            cb.function(
+                                    "regexp_replace",
+                                    String.class,
+                                    cb.coalesce(root.get("phone"), ""),
+                                    cb.literal("[^0-9]"),
+                                    cb.literal(""),
+                                    cb.literal("g")),
+                            digitLike));
+                }
+                return cb.or(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+            });
         }
         return repo.findAll(spec, pageable).map(mapper::toResponse);
     }

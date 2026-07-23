@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -48,6 +49,8 @@ public class PosSaleService {
     private final CustomerRepository customers;
     private final SalesInvoiceService salesInvoiceService;
     private final PaymentService paymentService;
+    private final RetailLoyaltyService loyaltyService;
+    private final RetailPricingService pricingService;
 
     public PosSaleService(
             RetailModuleGuard guard,
@@ -58,7 +61,9 @@ public class PosSaleService {
             ProductRepository products,
             CustomerRepository customers,
             SalesInvoiceService salesInvoiceService,
-            PaymentService paymentService) {
+            PaymentService paymentService,
+            RetailLoyaltyService loyaltyService,
+            RetailPricingService pricingService) {
         this.guard = guard;
         this.sales = sales;
         this.lines = lines;
@@ -68,6 +73,8 @@ public class PosSaleService {
         this.customers = customers;
         this.salesInvoiceService = salesInvoiceService;
         this.paymentService = paymentService;
+        this.loyaltyService = loyaltyService;
+        this.pricingService = pricingService;
     }
 
     @Transactional(readOnly = true)
@@ -101,6 +108,34 @@ public class PosSaleService {
     public PosSaleResponse addLine(UUID saleId, PosLineRequest r) {
         PosSale sale = loadEditable(saleId);
         List<PosSaleLine> existing = lines.findByOrganizationIdAndPosSaleIdOrderByLineOrderAsc(org(), saleId);
+        BigDecimal discountPercent = nz(r.discountPercent());
+        BigDecimal taxRate = nz(r.taxRate());
+
+        // Same SKU / variant / price → bump qty instead of a duplicate bill line.
+        PosSaleLine mergeTarget = existing.stream()
+                .filter(line -> Objects.equals(line.getProductId(), r.productId())
+                        && Objects.equals(line.getVariantId(), r.variantId())
+                        && line.getRate().compareTo(r.rate()) == 0
+                        && nz(line.getDiscountPercent()).compareTo(discountPercent) == 0
+                        && nz(line.getTaxRate()).compareTo(taxRate) == 0)
+                .findFirst()
+                .orElse(null);
+
+        if (mergeTarget != null) {
+            mergeTarget.setQuantity(mergeTarget.getQuantity().add(r.quantity()));
+            if (r.description() != null && !r.description().isBlank()) {
+                mergeTarget.setDescription(r.description());
+            }
+            if (r.barcode() != null && !r.barcode().isBlank()) {
+                mergeTarget.setBarcode(r.barcode());
+            }
+            mergeTarget.setLineTotal(lineTotal(mergeTarget));
+            audit(mergeTarget, false);
+            lines.save(mergeTarget);
+            recompute(sale);
+            return map(sales.save(sale));
+        }
+
         PosSaleLine line = new PosSaleLine();
         line.setOrganizationId(org());
         line.setPosSaleId(saleId);
@@ -110,8 +145,8 @@ public class PosSaleService {
         line.setBarcode(r.barcode());
         line.setQuantity(r.quantity());
         line.setRate(r.rate());
-        line.setDiscountPercent(nz(r.discountPercent()));
-        line.setTaxRate(nz(r.taxRate()));
+        line.setDiscountPercent(discountPercent);
+        line.setTaxRate(taxRate);
         line.setLineOrder(existing.size());
         line.setLineTotal(lineTotal(line));
         audit(line, true);
@@ -123,9 +158,100 @@ public class PosSaleService {
     public PosSaleResponse removeLine(UUID saleId, UUID lineId) {
         PosSale sale = loadEditable(saleId);
         PosSaleLine line = lines.findById(lineId)
-                .filter(l -> l.getPosSaleId().equals(saleId) && l.getOrganizationId().equals(org()))
+                .filter(l ->
+                        l.getPosSaleId().equals(saleId) && l.getOrganizationId().equals(org()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Line not found"));
         lines.delete(line);
+        recompute(sale);
+        return map(sales.save(sale));
+    }
+
+    public PosSaleResponse updateLine(UUID saleId, UUID lineId, PosLineUpdateRequest r) {
+        PosSale sale = loadEditable(saleId);
+        PosSaleLine line = lines.findById(lineId)
+                .filter(l ->
+                        l.getPosSaleId().equals(saleId) && l.getOrganizationId().equals(org()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Line not found"));
+        if (r.quantity() != null) {
+            line.setQuantity(r.quantity());
+        }
+        if (r.discountPercent() != null) {
+            if (r.discountPercent().signum() < 0 || r.discountPercent().compareTo(HUNDRED) > 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Discount percent must be 0–100");
+            }
+            line.setDiscountPercent(r.discountPercent());
+        }
+        if (r.rate() != null) {
+            line.setRate(r.rate());
+        }
+        if (r.taxRate() != null) {
+            line.setTaxRate(r.taxRate());
+        }
+        line.setLineTotal(lineTotal(line));
+        audit(line, false);
+        lines.save(line);
+        recompute(sale);
+        return map(sales.save(sale));
+    }
+
+    public PosSaleResponse applyAdjustments(UUID saleId, PosAdjustmentsRequest r) {
+        PosSale sale = loadEditable(saleId);
+        if (Boolean.TRUE.equals(r.clearCustomer())) {
+            sale.setCustomerId(null);
+            sale.setLoyaltyPointsRedeemed(BigDecimal.ZERO);
+        } else if (r.customerId() != null) {
+            customers
+                    .findByIdAndOrganizationId(r.customerId(), org())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Customer not found"));
+            sale.setCustomerId(r.customerId());
+        }
+        if (r.billDiscountPercent() != null) {
+            if (r.billDiscountPercent().signum() < 0 || r.billDiscountPercent().compareTo(HUNDRED) > 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bill discount percent must be 0–100");
+            }
+            sale.setBillDiscountPercent(r.billDiscountPercent());
+        }
+        if (r.billDiscountAmount() != null) {
+            if (r.billDiscountAmount().signum() < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bill discount amount cannot be negative");
+            }
+            sale.setBillDiscountAmount(r.billDiscountAmount());
+        }
+        if (r.loyaltyPointsRedeemed() != null) {
+            if (r.loyaltyPointsRedeemed().signum() < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Loyalty points cannot be negative");
+            }
+            UUID customerForLoyalty = r.customerId() != null ? r.customerId() : sale.getCustomerId();
+            if (r.loyaltyPointsRedeemed().signum() > 0) {
+                if (customerForLoyalty == null) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST, "Select a customer to redeem loyalty points");
+                }
+                var account = loyaltyService.getOrCreateAccount(new LoyaltyAccountRequest(customerForLoyalty, null));
+                if (account.pointsBalance().compareTo(r.loyaltyPointsRedeemed()) < 0) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Insufficient loyalty points");
+                }
+            }
+            sale.setLoyaltyPointsRedeemed(r.loyaltyPointsRedeemed());
+        }
+        if (r.couponCode() != null) {
+            String code = r.couponCode().isBlank() ? null : r.couponCode().trim();
+            sale.setCouponCode(code);
+            if (code != null) {
+                // Preview coupon against current line net; store as bill amount when coupon wins.
+                BigDecimal billBase = previewLineNet(saleId);
+                ApplyCouponResponse applied = pricingService.applyCoupon(new ApplyCouponRequest(code, billBase));
+                if (applied.applied()) {
+                    sale.setBillDiscountAmount(nz(applied.discountAmount()));
+                    sale.setBillDiscountPercent(BigDecimal.ZERO);
+                } else {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            applied.message() == null ? "Coupon not applicable" : applied.message());
+                }
+            }
+        }
+        audit(sale, false);
         recompute(sale);
         return map(sales.save(sale));
     }
@@ -164,15 +290,38 @@ public class PosSaleService {
         recompute(sale);
 
         UUID customerId = resolveCustomer(r.customerId(), sale.getCustomerId());
+        sale.setCustomerId(customerId);
         RetailStore store = stores.findByIdAndOrganizationIdAndDeletedFalse(sale.getStoreId(), org())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Store not found"));
 
-        // Build and confirm a core sales invoice from the cart lines.
+        BigDecimal loyaltyRedeem = nz(sale.getLoyaltyPointsRedeemed());
+        if (loyaltyRedeem.signum() > 0) {
+            loyaltyService.redeem(
+                    new RedeemRequest(customerId, loyaltyRedeem, "POS_SALE", saleId, "Redeemed at POS checkout"));
+        }
+
+        // Distribute bill + loyalty discount into line discount % so the sales invoice matches POS totals.
+        BigDecimal lineNetBeforeBill = previewLineNet(saleId);
+        BigDecimal headerDisc = headerDiscountAmount(sale, lineNetBeforeBill);
         List<SalesDtos.Item> items = new ArrayList<>();
         for (PosSaleLine line : saleLines) {
             Product product = products.findByIdAndOrganizationId(line.getProductId(), org())
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.BAD_REQUEST, "Product not found: " + line.getProductId()));
+            BigDecimal base = line.getQuantity().multiply(line.getRate());
+            BigDecimal lineDiscAmt =
+                    base.multiply(nz(line.getDiscountPercent())).divide(HUNDRED, 4, RoundingMode.HALF_UP);
+            BigDecimal share = BigDecimal.ZERO;
+            if (lineNetBeforeBill.signum() > 0 && headerDisc.signum() > 0 && base.signum() > 0) {
+                BigDecimal lineNet = base.subtract(lineDiscAmt);
+                share = headerDisc.multiply(lineNet).divide(lineNetBeforeBill, 4, RoundingMode.HALF_UP);
+            }
+            BigDecimal effectiveDiscPct = base.signum() <= 0
+                    ? nz(line.getDiscountPercent())
+                    : lineDiscAmt.add(share).multiply(HUNDRED).divide(base, 4, RoundingMode.HALF_UP);
+            if (effectiveDiscPct.compareTo(HUNDRED) > 0) {
+                effectiveDiscPct = HUNDRED;
+            }
             items.add(new SalesDtos.Item(
                     line.getProductId(),
                     line.getDescription() == null ? product.getName() : line.getDescription(),
@@ -180,7 +329,7 @@ public class PosSaleService {
                     line.getQuantity(),
                     product.getUnitId(),
                     line.getRate(),
-                    line.getDiscountPercent(),
+                    effectiveDiscPct,
                     line.getTaxRate(),
                     null,
                     null,
@@ -206,17 +355,35 @@ public class PosSaleService {
                 null,
                 items);
         SalesDtos.InvoiceDetail draft = salesInvoiceService.createDraft(invoice);
-        SalesDtos.InvoiceDetail confirmed = salesInvoiceService.confirm(draft.id());
+        // POS checkout is already authorized at the counter — skip AI sales-invoice approval gate.
+        SalesDtos.InvoiceDetail confirmed = salesInvoiceService.confirmConverted(draft.id());
 
         sale.setSalesInvoiceId(confirmed.id());
-        sale.setCustomerId(customerId);
+        if (confirmed.invoiceNumber() != null && !confirmed.invoiceNumber().isBlank()) {
+            sale.setBillNumber(confirmed.invoiceNumber());
+        }
+        // Keep POS totals aligned with the posted invoice (tax/discount rounding can differ).
+        if (confirmed.subtotal() != null) {
+            sale.setSubtotal(confirmed.subtotal());
+        }
+        if (confirmed.discountTotal() != null) {
+            sale.setDiscountTotal(confirmed.discountTotal());
+        }
+        BigDecimal invoiceTax = nz(confirmed.cgstTotal()).add(nz(confirmed.sgstTotal())).add(nz(confirmed.igstTotal()));
+        sale.setTaxTotal(invoiceTax);
+        if (confirmed.grandTotal() != null) {
+            sale.setGrandTotal(confirmed.grandTotal());
+        }
         if (r.receiptType() != null) {
             sale.setReceiptType(r.receiptType());
         }
 
-        // Record POS payments; create RECEIPT payments with allocation for non-CREDIT modes.
+        // Record POS payments; allocate only up to invoice outstanding (never over-allocate).
         payments.deleteByPosSaleId(saleId);
-        BigDecimal remaining = confirmed.grandTotal();
+        BigDecimal remaining = confirmed.outstandingAmount() != null
+                ? confirmed.outstandingAmount()
+                : nz(confirmed.grandTotal());
+        remaining = remaining.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
         for (PaymentInput input : r.payments()) {
             PosSalePayment posPayment = new PosSalePayment();
             posPayment.setOrganizationId(org());
@@ -226,27 +393,56 @@ public class PosSaleService {
             posPayment.setReference(input.reference());
 
             if (input.paymentMode() != PaymentMode.CREDIT) {
-                BigDecimal allocation = input.amount().min(remaining.max(BigDecimal.ZERO));
+                BigDecimal allocation = nz(input.amount()).min(remaining).setScale(2, RoundingMode.HALF_UP);
+                if (allocation.signum() < 0) {
+                    allocation = BigDecimal.ZERO;
+                }
                 List<PaymentDtos.Allocation> allocations = allocation.signum() > 0
                         ? List.of(new PaymentDtos.Allocation("SALES_INVOICE", confirmed.id(), allocation))
                         : List.of();
+                // Payment amount must cover allocation; use the allocated amount when tender exceeds due.
+                BigDecimal paymentAmount = allocation.signum() > 0
+                        ? nz(input.amount()).max(allocation)
+                        : nz(input.amount());
                 Payment payment = paymentService.create(new PaymentDtos.PaymentRequest(
                         LocalDate.now(),
                         Payment.Type.RECEIPT,
                         Payment.Party.CUSTOMER,
                         customerId,
                         null,
-                        input.amount(),
+                        paymentAmount,
                         input.paymentMode().name(),
                         input.reference(),
                         null,
                         "POS sale " + saleId,
                         allocations));
                 posPayment.setPaymentId(payment.getId());
-                remaining = remaining.subtract(allocation);
+                remaining = remaining.subtract(allocation).max(BigDecimal.ZERO);
             }
             audit(posPayment, true);
             payments.save(posPayment);
+        }
+
+        // Earn loyalty on net paid amount (1 currency × tier earn rate).
+        if (sale.getGrandTotal().signum() > 0) {
+            try {
+                var account = loyaltyService.getOrCreateAccount(new LoyaltyAccountRequest(customerId, null));
+                BigDecimal earnRate = BigDecimal.ONE;
+                if (account.tierId() != null) {
+                    earnRate = loyaltyService.listTiers().stream()
+                            .filter(t -> t.id().equals(account.tierId()))
+                            .map(TierResponse::earnRate)
+                            .findFirst()
+                            .orElse(BigDecimal.ONE);
+                }
+                BigDecimal earned = sale.getGrandTotal().multiply(nz(earnRate)).setScale(0, RoundingMode.DOWN);
+                if (earned.signum() > 0) {
+                    loyaltyService.earn(
+                            new EarnRequest(customerId, earned, "POS_SALE", saleId, "Earned at POS checkout"));
+                }
+            } catch (RuntimeException ignored) {
+                // Loyalty earn is best-effort; checkout should not fail if tiers are misconfigured.
+            }
         }
 
         sale.setStatus(PosSaleStatus.COMPLETED);
@@ -274,23 +470,60 @@ public class PosSaleService {
 
     private void recompute(PosSale sale) {
         BigDecimal subtotal = BigDecimal.ZERO;
-        BigDecimal discountTotal = BigDecimal.ZERO;
+        BigDecimal lineDiscountTotal = BigDecimal.ZERO;
         BigDecimal taxTotal = BigDecimal.ZERO;
-        BigDecimal grandTotal = BigDecimal.ZERO;
+        BigDecimal lineGrand = BigDecimal.ZERO;
         for (PosSaleLine line : lines.findByOrganizationIdAndPosSaleIdOrderByLineOrderAsc(org(), sale.getId())) {
             BigDecimal base = line.getQuantity().multiply(line.getRate());
             BigDecimal discount = base.multiply(nz(line.getDiscountPercent())).divide(HUNDRED, 2, RoundingMode.HALF_UP);
             BigDecimal taxable = base.subtract(discount);
             BigDecimal tax = taxable.multiply(nz(line.getTaxRate())).divide(HUNDRED, 2, RoundingMode.HALF_UP);
+            BigDecimal total = taxable.add(tax).setScale(2, RoundingMode.HALF_UP);
+            line.setLineTotal(total);
+            lines.save(line);
             subtotal = subtotal.add(base.setScale(2, RoundingMode.HALF_UP));
-            discountTotal = discountTotal.add(discount);
+            lineDiscountTotal = lineDiscountTotal.add(discount);
             taxTotal = taxTotal.add(tax);
-            grandTotal = grandTotal.add(taxable.add(tax).setScale(2, RoundingMode.HALF_UP));
+            lineGrand = lineGrand.add(total);
+        }
+        BigDecimal afterLine = subtotal.subtract(lineDiscountTotal).max(BigDecimal.ZERO);
+        BigDecimal headerDisc = headerDiscountAmount(sale, afterLine);
+        // Prefer reducing payable after tax so cashiers see an intuitive bill total.
+        if (headerDisc.compareTo(lineGrand) > 0) {
+            headerDisc = lineGrand;
+            // Clamp loyalty/bill amounts so stored values stay consistent with payable.
+            BigDecimal pctPart =
+                    afterLine.multiply(nz(sale.getBillDiscountPercent())).divide(HUNDRED, 2, RoundingMode.HALF_UP);
+            BigDecimal remaining = headerDisc.subtract(pctPart).max(BigDecimal.ZERO);
+            BigDecimal billAmt = nz(sale.getBillDiscountAmount()).min(remaining);
+            sale.setBillDiscountAmount(billAmt);
+            remaining = remaining.subtract(billAmt);
+            sale.setLoyaltyPointsRedeemed(nz(sale.getLoyaltyPointsRedeemed()).min(remaining));
+            headerDisc = headerDiscountAmount(sale, afterLine).min(lineGrand);
         }
         sale.setSubtotal(subtotal);
-        sale.setDiscountTotal(discountTotal);
+        sale.setDiscountTotal(lineDiscountTotal.add(headerDisc).setScale(2, RoundingMode.HALF_UP));
         sale.setTaxTotal(taxTotal);
-        sale.setGrandTotal(grandTotal);
+        sale.setGrandTotal(lineGrand.subtract(headerDisc).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
+    }
+
+    private BigDecimal headerDiscountAmount(PosSale sale, BigDecimal afterLineDiscountBase) {
+        BigDecimal pct = afterLineDiscountBase
+                .multiply(nz(sale.getBillDiscountPercent()))
+                .divide(HUNDRED, 2, RoundingMode.HALF_UP);
+        return pct.add(nz(sale.getBillDiscountAmount()))
+                .add(nz(sale.getLoyaltyPointsRedeemed()))
+                .max(BigDecimal.ZERO);
+    }
+
+    private BigDecimal previewLineNet(UUID saleId) {
+        BigDecimal net = BigDecimal.ZERO;
+        for (PosSaleLine line : lines.findByOrganizationIdAndPosSaleIdOrderByLineOrderAsc(org(), saleId)) {
+            BigDecimal base = line.getQuantity().multiply(line.getRate());
+            BigDecimal discount = base.multiply(nz(line.getDiscountPercent())).divide(HUNDRED, 2, RoundingMode.HALF_UP);
+            net = net.add(base.subtract(discount));
+        }
+        return net.max(BigDecimal.ZERO);
     }
 
     private BigDecimal lineTotal(PosSaleLine line) {
@@ -309,29 +542,29 @@ public class PosSaleService {
     private PosSale loadEditable(UUID id) {
         PosSale sale = load(id);
         if (sale.getStatus() == PosSaleStatus.COMPLETED || sale.getStatus() == PosSaleStatus.VOID) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "POS sale is not editable in status " + sale.getStatus());
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "POS sale is not editable in status " + sale.getStatus());
         }
         return sale;
     }
 
     private PosSaleResponse map(PosSale e) {
-        List<PosLineResponse> lineResponses = lines
-                .findByOrganizationIdAndPosSaleIdOrderByLineOrderAsc(org(), e.getId()).stream()
-                .map(l -> new PosLineResponse(
-                        l.getId(),
-                        l.getProductId(),
-                        l.getVariantId(),
-                        l.getDescription(),
-                        l.getBarcode(),
-                        l.getQuantity(),
-                        l.getRate(),
-                        l.getDiscountPercent(),
-                        l.getTaxRate(),
-                        l.getLineTotal(),
-                        l.getLineOrder()))
-                .toList();
-        List<PosPaymentResponse> paymentResponses = payments
-                .findByOrganizationIdAndPosSaleId(org(), e.getId()).stream()
+        List<PosLineResponse> lineResponses =
+                lines.findByOrganizationIdAndPosSaleIdOrderByLineOrderAsc(org(), e.getId()).stream()
+                        .map(l -> new PosLineResponse(
+                                l.getId(),
+                                l.getProductId(),
+                                l.getVariantId(),
+                                l.getDescription(),
+                                l.getBarcode(),
+                                l.getQuantity(),
+                                l.getRate(),
+                                l.getDiscountPercent(),
+                                l.getTaxRate(),
+                                l.getLineTotal(),
+                                l.getLineOrder()))
+                        .toList();
+        List<PosPaymentResponse> paymentResponses = payments.findByOrganizationIdAndPosSaleId(org(), e.getId()).stream()
                 .map(p -> new PosPaymentResponse(
                         p.getId(), p.getPaymentMode(), p.getAmount(), p.getPaymentId(), p.getReference()))
                 .toList();
@@ -349,6 +582,10 @@ public class PosSaleService {
                 e.getBillNumber(),
                 e.getSubtotal(),
                 e.getDiscountTotal(),
+                nz(e.getBillDiscountPercent()),
+                nz(e.getBillDiscountAmount()),
+                nz(e.getLoyaltyPointsRedeemed()),
+                e.getCouponCode(),
                 e.getTaxTotal(),
                 e.getGrandTotal(),
                 e.getHeldLabel(),

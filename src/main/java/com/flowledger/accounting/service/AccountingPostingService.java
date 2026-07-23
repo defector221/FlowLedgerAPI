@@ -544,12 +544,7 @@ public class AccountingPostingService {
                 org, "JOURNAL", "JV", organization.getFinancialYearStart(), entryDate, maxExisting + 1);
         for (int attempt = 0; attempt < 8; attempt++) {
             String candidate = numbers.next(
-                    org,
-                    "JOURNAL",
-                    "JV",
-                    "{PREFIX}/{FY}/{SEQ:6}",
-                    organization.getFinancialYearStart(),
-                    entryDate);
+                    org, "JOURNAL", "JV", "{PREFIX}/{FY}/{SEQ:6}", organization.getFinancialYearStart(), entryDate);
             if (!journals.existsByOrganizationIdAndEntryNumber(org, candidate)) {
                 return candidate;
             }

@@ -47,9 +47,7 @@ public class RetailInventoryService {
     // --------------------------------------------------------------- Locations
     @Transactional(readOnly = true)
     public List<LocationResponse> listLocations(UUID storeId) {
-        return locations
-                .findByOrganizationIdAndStoreIdAndDeletedFalseOrderByNameAsc(org(), storeId)
-                .stream()
+        return locations.findByOrganizationIdAndStoreIdAndDeletedFalseOrderByNameAsc(org(), storeId).stream()
                 .map(this::map)
                 .toList();
     }
@@ -169,8 +167,7 @@ public class RetailInventoryService {
     }
 
     private RetailStockCount loadCount(UUID id) {
-        return counts
-                .findByIdAndOrganizationIdAndDeletedFalse(id, org())
+        return counts.findByIdAndOrganizationIdAndDeletedFalse(id, org())
                 .orElseThrow(() -> notFound("Stock count not found"));
     }
 
@@ -186,12 +183,11 @@ public class RetailInventoryService {
     }
 
     private StockCountResponse map(RetailStockCount e) {
-        List<StockCountLineResponse> lineResponses = countLines
-                .findByOrganizationIdAndCountId(org(), e.getId())
-                .stream()
-                .map(l -> new StockCountLineResponse(
-                        l.getId(), l.getProductId(), l.getSystemQty(), l.getCountedQty(), l.getVarianceQty()))
-                .toList();
+        List<StockCountLineResponse> lineResponses =
+                countLines.findByOrganizationIdAndCountId(org(), e.getId()).stream()
+                        .map(l -> new StockCountLineResponse(
+                                l.getId(), l.getProductId(), l.getSystemQty(), l.getCountedQty(), l.getVarianceQty()))
+                        .toList();
         return new StockCountResponse(
                 e.getId(),
                 e.getStoreId(),

@@ -40,8 +40,7 @@ public class RetailLabelController {
 
     @PutMapping("/templates/{id}")
     @PreAuthorize("hasAuthority('RETAIL_STORE_MANAGE')")
-    public LabelTemplateResponse updateTemplate(
-            @PathVariable UUID id, @Valid @RequestBody LabelTemplateRequest r) {
+    public LabelTemplateResponse updateTemplate(@PathVariable UUID id, @Valid @RequestBody LabelTemplateRequest r) {
         return service.updateTemplate(id, r);
     }
 

@@ -4,8 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.flowledger.common.tenant.TenantContext;
-import com.flowledger.organization.entity.OrganizationSettings;
-import com.flowledger.organization.repository.OrganizationSettingsRepository;
+import com.flowledger.platform.domain.ModuleCodes;
+import com.flowledger.platform.service.FeatureService;
+import com.flowledger.platform.service.ModuleEntitlementCache;
 import com.flowledger.retail.domain.RetailEnums.ShiftStatus;
 import com.flowledger.retail.dto.RetailDtos.CloseShiftRequest;
 import com.flowledger.retail.dto.RetailDtos.OpenShiftRequest;
@@ -18,8 +19,10 @@ import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +35,7 @@ class RetailShiftServiceTest {
     UUID counterId = UUID.randomUUID();
     UUID cashierId = UUID.randomUUID();
 
-    AtomicReference<Optional<OrganizationSettings>> settings = new AtomicReference<>();
+    AtomicBoolean retailEnabled = new AtomicBoolean(true);
     AtomicReference<List<RetailShift>> openForCashier = new AtomicReference<>(List.of());
     AtomicReference<RetailShift> saved = new AtomicReference<>();
 
@@ -40,18 +43,17 @@ class RetailShiftServiceTest {
 
     @BeforeEach
     void setUp() {
-        OrganizationSettings enabled = new OrganizationSettings();
-        enabled.setRetailEnabled(true);
-        settings.set(Optional.of(enabled));
+        retailEnabled.set(true);
         openForCashier.set(List.of());
         saved.set(null);
 
-        RetailModuleGuard guard = new RetailModuleGuard(proxy(OrganizationSettingsRepository.class, (m, a) -> {
-            if ("findByOrganizationId".equals(m.getName())) {
-                return settings.get();
+        ModuleEntitlementCache cache = new ModuleEntitlementCache(null, null) {
+            @Override
+            public Snapshot get(UUID organizationId) {
+                return new Snapshot(Map.of(ModuleCodes.RETAIL, retailEnabled.get()), Map.of());
             }
-            return defaultValue(m.getReturnType());
-        }));
+        };
+        RetailModuleGuard guard = new RetailModuleGuard(new FeatureService(cache));
 
         RetailShiftRepository shifts = proxy(RetailShiftRepository.class, (m, a) -> switch (m.getName()) {
             case "findByOrganizationIdAndCashierIdAndStatusAndDeletedFalse" -> openForCashier.get();
@@ -66,7 +68,7 @@ class RetailShiftServiceTest {
             }
             case "findByOrganizationIdAndDeletedFalseOrderByOpenedAtDesc",
                     "findByOrganizationIdAndStoreIdAndDeletedFalseOrderByOpenedAtDesc" ->
-                    saved.get() == null ? List.of() : List.of(saved.get());
+                saved.get() == null ? List.of() : List.of(saved.get());
             default -> defaultValue(m.getReturnType());
         });
 
@@ -84,9 +86,7 @@ class RetailShiftServiceTest {
 
     @Test
     void openShiftRequiresRetailEnabled() {
-        OrganizationSettings disabled = new OrganizationSettings();
-        disabled.setRetailEnabled(false);
-        settings.set(Optional.of(disabled));
+        retailEnabled.set(false);
         assertThrows(
                 ResponseStatusException.class,
                 () -> service.open(new OpenShiftRequest(storeId, counterId, null, cashierId, BigDecimal.TEN, null)));

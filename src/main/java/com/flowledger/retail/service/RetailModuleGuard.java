@@ -1,7 +1,8 @@
 package com.flowledger.retail.service;
 
 import com.flowledger.common.tenant.TenantContext;
-import com.flowledger.organization.repository.OrganizationSettingsRepository;
+import com.flowledger.platform.domain.ModuleCodes;
+import com.flowledger.platform.service.FeatureService;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -12,10 +13,10 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @Component
 public class RetailModuleGuard {
-    private final OrganizationSettingsRepository settingsRepository;
+    private final FeatureService featureService;
 
-    public RetailModuleGuard(OrganizationSettingsRepository settingsRepository) {
-        this.settingsRepository = settingsRepository;
+    public RetailModuleGuard(FeatureService featureService) {
+        this.featureService = featureService;
     }
 
     /**
@@ -24,12 +25,9 @@ public class RetailModuleGuard {
      */
     public UUID ensureEnabled() {
         UUID organizationId = TenantContext.getOrganizationId();
-        boolean enabled = settingsRepository
-                .findByOrganizationId(organizationId)
-                .map(settings -> settings.isRetailEnabled())
-                .orElse(false);
-        if (!enabled) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Retail module is not enabled for this organization");
+        if (!featureService.hasModule(organizationId, ModuleCodes.RETAIL)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Retail module is not enabled for this organization");
         }
         return organizationId;
     }

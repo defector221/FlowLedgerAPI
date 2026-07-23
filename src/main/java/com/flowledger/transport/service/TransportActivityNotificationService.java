@@ -30,9 +30,7 @@ public class TransportActivityNotificationService {
     private final UserRepository users;
 
     public TransportActivityNotificationService(
-            NotificationService notifications,
-            OrganizationMembershipRepository memberships,
-            UserRepository users) {
+            NotificationService notifications, OrganizationMembershipRepository memberships, UserRepository users) {
         this.notifications = notifications;
         this.memberships = memberships;
         this.users = users;

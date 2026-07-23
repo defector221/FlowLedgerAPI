@@ -55,7 +55,7 @@ public class RetailLoyaltyController {
 
     @PostMapping("/loyalty/accounts")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAuthority('RETAIL_STORE_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('RETAIL_STORE_MANAGE','RETAIL_POS')")
     public LoyaltyAccountResponse getOrCreateAccount(@Valid @RequestBody LoyaltyAccountRequest r) {
         return service.getOrCreateAccount(r);
     }
@@ -100,8 +100,7 @@ public class RetailLoyaltyController {
 
     @PostMapping("/gift-cards/{id}/redeem")
     @PreAuthorize("hasAuthority('RETAIL_POS')")
-    public GiftCardResponse redeemGiftCard(
-            @PathVariable UUID id, @Valid @RequestBody GiftCardAmountRequest r) {
+    public GiftCardResponse redeemGiftCard(@PathVariable UUID id, @Valid @RequestBody GiftCardAmountRequest r) {
         return service.redeem(id, r);
     }
 

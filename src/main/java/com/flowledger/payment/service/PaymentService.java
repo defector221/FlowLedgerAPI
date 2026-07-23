@@ -282,20 +282,15 @@ public class PaymentService {
                 organizations.findById(TenantContext.getOrganizationId()).orElseThrow();
         UUID org = organization.getId();
         String fy = FinancialYearUtil.financialYear(date, organization.getFinancialYearStart());
-        String prefix = organization.getPaymentPrefix() == null || organization.getPaymentPrefix().isBlank()
+        String prefix = organization.getPaymentPrefix() == null
+                        || organization.getPaymentPrefix().isBlank()
                 ? "PAY"
                 : organization.getPaymentPrefix();
         long maxExisting = maxPaymentSequence(org, prefix + "/" + fy + "/");
-        numbers.ensureNextAtLeast(
-                org, "PAYMENT", prefix, organization.getFinancialYearStart(), date, maxExisting + 1);
+        numbers.ensureNextAtLeast(org, "PAYMENT", prefix, organization.getFinancialYearStart(), date, maxExisting + 1);
         for (int attempt = 0; attempt < 8; attempt++) {
             String candidate = numbers.next(
-                    org,
-                    "PAYMENT",
-                    prefix,
-                    "{PREFIX}/{FY}/{SEQ:6}",
-                    organization.getFinancialYearStart(),
-                    date);
+                    org, "PAYMENT", prefix, "{PREFIX}/{FY}/{SEQ:6}", organization.getFinancialYearStart(), date);
             if (!paymentNumberExists(org, candidate)) {
                 return candidate;
             }

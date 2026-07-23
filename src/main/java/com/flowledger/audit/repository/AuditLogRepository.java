@@ -3,12 +3,9 @@ package com.flowledger.audit.repository;
 import com.flowledger.audit.entity.AuditLog;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
-    Page<AuditLog> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId, Pageable pageable);
-
+public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSpecificationExecutor<AuditLog> {
     Optional<AuditLog> findByIdAndOrganizationId(UUID id, UUID organizationId);
 }

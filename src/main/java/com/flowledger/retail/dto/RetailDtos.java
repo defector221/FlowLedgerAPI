@@ -53,18 +53,12 @@ public final class RetailDtos {
             String status,
             Long version) {}
 
-    public record CounterRequest(
-            @NotNull UUID storeId, @NotBlank String code, @NotBlank String name, String status) {}
+    public record CounterRequest(@NotNull UUID storeId, @NotBlank String code, @NotBlank String name, String status) {}
 
-    public record CounterResponse(
-            UUID id, UUID storeId, String code, String name, String status, Long version) {}
+    public record CounterResponse(UUID id, UUID storeId, String code, String name, String status, Long version) {}
 
     public record TerminalRequest(
-            @NotNull UUID storeId,
-            UUID counterId,
-            @NotBlank String code,
-            @NotBlank String name,
-            String status) {}
+            @NotNull UUID storeId, UUID counterId, @NotBlank String code, @NotBlank String name, String status) {}
 
     public record TerminalResponse(
             UUID id, UUID storeId, UUID counterId, String code, String name, String status, Long version) {}
@@ -77,13 +71,7 @@ public final class RetailDtos {
             String status) {}
 
     public record CashierResponse(
-            UUID id,
-            UUID storeId,
-            UUID userId,
-            String employeeCode,
-            String displayName,
-            String status,
-            Long version) {}
+            UUID id, UUID storeId, UUID userId, String employeeCode, String displayName, String status, Long version) {}
 
     // ---------------------------------------------------------------- Shifts
     public record OpenShiftRequest(
@@ -132,12 +120,22 @@ public final class RetailDtos {
             BigDecimal discountPercent,
             BigDecimal taxRate) {}
 
+    public record PosLineUpdateRequest(
+            @Positive BigDecimal quantity, BigDecimal discountPercent, BigDecimal rate, BigDecimal taxRate) {}
+
+    public record PosAdjustmentsRequest(
+            UUID customerId,
+            Boolean clearCustomer,
+            BigDecimal billDiscountPercent,
+            BigDecimal billDiscountAmount,
+            BigDecimal loyaltyPointsRedeemed,
+            String couponCode) {}
+
     public record HoldRequest(String heldLabel) {}
 
     public record PaymentInput(@NotNull PaymentMode paymentMode, @NotNull BigDecimal amount, String reference) {}
 
-    public record CheckoutRequest(
-            UUID customerId, String receiptType, @NotNull List<@Valid PaymentInput> payments) {}
+    public record CheckoutRequest(UUID customerId, String receiptType, @NotNull List<@Valid PaymentInput> payments) {}
 
     public record PosLineResponse(
             UUID id,
@@ -169,6 +167,10 @@ public final class RetailDtos {
             String billNumber,
             BigDecimal subtotal,
             BigDecimal discountTotal,
+            BigDecimal billDiscountPercent,
+            BigDecimal billDiscountAmount,
+            BigDecimal loyaltyPointsRedeemed,
+            String couponCode,
             BigDecimal taxTotal,
             BigDecimal grandTotal,
             String heldLabel,
@@ -251,8 +253,7 @@ public final class RetailDtos {
     public record PriceListItemResponse(
             UUID id, UUID priceListId, UUID productId, UUID variantId, BigDecimal unitPrice, BigDecimal minQty) {}
 
-    public record ResolvePriceResponse(
-            UUID productId, UUID variantId, BigDecimal unitPrice, String source) {}
+    public record ResolvePriceResponse(UUID productId, UUID variantId, BigDecimal unitPrice, String source) {}
 
     // ------------------------------------------------------------ Promotions
     public record PromotionRequest(
@@ -341,10 +342,18 @@ public final class RetailDtos {
             UUID id, UUID customerId, UUID tierId, BigDecimal pointsBalance, BigDecimal lifetimePoints) {}
 
     public record EarnRequest(
-            @NotNull UUID customerId, @NotNull BigDecimal points, String referenceType, UUID referenceId, String notes) {}
+            @NotNull UUID customerId,
+            @NotNull BigDecimal points,
+            String referenceType,
+            UUID referenceId,
+            String notes) {}
 
     public record RedeemRequest(
-            @NotNull UUID customerId, @NotNull BigDecimal points, String referenceType, UUID referenceId, String notes) {}
+            @NotNull UUID customerId,
+            @NotNull BigDecimal points,
+            String referenceType,
+            UUID referenceId,
+            String notes) {}
 
     public record LoyaltyTransactionResponse(
             UUID id, UUID accountId, String txnType, BigDecimal points, String referenceType, UUID referenceId) {}

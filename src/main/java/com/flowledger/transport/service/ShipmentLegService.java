@@ -85,9 +85,7 @@ public class ShipmentLegService {
         if (isTerminal(shipment.getStatus())) {
             conflict("Cannot add legs to a closed shipment");
         }
-        int sequence = request.sequenceNo() == null
-                ? nextSequence(shipmentId)
-                : request.sequenceNo();
+        int sequence = request.sequenceNo() == null ? nextSequence(shipmentId) : request.sequenceNo();
         if (legs.existsByShipmentIdAndSequenceNoAndDeletedFalse(shipmentId, sequence)) {
             conflict("Leg sequence " + sequence + " already exists");
         }
@@ -149,15 +147,19 @@ public class ShipmentLegService {
         ShipmentLeg leg = loadLeg(legId);
         Shipment shipment = loadShipment(leg.getShipmentId());
         ShipmentLegStatus target = request.status();
-        if (target == ShipmentLegStatus.DISPATCHED) return dispatch(legId, new TransitionRequest(request.remarks(), null, null));
-        if (target == ShipmentLegStatus.ARRIVED) return arrive(legId, new TransitionRequest(request.remarks(), null, null));
-        if (target == ShipmentLegStatus.COMPLETED) return complete(legId, new TransitionRequest(request.remarks(), null, null));
+        if (target == ShipmentLegStatus.DISPATCHED)
+            return dispatch(legId, new TransitionRequest(request.remarks(), null, null));
+        if (target == ShipmentLegStatus.ARRIVED)
+            return arrive(legId, new TransitionRequest(request.remarks(), null, null));
+        if (target == ShipmentLegStatus.COMPLETED)
+            return complete(legId, new TransitionRequest(request.remarks(), null, null));
         if (target == ShipmentLegStatus.CANCELLED) {
             leg.setStatus(ShipmentLegStatus.CANCELLED);
             audit(leg, false);
             legs.save(leg);
             timeline(shipment, "LEG_CANCELLED", request.remarks(), null);
-            outbox.enqueue("LegCancelled", "SHIPMENT_LEG", leg.getId(), "{\"shipmentId\":\"" + shipment.getId() + "\"}");
+            outbox.enqueue(
+                    "LegCancelled", "SHIPMENT_LEG", leg.getId(), "{\"shipmentId\":\"" + shipment.getId() + "\"}");
             recompute(shipment);
             return mapLeg(leg);
         }
@@ -292,7 +294,9 @@ public class ShipmentLegService {
             doc.setUpdatedBy(actor);
         }
         ShipmentLegDocument saved = documents.save(doc);
-        String type = request.documentType() == null ? "DOCUMENT" : request.documentType().name();
+        String type = request.documentType() == null
+                ? "DOCUMENT"
+                : request.documentType().name();
         timeline(
                 shipment,
                 type.equals("POD") ? "POD_UPLOADED" : "LEG_DOCUMENT_UPLOADED",
@@ -310,10 +314,9 @@ public class ShipmentLegService {
     }
 
     public void recompute(Shipment shipment) {
-        List<ShipmentLeg> active =
-                legs.findByShipmentIdAndDeletedFalseOrderBySequenceNo(shipment.getId()).stream()
-                        .filter(l -> l.getStatus() != ShipmentLegStatus.CANCELLED)
-                        .toList();
+        List<ShipmentLeg> active = legs.findByShipmentIdAndDeletedFalseOrderBySequenceNo(shipment.getId()).stream()
+                .filter(l -> l.getStatus() != ShipmentLegStatus.CANCELLED)
+                .toList();
         BigDecimal freight = BigDecimal.ZERO;
         BigDecimal fuel = BigDecimal.ZERO;
         BigDecimal toll = BigDecimal.ZERO;
@@ -420,7 +423,8 @@ public class ShipmentLegService {
     private void validateOverlap(ShipmentLeg leg, UUID excludeId) {
         if (leg.getDriverId() != null && enforceDriverOverlap) {
             boolean busy = legs
-                    .findByOrganizationIdAndDriverIdAndDeletedFalseAndStatusIn(org(), leg.getDriverId(), List.copyOf(ACTIVE))
+                    .findByOrganizationIdAndDriverIdAndDeletedFalseAndStatusIn(
+                            org(), leg.getDriverId(), List.copyOf(ACTIVE))
                     .stream()
                     .anyMatch(other -> !Objects.equals(other.getId(), excludeId));
             if (busy) conflict("Driver is already assigned to an active leg");
@@ -477,7 +481,8 @@ public class ShipmentLegService {
         leg.setDestinationLocation(request.destinationLocation());
         leg.setWaypointsJson(request.waypointsJson());
         if (request.estimatedDistance() != null) leg.setEstimatedDistance(request.estimatedDistance());
-        if (request.estimatedDurationMinutes() != null) leg.setEstimatedDurationMinutes(request.estimatedDurationMinutes());
+        if (request.estimatedDurationMinutes() != null)
+            leg.setEstimatedDurationMinutes(request.estimatedDurationMinutes());
         if (request.freightCost() != null) leg.setFreightCost(request.freightCost());
         if (request.fuelCost() != null) leg.setFuelCost(request.fuelCost());
         if (request.tollCost() != null) leg.setTollCost(request.tollCost());

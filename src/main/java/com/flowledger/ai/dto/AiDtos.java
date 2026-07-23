@@ -183,12 +183,7 @@ public final class AiDtos {
     public record WorkflowApprovalDecideRequest(String remarks) {}
 
     public record WorkflowApprovalActionResponse(
-            UUID id,
-            String action,
-            UUID actorId,
-            String actorName,
-            OffsetDateTime actedAt,
-            String remarks) {}
+            UUID id, String action, UUID actorId, String actorName, OffsetDateTime actedAt, String remarks) {}
 
     public record WorkflowApprovalResponse(
             UUID id,

@@ -27,7 +27,8 @@ public class DocumentNumberService {
      * Used when seeded or manually inserted documents have advanced past the counter.
      */
     @Transactional
-    public void ensureNextAtLeast(UUID org, String type, String prefix, String fyStart, LocalDate date, long minNextValue) {
+    public void ensureNextAtLeast(
+            UUID org, String type, String prefix, String fyStart, LocalDate date, long minNextValue) {
         if (minNextValue < 1) return;
         String fy = FinancialYearUtil.financialYear(date, fyStart);
         DocumentSequence sequence = lockedOrCreate(org, type, fy, prefix);

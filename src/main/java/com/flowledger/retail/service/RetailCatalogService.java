@@ -113,7 +113,8 @@ public class RetailCatalogService {
     }
 
     public DepartmentResponse updateDepartment(UUID id, DepartmentRequest r) {
-        RetailDepartment e = departments.findByIdAndOrganizationIdAndDeletedFalse(id, org())
+        RetailDepartment e = departments
+                .findByIdAndOrganizationIdAndDeletedFalse(id, org())
                 .orElseThrow(() -> notFound("Department not found"));
         e.setName(r.name());
         audit(e, false);
@@ -122,7 +123,8 @@ public class RetailCatalogService {
     }
 
     public void deleteDepartment(UUID id) {
-        RetailDepartment e = departments.findByIdAndOrganizationIdAndDeletedFalse(id, org())
+        RetailDepartment e = departments
+                .findByIdAndOrganizationIdAndDeletedFalse(id, org())
                 .orElseThrow(() -> notFound("Department not found"));
         e.setDeleted(true);
         audit(e, false);
@@ -152,7 +154,8 @@ public class RetailCatalogService {
     }
 
     public CollectionResponse updateCollection(UUID id, CollectionRequest r) {
-        RetailCollection e = collections.findByIdAndOrganizationIdAndDeletedFalse(id, org())
+        RetailCollection e = collections
+                .findByIdAndOrganizationIdAndDeletedFalse(id, org())
                 .orElseThrow(() -> notFound("Collection not found"));
         e.setName(r.name());
         e.setSeason(r.season());
@@ -162,7 +165,8 @@ public class RetailCatalogService {
     }
 
     public void deleteCollection(UUID id) {
-        RetailCollection e = collections.findByIdAndOrganizationIdAndDeletedFalse(id, org())
+        RetailCollection e = collections
+                .findByIdAndOrganizationIdAndDeletedFalse(id, org())
                 .orElseThrow(() -> notFound("Collection not found"));
         e.setDeleted(true);
         audit(e, false);
@@ -241,8 +245,7 @@ public class RetailCatalogService {
     }
 
     public BarcodeResponse createBarcode(BarcodeRequest r) {
-        barcodes.findByOrganizationIdAndBarcode(org(), r.barcode())
-                .ifPresent(b -> conflict("Barcode already exists"));
+        barcodes.findByOrganizationIdAndBarcode(org(), r.barcode()).ifPresent(b -> conflict("Barcode already exists"));
         RetailProductBarcode e = new RetailProductBarcode();
         e.setOrganizationId(org());
         e.setProductId(r.productId());
@@ -276,7 +279,8 @@ public class RetailCatalogService {
         if (mapping.isPresent()) {
             RetailProductBarcode m = mapping.get();
             if (m.getVariantId() != null) {
-                Optional<RetailProductVariant> v = variants.findByIdAndOrganizationIdAndDeletedFalse(m.getVariantId(), org);
+                Optional<RetailProductVariant> v =
+                        variants.findByIdAndOrganizationIdAndDeletedFalse(m.getVariantId(), org);
                 if (v.isPresent()) {
                     return fromVariant(v.get(), barcode);
                 }
@@ -289,15 +293,37 @@ public class RetailCatalogService {
         }
 
         // 2. Variant-level barcode.
-        Optional<RetailProductVariant> variant = variants.findFirstByOrganizationIdAndBarcodeAndDeletedFalse(org, barcode);
+        Optional<RetailProductVariant> variant =
+                variants.findFirstByOrganizationIdAndBarcodeAndDeletedFalse(org, barcode);
         if (variant.isPresent()) {
             return fromVariant(variant.get(), barcode);
         }
 
         // 3. Core product barcode.
-        return products.findFirstByOrganizationIdAndBarcode(org, barcode)
-                .map(p -> fromProduct(p, barcode))
-                .orElseThrow(() -> notFound("No product found for barcode " + barcode));
+        Optional<Product> byBarcode = products.findFirstByOrganizationIdAndBarcode(org, barcode);
+        if (byBarcode.isPresent()) {
+            return fromProduct(byBarcode.get(), barcode);
+        }
+
+        // 4. Name / SKU fallback for typed POS search.
+        String needle = barcode.trim().toLowerCase(Locale.ROOT);
+        List<Product> active = products.findByOrganizationIdAndActiveTrue(org);
+        Optional<Product> exact = active.stream()
+                .filter(p -> (p.getName() != null && p.getName().equalsIgnoreCase(barcode.trim()))
+                        || (p.getSku() != null && p.getSku().equalsIgnoreCase(barcode.trim())))
+                .findFirst();
+        if (exact.isPresent()) {
+            Product p = exact.get();
+            return fromProduct(p, p.getBarcode() != null ? p.getBarcode() : barcode);
+        }
+        Optional<Product> partial = active.stream()
+                .filter(p -> (p.getName() != null
+                                && p.getName().toLowerCase(Locale.ROOT).contains(needle))
+                        || (p.getSku() != null
+                                && p.getSku().toLowerCase(Locale.ROOT).contains(needle)))
+                .findFirst();
+        return partial.map(p -> fromProduct(p, p.getBarcode() != null ? p.getBarcode() : barcode))
+                .orElseThrow(() -> notFound("No product found for \"" + barcode + "\""));
     }
 
     private ProductLookupResponse fromProduct(Product p, String barcode) {
@@ -314,7 +340,8 @@ public class RetailCatalogService {
     }
 
     private ProductLookupResponse fromVariant(RetailProductVariant v, String barcode) {
-        Product parent = products.findByIdAndOrganizationId(v.getParentProductId(), org()).orElse(null);
+        Product parent = products.findByIdAndOrganizationId(v.getParentProductId(), org())
+                .orElse(null);
         return new ProductLookupResponse(
                 v.getParentProductId(),
                 v.getId(),

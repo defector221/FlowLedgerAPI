@@ -68,8 +68,7 @@ public class RetailInventoryController {
 
     @PostMapping("/stock-counts/{id}/lines")
     @PreAuthorize("hasAuthority('RETAIL_STORE_MANAGE')")
-    public StockCountResponse addLines(
-            @PathVariable UUID id, @Valid @RequestBody List<StockCountLineRequest> lines) {
+    public StockCountResponse addLines(@PathVariable UUID id, @Valid @RequestBody List<StockCountLineRequest> lines) {
         return service.addLines(id, lines);
     }
 
