@@ -27,7 +27,8 @@ public class AiToolRegistry {
             PaymentTool paymentTool,
             CustomerTool customerTool,
             SupplierTool supplierTool,
-            ReportTool reportTool) {
+            ReportTool reportTool,
+            RetailTool retailTool) {
         tools.put("inventory", inventoryTool::summarize);
         tools.put("sales", salesTool::summarize);
         tools.put("accounting", accountingTool::summarize);
@@ -38,6 +39,7 @@ public class AiToolRegistry {
         tools.put("customer", customerTool::summarize);
         tools.put("supplier", supplierTool::summarize);
         tools.put("report", reportTool::summarize);
+        tools.put("retail", retailTool::summarize);
     }
 
     public String invoke(String name, String query) {

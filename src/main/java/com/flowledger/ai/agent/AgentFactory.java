@@ -14,16 +14,25 @@ public class AgentFactory {
             case ASK ->
                 new SimpleAiAgent(
                         type,
-                        Set.of("dashboard", "sales", "inventory", "payment", "gst", "report", "customer", "supplier"));
+                        Set.of(
+                                "dashboard",
+                                "sales",
+                                "inventory",
+                                "payment",
+                                "gst",
+                                "report",
+                                "customer",
+                                "supplier",
+                                "retail"));
             case BUSINESS_ADVISOR, CEO ->
                 new SimpleAiAgent(
-                        type, Set.of("dashboard", "sales", "inventory", "payment", "gst", "report", "accounting"));
+                        type, Set.of("dashboard", "sales", "inventory", "payment", "gst", "report", "accounting", "retail"));
             case CFO -> new SimpleAiAgent(type, Set.of("payment", "dashboard", "accounting", "report", "sales"));
             case ACCOUNTANT -> new SimpleAiAgent(type, Set.of("accounting", "payment", "report"));
             case INVENTORY_PLANNER -> new SimpleAiAgent(type, Set.of("inventory", "purchase", "dashboard", "supplier"));
             case PROCUREMENT -> new SimpleAiAgent(type, Set.of("purchase", "supplier", "inventory", "report"));
             case GST_EXPERT -> new SimpleAiAgent(type, Set.of("gst", "report", "sales", "purchase"));
-            case SALES_COACH -> new SimpleAiAgent(type, Set.of("sales", "customer", "payment", "dashboard"));
+            case SALES_COACH -> new SimpleAiAgent(type, Set.of("sales", "customer", "payment", "dashboard", "retail"));
             case COLLECTIONS -> new SimpleAiAgent(type, Set.of("payment", "customer", "sales", "dashboard"));
             case CRM -> new SimpleAiAgent(type, Set.of("customer", "supplier", "sales"));
         };

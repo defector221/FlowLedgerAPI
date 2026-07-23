@@ -8,6 +8,7 @@ public record UpdateOrganizationSettingsRequest(
         Boolean roundOffEnabled,
         UUID defaultWarehouseId,
         Boolean transportEnabled,
+        Boolean retailEnabled,
         Boolean transportRequiredDefault,
         Boolean transportAllowOverride,
         Boolean transportApprovalRequired,

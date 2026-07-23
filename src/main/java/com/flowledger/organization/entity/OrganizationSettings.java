@@ -35,6 +35,9 @@ public class OrganizationSettings {
     private boolean transportEnabled;
 
     @Column(nullable = false)
+    private boolean retailEnabled;
+
+    @Column(nullable = false)
     private boolean transportRequiredDefault;
 
     @Column(nullable = false)

@@ -14,4 +14,6 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     List<Product> findByOrganizationId(UUID organizationId);
 
     Page<Product> findByOrganizationId(UUID organizationId, Pageable pageable);
+
+    Optional<Product> findFirstByOrganizationIdAndBarcode(UUID organizationId, String barcode);
 }

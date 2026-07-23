@@ -274,6 +274,7 @@ public class ChatOrchestrationService {
                 "balance sheet",
                 "reconcile");
         addIf(allowed, selected, "report", normalizedMessage, "report", "gstr");
+        addIf(allowed, selected, "retail", normalizedMessage, "retail", "pos", "store sales", "cashier", "shift");
         addIf(
                 allowed,
                 selected,

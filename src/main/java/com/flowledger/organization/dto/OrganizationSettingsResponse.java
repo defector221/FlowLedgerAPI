@@ -10,6 +10,7 @@ public record OrganizationSettingsResponse(
         boolean roundOffEnabled,
         UUID defaultWarehouseId,
         boolean transportEnabled,
+        boolean retailEnabled,
         boolean transportRequiredDefault,
         boolean transportAllowOverride,
         boolean transportApprovalRequired,

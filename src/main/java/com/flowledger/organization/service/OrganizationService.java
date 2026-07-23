@@ -136,6 +136,9 @@ public class OrganizationService {
         if (request.transportEnabled() != null) {
             settings.setTransportEnabled(request.transportEnabled());
         }
+        if (request.retailEnabled() != null) {
+            settings.setRetailEnabled(request.retailEnabled());
+        }
         if (request.transportRequiredDefault() != null) {
             settings.setTransportRequiredDefault(request.transportRequiredDefault());
         }
