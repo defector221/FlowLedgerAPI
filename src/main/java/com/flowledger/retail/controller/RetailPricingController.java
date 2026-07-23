@@ -70,8 +70,7 @@ public class RetailPricingController {
 
     @PutMapping("/price-lists/items/{itemId}")
     @PreAuthorize("hasAuthority('RETAIL_STORE_MANAGE')")
-    public PriceListItemResponse updateItem(
-            @PathVariable UUID itemId, @Valid @RequestBody PriceListItemRequest r) {
+    public PriceListItemResponse updateItem(@PathVariable UUID itemId, @Valid @RequestBody PriceListItemRequest r) {
         return service.updateItem(itemId, r);
     }
 

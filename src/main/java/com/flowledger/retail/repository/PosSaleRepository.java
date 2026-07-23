@@ -20,11 +20,7 @@ public interface PosSaleRepository extends JpaRepository<PosSale, UUID> {
             UUID organizationId, PosSaleStatus status, OffsetDateTime from, OffsetDateTime to);
 
     List<PosSale> findByOrganizationIdAndStoreIdAndStatusAndCompletedAtBetweenAndDeletedFalse(
-            UUID organizationId,
-            UUID storeId,
-            PosSaleStatus status,
-            OffsetDateTime from,
-            OffsetDateTime to);
+            UUID organizationId, UUID storeId, PosSaleStatus status, OffsetDateTime from, OffsetDateTime to);
 
     List<PosSale> findByOrganizationIdAndShiftIdAndDeletedFalse(UUID organizationId, UUID shiftId);
 }

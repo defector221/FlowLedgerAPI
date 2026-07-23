@@ -56,6 +56,18 @@ public class PosSale extends RetailAuditedEntity {
     @Column(name = "discount_total", nullable = false, precision = 18, scale = 2)
     private BigDecimal discountTotal = BigDecimal.ZERO;
 
+    @Column(name = "bill_discount_percent", nullable = false, precision = 8, scale = 4)
+    private BigDecimal billDiscountPercent = BigDecimal.ZERO;
+
+    @Column(name = "bill_discount_amount", nullable = false, precision = 18, scale = 2)
+    private BigDecimal billDiscountAmount = BigDecimal.ZERO;
+
+    @Column(name = "loyalty_points_redeemed", nullable = false, precision = 18, scale = 2)
+    private BigDecimal loyaltyPointsRedeemed = BigDecimal.ZERO;
+
+    @Column(name = "coupon_code")
+    private String couponCode;
+
     @Column(name = "tax_total", nullable = false, precision = 18, scale = 2)
     private BigDecimal taxTotal = BigDecimal.ZERO;
 

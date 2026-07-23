@@ -29,8 +29,12 @@ public interface ShipmentLegRepository extends JpaRepository<ShipmentLeg, UUID> 
     void deleteByShipmentId(@Param("shipmentId") UUID shipmentId);
 
     List<ShipmentLeg> findByOrganizationIdAndDriverIdAndDeletedFalseAndStatusIn(
-            UUID organizationId, UUID driverId, List<com.flowledger.transport.domain.TransportEnums.ShipmentLegStatus> statuses);
+            UUID organizationId,
+            UUID driverId,
+            List<com.flowledger.transport.domain.TransportEnums.ShipmentLegStatus> statuses);
 
     List<ShipmentLeg> findByOrganizationIdAndVehicleIdAndDeletedFalseAndStatusIn(
-            UUID organizationId, UUID vehicleId, List<com.flowledger.transport.domain.TransportEnums.ShipmentLegStatus> statuses);
+            UUID organizationId,
+            UUID vehicleId,
+            List<com.flowledger.transport.domain.TransportEnums.ShipmentLegStatus> statuses);
 }

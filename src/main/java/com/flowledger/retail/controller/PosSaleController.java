@@ -55,6 +55,19 @@ public class PosSaleController {
         return sales.removeLine(id, lineId);
     }
 
+    @PutMapping("/sales/{id}/lines/{lineId}")
+    @PreAuthorize("hasAuthority('RETAIL_POS')")
+    public PosSaleResponse updateLine(
+            @PathVariable UUID id, @PathVariable UUID lineId, @Valid @RequestBody PosLineUpdateRequest r) {
+        return sales.updateLine(id, lineId, r);
+    }
+
+    @PutMapping("/sales/{id}/adjustments")
+    @PreAuthorize("hasAuthority('RETAIL_POS')")
+    public PosSaleResponse applyAdjustments(@PathVariable UUID id, @Valid @RequestBody PosAdjustmentsRequest r) {
+        return sales.applyAdjustments(id, r);
+    }
+
     @PostMapping("/sales/{id}/hold")
     @PreAuthorize("hasAuthority('RETAIL_POS')")
     public PosSaleResponse hold(@PathVariable UUID id, @RequestBody(required = false) HoldRequest r) {

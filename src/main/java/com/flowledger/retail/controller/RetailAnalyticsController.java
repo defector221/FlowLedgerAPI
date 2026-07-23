@@ -19,8 +19,7 @@ public class RetailAnalyticsController {
 
     @GetMapping("/daily-sales")
     @PreAuthorize("hasAuthority('RETAIL_VIEW')")
-    public DailySalesResponse dailySales(
-            @RequestParam UUID storeId, @RequestParam(required = false) LocalDate date) {
+    public DailySalesResponse dailySales(@RequestParam UUID storeId, @RequestParam(required = false) LocalDate date) {
         return service.dailySales(storeId, date);
     }
 }

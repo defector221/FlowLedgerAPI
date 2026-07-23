@@ -62,8 +62,7 @@ public class RetailCatalogController {
 
     @PutMapping("/departments/{id}")
     @PreAuthorize("hasAuthority('RETAIL_STORE_MANAGE')")
-    public DepartmentResponse updateDepartment(
-            @PathVariable UUID id, @Valid @RequestBody DepartmentRequest r) {
+    public DepartmentResponse updateDepartment(@PathVariable UUID id, @Valid @RequestBody DepartmentRequest r) {
         return service.updateDepartment(id, r);
     }
 
@@ -90,8 +89,7 @@ public class RetailCatalogController {
 
     @PutMapping("/collections/{id}")
     @PreAuthorize("hasAuthority('RETAIL_STORE_MANAGE')")
-    public CollectionResponse updateCollection(
-            @PathVariable UUID id, @Valid @RequestBody CollectionRequest r) {
+    public CollectionResponse updateCollection(@PathVariable UUID id, @Valid @RequestBody CollectionRequest r) {
         return service.updateCollection(id, r);
     }
 

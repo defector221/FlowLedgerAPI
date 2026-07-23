@@ -139,8 +139,8 @@ public class RetailPricingService {
     }
 
     public PriceListItemResponse updateItem(UUID itemId, PriceListItemRequest r) {
-        RetailPriceListItem e = items.findByIdAndOrganizationId(itemId, org())
-                .orElseThrow(() -> notFound("Price list item not found"));
+        RetailPriceListItem e =
+                items.findByIdAndOrganizationId(itemId, org()).orElseThrow(() -> notFound("Price list item not found"));
         e.setProductId(r.productId());
         e.setVariantId(r.variantId());
         e.setUnitPrice(r.unitPrice());
@@ -150,15 +150,14 @@ public class RetailPricingService {
     }
 
     public void deleteItem(UUID itemId) {
-        RetailPriceListItem e = items.findByIdAndOrganizationId(itemId, org())
-                .orElseThrow(() -> notFound("Price list item not found"));
+        RetailPriceListItem e =
+                items.findByIdAndOrganizationId(itemId, org()).orElseThrow(() -> notFound("Price list item not found"));
         items.delete(e);
     }
 
     // --------------------------------------------------- Store price list assign
     public void assignStorePriceList(UUID storeId, UUID priceListId) {
-        stores.findByIdAndOrganizationIdAndDeletedFalse(storeId, org())
-                .orElseThrow(() -> notFound("Store not found"));
+        stores.findByIdAndOrganizationIdAndDeletedFalse(storeId, org()).orElseThrow(() -> notFound("Store not found"));
         loadPriceList(priceListId);
         Optional<RetailStorePriceList> existing =
                 storePriceLists.findByOrganizationIdAndStoreIdAndPriceListId(org(), storeId, priceListId);
@@ -197,9 +196,8 @@ public class RetailPricingService {
             }
         }
 
-        Product product = products
-                .findByIdAndOrganizationId(productId, org())
-                .orElseThrow(() -> notFound("Product not found"));
+        Product product =
+                products.findByIdAndOrganizationId(productId, org()).orElseThrow(() -> notFound("Product not found"));
         BigDecimal fallback = product.getSellingPrice() == null ? BigDecimal.ZERO : product.getSellingPrice();
         return new ResolvePriceResponse(productId, variantId, fallback, "PRODUCT");
     }
@@ -208,11 +206,9 @@ public class RetailPricingService {
             UUID priceListId, UUID productId, UUID variantId, BigDecimal qty) {
         return items.findByOrganizationIdAndPriceListIdAndProductId(org(), priceListId, productId).stream()
                 .filter(i -> i.getMinQty() == null || i.getMinQty().compareTo(qty) <= 0)
-                .filter(i -> variantId == null
-                        || i.getVariantId() == null
-                        || Objects.equals(i.getVariantId(), variantId))
-                .sorted(Comparator
-                        .comparing((RetailPriceListItem i) ->
+                .filter(i ->
+                        variantId == null || i.getVariantId() == null || Objects.equals(i.getVariantId(), variantId))
+                .sorted(Comparator.comparing((RetailPriceListItem i) ->
                                 variantId != null && Objects.equals(i.getVariantId(), variantId) ? 0 : 1)
                         .thenComparing(
                                 (RetailPriceListItem i) -> i.getMinQty() == null ? BigDecimal.ZERO : i.getMinQty(),
@@ -260,8 +256,8 @@ public class RetailPricingService {
     }
 
     public ApplyCouponResponse applyCoupon(ApplyCouponRequest r) {
-        Optional<RetailPromotion> found = promotions
-                .findFirstByOrganizationIdAndCouponCodeIgnoreCaseAndActiveTrueAndDeletedFalse(
+        Optional<RetailPromotion> found =
+                promotions.findFirstByOrganizationIdAndCouponCodeIgnoreCaseAndActiveTrueAndDeletedFalse(
                         org(), r.couponCode().trim());
         if (found.isEmpty()) {
             return new ApplyCouponResponse(r.couponCode(), false, BigDecimal.ZERO, r.billAmount(), "Coupon not found");
@@ -269,26 +265,21 @@ public class RetailPricingService {
         RetailPromotion promo = found.get();
         OffsetDateTime now = OffsetDateTime.now();
         if (promo.getStartsAt() != null && now.isBefore(promo.getStartsAt())) {
-            return new ApplyCouponResponse(r.couponCode(), false, BigDecimal.ZERO, r.billAmount(), "Coupon not started");
+            return new ApplyCouponResponse(
+                    r.couponCode(), false, BigDecimal.ZERO, r.billAmount(), "Coupon not started");
         }
         if (promo.getEndsAt() != null && now.isAfter(promo.getEndsAt())) {
             return new ApplyCouponResponse(r.couponCode(), false, BigDecimal.ZERO, r.billAmount(), "Coupon expired");
         }
         if (promo.getMinBillAmount() != null && r.billAmount().compareTo(promo.getMinBillAmount()) < 0) {
             return new ApplyCouponResponse(
-                    r.couponCode(),
-                    false,
-                    BigDecimal.ZERO,
-                    r.billAmount(),
-                    "Minimum bill amount not met");
+                    r.couponCode(), false, BigDecimal.ZERO, r.billAmount(), "Minimum bill amount not met");
         }
 
         BigDecimal discount = BigDecimal.ZERO;
         if (promo.getPromoType() == PromoType.PERCENT_OFF || promo.getPromoType() == PromoType.COUPON) {
             if (promo.getDiscountPercent() != null) {
-                discount = r.billAmount()
-                        .multiply(promo.getDiscountPercent())
-                        .divide(HUNDRED, 2, RoundingMode.HALF_UP);
+                discount = r.billAmount().multiply(promo.getDiscountPercent()).divide(HUNDRED, 2, RoundingMode.HALF_UP);
             }
         }
         if (promo.getDiscountAmount() != null

@@ -43,14 +43,8 @@ import org.springframework.web.server.ResponseStatusException;
 @ConditionalOnAiEnabled
 public class AiWorkflowGateService {
     private static final Logger log = LoggerFactory.getLogger(AiWorkflowGateService.class);
-    private static final List<String> DOCUMENT_TYPES =
-            List.of(
-                    "QUOTATION",
-                    "SALES_ORDER",
-                    "DELIVERY_CHALLAN",
-                    "SALES_INVOICE",
-                    "PURCHASE_ORDER",
-                    "PURCHASE_INVOICE");
+    private static final List<String> DOCUMENT_TYPES = List.of(
+            "QUOTATION", "SALES_ORDER", "DELIVERY_CHALLAN", "SALES_INVOICE", "PURCHASE_ORDER", "PURCHASE_INVOICE");
     private static final Set<String> APPROVAL_ACTIONS = Set.of("APPROVE", "REVIEW");
     private static final Set<String> SKIP_ROLES = Set.of("REQUESTER");
 
@@ -421,8 +415,7 @@ public class AiWorkflowGateService {
         return filtered;
     }
 
-    private static int mapCurrentStepAfterFilter(
-            List<WorkflowStep> raw, List<WorkflowStep> filtered, int currentStep) {
+    private static int mapCurrentStepAfterFilter(List<WorkflowStep> raw, List<WorkflowStep> filtered, int currentStep) {
         if (raw.isEmpty() || filtered.isEmpty()) {
             return 1;
         }
@@ -495,10 +488,10 @@ public class AiWorkflowGateService {
      */
     private AiWorkflowDraft selectPrimaryWorkflow(List<AiWorkflowDraft> matched) {
         return matched.stream()
-                .max(Comparator.comparingInt((AiWorkflowDraft draft) -> approvalStepsFromDraft(draft).size())
+                .max(Comparator.comparingInt((AiWorkflowDraft draft) ->
+                                approvalStepsFromDraft(draft).size())
                         .thenComparing(this::minAmountOf, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparing(
-                                AiWorkflowDraft::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                        .thenComparing(AiWorkflowDraft::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No matching workflow"));
     }
 

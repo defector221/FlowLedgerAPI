@@ -26,7 +26,8 @@ public class RetailModuleGuard {
     public UUID ensureEnabled() {
         UUID organizationId = TenantContext.getOrganizationId();
         if (!featureService.hasModule(organizationId, ModuleCodes.RETAIL)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Retail module is not enabled for this organization");
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Retail module is not enabled for this organization");
         }
         return organizationId;
     }

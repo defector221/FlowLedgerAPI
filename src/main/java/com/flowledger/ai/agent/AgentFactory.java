@@ -26,7 +26,8 @@ public class AgentFactory {
                                 "retail"));
             case BUSINESS_ADVISOR, CEO ->
                 new SimpleAiAgent(
-                        type, Set.of("dashboard", "sales", "inventory", "payment", "gst", "report", "accounting", "retail"));
+                        type,
+                        Set.of("dashboard", "sales", "inventory", "payment", "gst", "report", "accounting", "retail"));
             case CFO -> new SimpleAiAgent(type, Set.of("payment", "dashboard", "accounting", "report", "sales"));
             case ACCOUNTANT -> new SimpleAiAgent(type, Set.of("accounting", "payment", "report"));
             case INVENTORY_PLANNER -> new SimpleAiAgent(type, Set.of("inventory", "purchase", "dashboard", "supplier"));

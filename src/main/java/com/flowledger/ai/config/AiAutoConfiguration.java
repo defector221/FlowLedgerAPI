@@ -22,6 +22,7 @@ public class AiAutoConfiguration {
     public AiAutoConfiguration() {
         log.info("FlowLedger AI module enabled — registering AI providers and routes");
     }
+
     @Bean
     OpenAIProvider openAIProvider(
             AiProperties properties, ObjectMapper objectMapper, RestClient.Builder restClientBuilder) {

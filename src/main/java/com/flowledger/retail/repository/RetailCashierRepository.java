@@ -12,6 +12,5 @@ public interface RetailCashierRepository extends JpaRepository<RetailCashier, UU
 
     Optional<RetailCashier> findByIdAndOrganizationIdAndDeletedFalse(UUID id, UUID organizationId);
 
-    boolean existsByOrganizationIdAndStoreIdAndUserIdAndDeletedFalse(
-            UUID organizationId, UUID storeId, UUID userId);
+    boolean existsByOrganizationIdAndStoreIdAndUserIdAndDeletedFalse(UUID organizationId, UUID storeId, UUID userId);
 }

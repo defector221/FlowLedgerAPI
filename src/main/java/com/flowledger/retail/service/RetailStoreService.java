@@ -164,8 +164,7 @@ public class RetailStoreService {
     }
 
     public CounterResponse updateCounter(UUID id, CounterRequest r) {
-        RetailCashCounter e = counters
-                .findByIdAndOrganizationIdAndDeletedFalse(id, org())
+        RetailCashCounter e = counters.findByIdAndOrganizationIdAndDeletedFalse(id, org())
                 .orElseThrow(() -> notFound("Counter not found"));
         e.setName(r.name());
         if (r.status() != null) {
@@ -176,8 +175,7 @@ public class RetailStoreService {
     }
 
     public void deleteCounter(UUID id) {
-        RetailCashCounter e = counters
-                .findByIdAndOrganizationIdAndDeletedFalse(id, org())
+        RetailCashCounter e = counters.findByIdAndOrganizationIdAndDeletedFalse(id, org())
                 .orElseThrow(() -> notFound("Counter not found"));
         e.setDeleted(true);
         audit(e, false);
@@ -252,8 +250,7 @@ public class RetailStoreService {
     }
 
     public CashierResponse updateCashier(UUID id, CashierRequest r) {
-        RetailCashier e = cashiers
-                .findByIdAndOrganizationIdAndDeletedFalse(id, org())
+        RetailCashier e = cashiers.findByIdAndOrganizationIdAndDeletedFalse(id, org())
                 .orElseThrow(() -> notFound("Cashier not found"));
         e.setEmployeeCode(r.employeeCode());
         e.setDisplayName(r.displayName());
@@ -265,8 +262,7 @@ public class RetailStoreService {
     }
 
     public void deleteCashier(UUID id) {
-        RetailCashier e = cashiers
-                .findByIdAndOrganizationIdAndDeletedFalse(id, org())
+        RetailCashier e = cashiers.findByIdAndOrganizationIdAndDeletedFalse(id, org())
                 .orElseThrow(() -> notFound("Cashier not found"));
         e.setDeleted(true);
         audit(e, false);

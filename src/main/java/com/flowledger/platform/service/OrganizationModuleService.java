@@ -78,15 +78,10 @@ public class OrganizationModuleService {
     }
 
     void upsertModule(
-            UUID organizationId,
-            UUID actorId,
-            UpsertOrganizationModuleRequest request,
-            boolean validateDependencies) {
-        PlatformModule catalogModule = modules
-                .findById(request.moduleCode())
+            UUID organizationId, UUID actorId, UpsertOrganizationModuleRequest request, boolean validateDependencies) {
+        PlatformModule catalogModule = modules.findById(request.moduleCode())
                 .orElseThrow(() -> new ResourceNotFoundException("Module not found: " + request.moduleCode()));
-        if ("COMING_SOON".equalsIgnoreCase(catalogModule.getStatus())
-                && Boolean.TRUE.equals(request.enabled())) {
+        if ("COMING_SOON".equalsIgnoreCase(catalogModule.getStatus()) && Boolean.TRUE.equals(request.enabled())) {
             throw new BusinessException("Module " + request.moduleCode() + " is not available yet");
         }
 
@@ -180,8 +175,7 @@ public class OrganizationModuleService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Feature not found: " + request.moduleCode() + "." + request.featureCode()));
 
-        if (!Boolean.TRUE.equals(
-                cache.get(organizationId).modules().get(request.moduleCode()))) {
+        if (!Boolean.TRUE.equals(cache.get(organizationId).modules().get(request.moduleCode()))) {
             // Reload from DB in case cache stale mid-transaction
             boolean moduleOn = organizationModules
                     .findByOrganizationIdAndModuleCode(organizationId, request.moduleCode())
@@ -225,11 +219,9 @@ public class OrganizationModuleService {
 
         boolean nowEnabled = row.isEffectivelyEnabled();
         if (!wasEnabled && nowEnabled) {
-            events.publishEvent(
-                    new FeatureEnabledEvent(organizationId, request.moduleCode(), request.featureCode()));
+            events.publishEvent(new FeatureEnabledEvent(organizationId, request.moduleCode(), request.featureCode()));
         } else if (wasEnabled && !nowEnabled) {
-            events.publishEvent(
-                    new FeatureDisabledEvent(organizationId, request.moduleCode(), request.featureCode()));
+            events.publishEvent(new FeatureDisabledEvent(organizationId, request.moduleCode(), request.featureCode()));
         }
     }
 
@@ -274,9 +266,8 @@ public class OrganizationModuleService {
         if (!ModuleCodes.RETAIL.equals(moduleCode) && !ModuleCodes.TRANSPORT.equals(moduleCode)) {
             return;
         }
-        OrganizationSettings settings = settingsRepository
-                .findByOrganizationId(organizationId)
-                .orElse(null);
+        OrganizationSettings settings =
+                settingsRepository.findByOrganizationId(organizationId).orElse(null);
         if (settings == null) {
             return;
         }

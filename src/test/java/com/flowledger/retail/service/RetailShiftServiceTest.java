@@ -50,8 +50,7 @@ class RetailShiftServiceTest {
         ModuleEntitlementCache cache = new ModuleEntitlementCache(null, null) {
             @Override
             public Snapshot get(UUID organizationId) {
-                return new Snapshot(
-                        Map.of(ModuleCodes.RETAIL, retailEnabled.get()), Map.of());
+                return new Snapshot(Map.of(ModuleCodes.RETAIL, retailEnabled.get()), Map.of());
             }
         };
         RetailModuleGuard guard = new RetailModuleGuard(new FeatureService(cache));
@@ -69,7 +68,7 @@ class RetailShiftServiceTest {
             }
             case "findByOrganizationIdAndDeletedFalseOrderByOpenedAtDesc",
                     "findByOrganizationIdAndStoreIdAndDeletedFalseOrderByOpenedAtDesc" ->
-                    saved.get() == null ? List.of() : List.of(saved.get());
+                saved.get() == null ? List.of() : List.of(saved.get());
             default -> defaultValue(m.getReturnType());
         });
 

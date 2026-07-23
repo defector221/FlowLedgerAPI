@@ -31,9 +31,7 @@ public class AiWorkflowNotificationService {
     private final UserRepository users;
 
     public AiWorkflowNotificationService(
-            NotificationService notifications,
-            OrganizationMembershipRepository memberships,
-            UserRepository users) {
+            NotificationService notifications, OrganizationMembershipRepository memberships, UserRepository users) {
         this.notifications = notifications;
         this.memberships = memberships;
         this.users = users;

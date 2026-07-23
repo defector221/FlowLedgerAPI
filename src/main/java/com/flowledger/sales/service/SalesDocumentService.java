@@ -4,13 +4,13 @@ import com.flowledger.accounting.service.AccountingPostingService;
 import com.flowledger.ai.workflow.AiWorkflowGateService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
+import com.flowledger.customer.entity.Customer;
+import com.flowledger.customer.repository.CustomerRepository;
 import com.flowledger.inventory.dto.InventoryDtos.PostTransaction;
 import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.service.InventoryService;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
-import com.flowledger.customer.entity.Customer;
-import com.flowledger.customer.repository.CustomerRepository;
 import com.flowledger.product.entity.Product;
 import com.flowledger.product.repository.ProductRepository;
 import com.flowledger.sales.dto.SalesDtos.*;
@@ -420,18 +420,18 @@ public class SalesDocumentService {
 
     @Transactional(readOnly = true)
     public DeliveryChallan getChallan(UUID id) {
-        DeliveryChallan challan = challans
-                .findDetailedByIdAndOrganizationId(id, orgId())
+        DeliveryChallan challan = challans.findDetailedByIdAndOrganizationId(id, orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Challan not found"));
         for (DeliveryChallanItem item : challan.getItems()) {
             if (item.getDescription() == null || item.getDescription().isBlank()) {
                 item.setDescription(resolveLineDescription(item.getProductId(), item.getDescription()));
             }
         }
-        invoices.findByOrganizationIdAndDeliveryChallanId(orgId(), challan.getId()).ifPresent(invoice -> {
-            challan.setLinkedInvoiceId(invoice.getId());
-            challan.setLinkedInvoiceNumber(invoice.getInvoiceNumber());
-        });
+        invoices.findByOrganizationIdAndDeliveryChallanId(orgId(), challan.getId())
+                .ifPresent(invoice -> {
+                    challan.setLinkedInvoiceId(invoice.getId());
+                    challan.setLinkedInvoiceNumber(invoice.getInvoiceNumber());
+                });
         return challan;
     }
 
@@ -448,9 +448,9 @@ public class SalesDocumentService {
     @Transactional(readOnly = true)
     public InvoiceDetail getInvoiceForChallan(UUID challanId) {
         getChallan(challanId); // ensure tenant + exists
-        SalesInvoice invoice = invoices
-                .findByOrganizationIdAndDeliveryChallanId(orgId(), challanId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No invoice linked to this challan"));
+        SalesInvoice invoice = invoices.findByOrganizationIdAndDeliveryChallanId(orgId(), challanId)
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No invoice linked to this challan"));
         return invoiceService.get(invoice.getId());
     }
 
@@ -466,7 +466,8 @@ public class SalesDocumentService {
         }
         SalesOrder order = challan.getSalesOrderId() == null
                 ? null
-                : orders.findByIdAndOrganizationId(challan.getSalesOrderId(), orgId()).orElse(null);
+                : orders.findByIdAndOrganizationId(challan.getSalesOrderId(), orgId())
+                        .orElse(null);
         if (order == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Challan has no linked sales order");
         }
@@ -664,40 +665,41 @@ public class SalesDocumentService {
         quotation.setQuotationDate(request.quotationDate() == null ? LocalDate.now() : request.quotationDate());
         quotation.setExpiryDate(request.expiryDate());
         quotation.setBillingAddress(firstNonBlank(request.billingAddress(), customer.getBillingAddress()));
-        quotation.setShippingAddress(firstNonBlank(
-                request.shippingAddress(),
-                customer.getShippingAddress(),
-                customer.getBillingAddress()));
+        quotation.setShippingAddress(
+                firstNonBlank(request.shippingAddress(), customer.getShippingAddress(), customer.getBillingAddress()));
         quotation.setPlaceOfSupply(firstNonBlank(request.placeOfSupply(), customer.getStateCode()));
         quotation.setNotes(request.notes());
         quotation.setTermsAndConditions(request.termsAndConditions());
         quotation.getItems().clear();
-        LineTotals totals = buildPricedItems(request.items(), quotation.getPlaceOfSupply(), org, (item, line, order) -> {
-            QuotationItem quotationItem = new QuotationItem();
-            quotationItem.setQuotation(quotation);
-            quotationItem.setProductId(item.productId());
-            quotationItem.setDescription(resolveLineDescription(item.productId(), item.description()));
-            quotationItem.setHsnSacCode(item.hsnSacCode());
-            quotationItem.setQuantity(item.quantity());
-            quotationItem.setUnitId(item.unitId());
-            quotationItem.setRate(item.rate());
-            quotationItem.setDiscountPercent(z(item.discountPercent()));
-            quotationItem.setDiscountAmount(line.discount());
-            quotationItem.setTaxRate(z(item.taxRate()));
-            String taxType = TaxSplitDefaults.normalizeTaxType(item.taxType());
-            String strategy = TaxSplitDefaults.normalizeStrategy(item.splitStrategy(), taxType);
-            quotationItem.setTaxType(taxType);
-            quotationItem.setSplitStrategy(strategy);
-            quotationItem.setCgstSharePercent(TaxSplitDefaults.cgstShare(strategy, taxType, item.cgstSharePercent()));
-            quotationItem.setSgstSharePercent(TaxSplitDefaults.sgstShare(strategy, taxType, item.sgstSharePercent()));
-            quotationItem.setTaxableAmount(line.taxable());
-            quotationItem.setCgstAmount(line.cgst());
-            quotationItem.setSgstAmount(line.sgst());
-            quotationItem.setIgstAmount(line.igst());
-            quotationItem.setLineTotal(line.lineTotal());
-            quotationItem.setLineOrder(order);
-            quotation.getItems().add(quotationItem);
-        });
+        LineTotals totals =
+                buildPricedItems(request.items(), quotation.getPlaceOfSupply(), org, (item, line, order) -> {
+                    QuotationItem quotationItem = new QuotationItem();
+                    quotationItem.setQuotation(quotation);
+                    quotationItem.setProductId(item.productId());
+                    quotationItem.setDescription(resolveLineDescription(item.productId(), item.description()));
+                    quotationItem.setHsnSacCode(item.hsnSacCode());
+                    quotationItem.setQuantity(item.quantity());
+                    quotationItem.setUnitId(item.unitId());
+                    quotationItem.setRate(item.rate());
+                    quotationItem.setDiscountPercent(z(item.discountPercent()));
+                    quotationItem.setDiscountAmount(line.discount());
+                    quotationItem.setTaxRate(z(item.taxRate()));
+                    String taxType = TaxSplitDefaults.normalizeTaxType(item.taxType());
+                    String strategy = TaxSplitDefaults.normalizeStrategy(item.splitStrategy(), taxType);
+                    quotationItem.setTaxType(taxType);
+                    quotationItem.setSplitStrategy(strategy);
+                    quotationItem.setCgstSharePercent(
+                            TaxSplitDefaults.cgstShare(strategy, taxType, item.cgstSharePercent()));
+                    quotationItem.setSgstSharePercent(
+                            TaxSplitDefaults.sgstShare(strategy, taxType, item.sgstSharePercent()));
+                    quotationItem.setTaxableAmount(line.taxable());
+                    quotationItem.setCgstAmount(line.cgst());
+                    quotationItem.setSgstAmount(line.sgst());
+                    quotationItem.setIgstAmount(line.igst());
+                    quotationItem.setLineTotal(line.lineTotal());
+                    quotationItem.setLineOrder(order);
+                    quotation.getItems().add(quotationItem);
+                });
         quotation.setSubtotal(totals.subtotal());
         quotation.setDiscountTotal(totals.discountTotal());
         quotation.setTaxTotal(totals.taxTotal());
@@ -711,10 +713,8 @@ public class SalesDocumentService {
         order.setExpectedDeliveryDate(request.expectedDeliveryDate());
         order.setQuotationId(request.quotationId());
         order.setBillingAddress(firstNonBlank(request.billingAddress(), customer.getBillingAddress()));
-        order.setShippingAddress(firstNonBlank(
-                request.shippingAddress(),
-                customer.getShippingAddress(),
-                customer.getBillingAddress()));
+        order.setShippingAddress(
+                firstNonBlank(request.shippingAddress(), customer.getShippingAddress(), customer.getBillingAddress()));
         order.setPlaceOfSupply(firstNonBlank(request.placeOfSupply(), customer.getStateCode()));
         order.setNotes(request.notes());
         order.setTermsAndConditions(request.termsAndConditions());
@@ -837,8 +837,7 @@ public class SalesDocumentService {
         if (productId == null) {
             return description;
         }
-        return products
-                .findByIdAndOrganizationId(productId, orgId())
+        return products.findByIdAndOrganizationId(productId, orgId())
                 .map(Product::getName)
                 .orElse(description);
     }
@@ -850,8 +849,7 @@ public class SalesDocumentService {
     }
 
     private void fillPartyDefaults(SalesOrder order) {
-        if (!needsPartyDefaults(
-                order.getBillingAddress(), order.getShippingAddress(), order.getPlaceOfSupply())) {
+        if (!needsPartyDefaults(order.getBillingAddress(), order.getShippingAddress(), order.getPlaceOfSupply())) {
             return;
         }
         customers.findByIdAndOrganizationId(order.getCustomerId(), orgId()).ifPresent(customer -> {

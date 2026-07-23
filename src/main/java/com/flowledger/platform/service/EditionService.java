@@ -73,16 +73,14 @@ public class EditionService {
         Organization org = organizations
                 .findById(organizationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization not found"));
-        Edition edition = editions
-                .findById(org.getEditionCode())
+        Edition edition = editions.findById(org.getEditionCode())
                 .orElseThrow(() -> new ResourceNotFoundException("Edition not found"));
         return new OrganizationEditionResponse(edition.getCode(), edition.getDisplayName(), edition.getDescription());
     }
 
     @Transactional
     public OrganizationEditionResponse changeEdition(UUID organizationId, String editionCode, UUID actorId) {
-        Edition edition = editions
-                .findById(editionCode)
+        Edition edition = editions.findById(editionCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Edition not found: " + editionCode));
         Organization org = organizations
                 .findById(organizationId)

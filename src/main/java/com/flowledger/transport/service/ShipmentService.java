@@ -4,15 +4,14 @@ import static com.flowledger.transport.dto.TransportDtos.*;
 
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
+import com.flowledger.customer.repository.CustomerRepository;
 import com.flowledger.inventory.dto.InventoryDtos.PostTransaction;
 import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.service.InventoryService;
 import com.flowledger.organization.entity.OrganizationSettings;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.organization.repository.OrganizationSettingsRepository;
-import com.flowledger.customer.repository.CustomerRepository;
 import com.flowledger.product.entity.Product;
-import com.flowledger.warehouse.repository.WarehouseRepository;
 import com.flowledger.sales.entity.DeliveryChallan;
 import com.flowledger.sales.entity.DeliveryChallanItem;
 import com.flowledger.sales.repository.DeliveryChallanRepository;
@@ -21,6 +20,7 @@ import com.flowledger.search.model.SearchEntityType;
 import com.flowledger.transport.domain.TransportEnums.*;
 import com.flowledger.transport.entity.*;
 import com.flowledger.transport.repository.*;
+import com.flowledger.warehouse.repository.WarehouseRepository;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Subquery;
 import java.math.BigDecimal;
@@ -158,8 +158,7 @@ public class ShipmentService {
     }
 
     public ShipmentResponse createFromChallan(UUID challanId, ChallanShipmentRequest options) {
-        DeliveryChallan challan = challans
-                .findDetailedByIdAndOrganizationId(challanId, org())
+        DeliveryChallan challan = challans.findDetailedByIdAndOrganizationId(challanId, org())
                 .or(() -> challans.findByIdAndOrganizationId(challanId, org()))
                 .orElseThrow(() -> notFound("Delivery challan not found"));
         Map<UUID, BigDecimal> reserved = reservedChallanQuantities(challan.getId());
@@ -321,7 +320,9 @@ public class ShipmentService {
         if (shipment.getStatus() == ShipmentStatus.CLOSED || shipment.getStatus() == ShipmentStatus.CANCELLED) {
             conflict("Cannot add timeline events to a closed shipment");
         }
-        String type = request == null || request.eventType() == null || request.eventType().isBlank()
+        String type = request == null
+                        || request.eventType() == null
+                        || request.eventType().isBlank()
                 ? "NOTE"
                 : request.eventType().trim().toUpperCase(Locale.ROOT);
         event(
@@ -335,12 +336,7 @@ public class ShipmentService {
 
     public void recordProviderUpdate(UUID shipmentId, String provider, String status, String payloadJson) {
         Shipment shipment = load(shipmentId);
-        event(
-                shipment,
-                "PROVIDER_UPDATE",
-                provider + (status == null ? "" : " · " + status),
-                null,
-                payloadJson);
+        event(shipment, "PROVIDER_UPDATE", provider + (status == null ? "" : " · " + status), null, payloadJson);
     }
 
     public ShipmentResponse checkpoint(UUID id, TransitionRequest r) {
@@ -580,10 +576,11 @@ public class ShipmentService {
             ShipmentStatus.LOADED);
 
     private Map<UUID, BigDecimal> reservedChallanQuantities(UUID challanId) {
-        Specification<Shipment> spec = baseSpec().and((root, query, cb) -> cb.and(
-                cb.equal(cb.upper(root.get("sourceDocumentType")), "DELIVERY_CHALLAN"),
-                cb.equal(root.get("sourceDocumentId"), challanId),
-                root.get("status").in(RESERVES_CHALLAN_QTY)));
+        Specification<Shipment> spec = baseSpec()
+                .and((root, query, cb) -> cb.and(
+                        cb.equal(cb.upper(root.get("sourceDocumentType")), "DELIVERY_CHALLAN"),
+                        cb.equal(root.get("sourceDocumentId"), challanId),
+                        root.get("status").in(RESERVES_CHALLAN_QTY)));
         Map<UUID, BigDecimal> reserved = new HashMap<>();
         for (Shipment shipment : shipments.findAll(spec)) {
             for (ShipmentLine line : lines.findByShipmentIdOrderByLineOrder(shipment.getId())) {
@@ -594,25 +591,20 @@ public class ShipmentService {
         return reserved;
     }
 
-    private static BigDecimal availableChallanQuantity(
-            DeliveryChallanItem item, Map<UUID, BigDecimal> reserved) {
+    private static BigDecimal availableChallanQuantity(DeliveryChallanItem item, Map<UUID, BigDecimal> reserved) {
         BigDecimal available = item.getQuantityRemaining().subtract(z(reserved.get(item.getId())));
         return available.signum() > 0 ? available : BigDecimal.ZERO;
     }
 
     private void validateChallanLines(
-            DeliveryChallan challan,
-            List<LineRequest> requested,
-            boolean dispatch,
-            Map<UUID, BigDecimal> reserved) {
+            DeliveryChallan challan, List<LineRequest> requested, boolean dispatch, Map<UUID, BigDecimal> reserved) {
         Map<UUID, DeliveryChallanItem> byId = new HashMap<>();
         challan.getItems().forEach(i -> byId.put(i.getId(), i));
         for (LineRequest line : requested) {
             DeliveryChallanItem item = byId.get(line.sourceLineId());
             if (item == null || !item.getProductId().equals(line.productId()))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid challan source line");
-            BigDecimal available =
-                    dispatch ? item.getQuantityRemaining() : availableChallanQuantity(item, reserved);
+            BigDecimal available = dispatch ? item.getQuantityRemaining() : availableChallanQuantity(item, reserved);
             if (line.quantity().compareTo(available) > 0)
                 conflict((dispatch ? "Dispatch" : "Shipment")
                         + " quantity exceeds challan remaining quantity"
@@ -727,7 +719,8 @@ public class ShipmentService {
     }
 
     private void ensureDefaultLeg(Shipment shipment) {
-        if (!legs.findByShipmentIdAndDeletedFalseOrderBySequenceNo(shipment.getId()).isEmpty()) return;
+        if (!legs.findByShipmentIdAndDeletedFalseOrderBySequenceNo(shipment.getId())
+                .isEmpty()) return;
         ShipmentLeg leg = new ShipmentLeg();
         leg.setOrganizationId(shipment.getOrganizationId());
         leg.setShipmentId(shipment.getId());
@@ -736,7 +729,10 @@ public class ShipmentService {
         leg.setTransportMode(shipment.getTransportMode());
         leg.setTransportCompanyId(shipment.getTransportCompanyId());
         leg.setOriginLocation(resolveWarehouseLabel(shipment.getFromWarehouseId()));
-        leg.setDestinationLocation(text(shipment.getShipToAddress()) ? shipment.getShipToAddress() : resolveCustomerName(shipment.getShipToPartyId()));
+        leg.setDestinationLocation(
+                text(shipment.getShipToAddress())
+                        ? shipment.getShipToAddress()
+                        : resolveCustomerName(shipment.getShipToPartyId()));
         leg.setExpectedDeparture(shipment.getExpectedDispatchDate());
         leg.setExpectedArrival(shipment.getExpectedDeliveryDate());
         leg.setFreightCost(z(shipment.getFreightCharges()));

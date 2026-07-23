@@ -7,8 +7,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface RetailTerminalRepository extends JpaRepository<RetailTerminal, UUID> {
-    List<RetailTerminal> findByOrganizationIdAndStoreIdAndDeletedFalseOrderByNameAsc(
-            UUID organizationId, UUID storeId);
+    List<RetailTerminal> findByOrganizationIdAndStoreIdAndDeletedFalseOrderByNameAsc(UUID organizationId, UUID storeId);
 
     Optional<RetailTerminal> findByIdAndOrganizationIdAndDeletedFalse(UUID id, UUID organizationId);
 

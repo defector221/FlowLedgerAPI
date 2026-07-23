@@ -18,15 +18,15 @@ class FeatureServiceTest {
 
     @BeforeEach
     void setUp() {
-        ModuleEntitlementCache cache = new ModuleEntitlementCache(
-                (OrganizationModuleRepository) null, (OrganizationFeatureRepository) null) {
-            @Override
-            public Snapshot get(UUID organizationId) {
-                return new Snapshot(
-                        Map.of("RETAIL", true, "TRANSPORT", false, "SALES", true),
-                        Map.of("RETAIL.POS", true, "RETAIL.LOYALTY", false));
-            }
-        };
+        ModuleEntitlementCache cache =
+                new ModuleEntitlementCache((OrganizationModuleRepository) null, (OrganizationFeatureRepository) null) {
+                    @Override
+                    public Snapshot get(UUID organizationId) {
+                        return new Snapshot(
+                                Map.of("RETAIL", true, "TRANSPORT", false, "SALES", true),
+                                Map.of("RETAIL.POS", true, "RETAIL.LOYALTY", false));
+                    }
+                };
         featureService = new FeatureService(cache);
         TenantContext.set(orgId, UUID.randomUUID());
     }

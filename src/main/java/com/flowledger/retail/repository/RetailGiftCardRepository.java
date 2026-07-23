@@ -11,8 +11,7 @@ public interface RetailGiftCardRepository extends JpaRepository<RetailGiftCard, 
 
     Optional<RetailGiftCard> findByIdAndOrganizationIdAndDeletedFalse(UUID id, UUID organizationId);
 
-    Optional<RetailGiftCard> findByOrganizationIdAndCardNumberAndDeletedFalse(
-            UUID organizationId, String cardNumber);
+    Optional<RetailGiftCard> findByOrganizationIdAndCardNumberAndDeletedFalse(UUID organizationId, String cardNumber);
 
     boolean existsByOrganizationIdAndCardNumberAndDeletedFalse(UUID organizationId, String cardNumber);
 }

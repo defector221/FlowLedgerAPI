@@ -1,7 +1,7 @@
 package com.flowledger.sales.entity;
 
-import com.flowledger.common.entity.AuditedEntity;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.flowledger.common.entity.AuditedEntity;
 import jakarta.persistence.*;
 import java.time.*;
 import java.util.*;
