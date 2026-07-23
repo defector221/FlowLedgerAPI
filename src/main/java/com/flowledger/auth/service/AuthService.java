@@ -13,6 +13,7 @@ import com.flowledger.notification.NotificationService;
 import com.flowledger.notification.NotificationType;
 import com.flowledger.organization.entity.*;
 import com.flowledger.organization.repository.*;
+import com.flowledger.platform.service.EditionService;
 import com.flowledger.subscription.service.SubscriptionService;
 import java.time.*;
 import java.util.*;
@@ -37,6 +38,7 @@ public class AuthService {
     private final SubscriptionService subscriptions;
     private final NotificationService notifications;
     private final ChartOfAccountsBootstrapService accountingBootstrap;
+    private final EditionService editionService;
 
     @Value("${flowledger.app.frontend-url}")
     private String frontendUrl;
@@ -53,7 +55,8 @@ public class AuthService {
             OrganizationMembershipService membershipService,
             SubscriptionService subscriptions,
             NotificationService notifications,
-            ChartOfAccountsBootstrapService accountingBootstrap) {
+            ChartOfAccountsBootstrapService accountingBootstrap,
+            EditionService editionService) {
         this.users = users;
         this.roles = roles;
         this.refreshTokens = refreshTokens;
@@ -66,6 +69,7 @@ public class AuthService {
         this.subscriptions = subscriptions;
         this.notifications = notifications;
         this.accountingBootstrap = accountingBootstrap;
+        this.editionService = editionService;
     }
 
     @Transactional
@@ -136,6 +140,7 @@ public class AuthService {
                 .orElseThrow(() -> new BusinessException("Organization admin role is unavailable"));
         membershipService.createAdminMembership(user, organization, role);
         subscriptions.ensureOrganizationSubscription(organization.getId(), "FREE");
+        editionService.provisionNewOrganization(organization.getId(), "FREE", user.getId());
         bootstrapAccounting(organization);
         return tokens(user, organization.getId());
     }
@@ -271,6 +276,7 @@ public class AuthService {
         membershipService.createAdminMembership(user, organization, role);
         subscriptions.ensureDefaultSubscription(user.getId(), "FREE");
         subscriptions.ensureOrganizationSubscription(organization.getId(), "FREE");
+        editionService.provisionNewOrganization(organization.getId(), "FREE", user.getId());
         bootstrapAccounting(organization);
         return tokens(user, organization.getId());
     }

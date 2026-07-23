@@ -57,4 +57,7 @@ public class Organization extends AuditableEntity {
     private boolean onboardingCompleted;
 
     private Instant onboardingCompletedAt;
+
+    @Column(nullable = false, length = 32)
+    private String editionCode = "PROFESSIONAL";
 }

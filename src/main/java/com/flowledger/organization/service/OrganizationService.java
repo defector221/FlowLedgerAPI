@@ -9,6 +9,8 @@ import com.flowledger.organization.entity.OrganizationSettings;
 import com.flowledger.organization.mapper.OrganizationMapper;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.organization.repository.OrganizationSettingsRepository;
+import com.flowledger.platform.domain.ModuleCodes;
+import com.flowledger.platform.service.OrganizationModuleService;
 import com.flowledger.storage.StorageService;
 import java.io.InputStream;
 import java.time.Instant;
@@ -26,18 +28,21 @@ public class OrganizationService {
     private final OrganizationMapper mapper;
     private final StorageService storage;
     private final ChartOfAccountsBootstrapService accountingBootstrap;
+    private final OrganizationModuleService organizationModuleService;
 
     public OrganizationService(
             OrganizationRepository repo,
             OrganizationSettingsRepository settingsRepo,
             OrganizationMapper mapper,
             StorageService storage,
-            ChartOfAccountsBootstrapService accountingBootstrap) {
+            ChartOfAccountsBootstrapService accountingBootstrap,
+            OrganizationModuleService organizationModuleService) {
         this.repo = repo;
         this.settingsRepo = settingsRepo;
         this.mapper = mapper;
         this.storage = storage;
         this.accountingBootstrap = accountingBootstrap;
+        this.organizationModuleService = organizationModuleService;
     }
 
     public OrganizationResponse current() {
@@ -135,9 +140,13 @@ public class OrganizationService {
         }
         if (request.transportEnabled() != null) {
             settings.setTransportEnabled(request.transportEnabled());
+            organizationModuleService.setModuleEnabled(
+                    orgId, ModuleCodes.TRANSPORT, request.transportEnabled(), SecurityUtils.currentUserId());
         }
         if (request.retailEnabled() != null) {
             settings.setRetailEnabled(request.retailEnabled());
+            organizationModuleService.setModuleEnabled(
+                    orgId, ModuleCodes.RETAIL, request.retailEnabled(), SecurityUtils.currentUserId());
         }
         if (request.transportRequiredDefault() != null) {
             settings.setTransportRequiredDefault(request.transportRequiredDefault());
