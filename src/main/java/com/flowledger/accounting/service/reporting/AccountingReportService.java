@@ -207,8 +207,8 @@ public class AccountingReportService {
                 from != null ? from : LocalDate.of(1970, 1, 1),
                 to != null ? to : LocalDate.of(2999, 12, 31));
         Map<UUID, Account> accountMap = new HashMap<>();
-        for (Account a : accounts.findByOrganizationIdOrderByAccountCodeAsc(org)) {
-            accountMap.put(a.getId(), a);
+        for (Account accountEntity : accounts.findByOrganizationIdOrderByAccountCodeAsc(org)) {
+            accountMap.put(accountEntity.getId(), accountEntity);
         }
         for (JournalEntry entry : entries) {
             for (JournalEntryLine line : lines.findByJournalEntryIdOrderByLineNumberAsc(entry.getId())) {

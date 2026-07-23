@@ -15,6 +15,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
@@ -70,6 +71,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     ProblemDetail notFound(ResourceNotFoundException ex, HttpServletRequest request) {
         return problem(HttpStatus.NOT_FOUND, ex.getMessage(), request, null);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    ProblemDetail noHandler(NoResourceFoundException ex, HttpServletRequest request) {
+        log.warn("No handler for {} {}", request.getMethod(), request.getRequestURI());
+        return problem(HttpStatus.NOT_FOUND, "No endpoint found for " + request.getRequestURI(), request, null);
     }
 
     @ExceptionHandler(UnauthorizedException.class)

@@ -91,19 +91,24 @@ public class FiscalYearService {
         }
     }
 
-    private static FiscalYearResponse toResponse(FiscalYear fy) {
+    private static FiscalYearResponse toResponse(FiscalYear fiscalYear) {
         return new FiscalYearResponse(
-                fy.getId(), fy.getName(), fy.getStartDate(), fy.getEndDate(), fy.getStatus(), fy.isCurrent());
+                fiscalYear.getId(),
+                fiscalYear.getName(),
+                fiscalYear.getStartDate(),
+                fiscalYear.getEndDate(),
+                fiscalYear.getStatus(),
+                fiscalYear.isCurrent());
     }
 
-    private static PeriodResponse toResponse(AccountingPeriod p) {
+    private static PeriodResponse toResponse(AccountingPeriod period) {
         return new PeriodResponse(
-                p.getId(),
-                p.getFiscalYearId(),
-                p.getPeriodNumber(),
-                p.getName(),
-                p.getStartDate(),
-                p.getEndDate(),
-                p.getStatus());
+                period.getId(),
+                period.getFiscalYearId(),
+                period.getPeriodNumber(),
+                period.getName(),
+                period.getStartDate(),
+                period.getEndDate(),
+                period.getStatus());
     }
 }

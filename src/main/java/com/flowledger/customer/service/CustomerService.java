@@ -36,11 +36,11 @@ public class CustomerService extends OrganizationScopedService {
         if (repo.existsByOrganizationIdAndCustomerCode(org, code)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Customer code already exists");
         }
-        Customer c = mapper.toEntity(dto);
-        c.setCustomerCode(code);
-        c.setOrganizationId(org);
-        applyDefaults(c);
-        Customer saved = repo.save(c);
+        Customer customer = mapper.toEntity(dto);
+        customer.setCustomerCode(code);
+        customer.setOrganizationId(org);
+        applyDefaults(customer);
+        Customer saved = repo.save(customer);
         searchEvents.upsert(org, SearchEntityType.CUSTOMER, saved.getId());
         return mapper.toResponse(saved);
     }
@@ -53,15 +53,15 @@ public class CustomerService extends OrganizationScopedService {
                 name, "CUST", candidate -> repo.existsByOrganizationIdAndCustomerCode(org, candidate));
     }
 
-    private void applyDefaults(Customer c) {
-        if (c.getCountry() == null || c.getCountry().isBlank()) {
-            c.setCountry("India");
+    private void applyDefaults(Customer customer) {
+        if (customer.getCountry() == null || customer.getCountry().isBlank()) {
+            customer.setCountry("India");
         }
-        if (c.getCreditLimit() == null) {
-            c.setCreditLimit(BigDecimal.ZERO);
+        if (customer.getCreditLimit() == null) {
+            customer.setCreditLimit(BigDecimal.ZERO);
         }
-        if (c.getOpeningBalance() == null) {
-            c.setOpeningBalance(BigDecimal.ZERO);
+        if (customer.getOpeningBalance() == null) {
+            customer.setOpeningBalance(BigDecimal.ZERO);
         }
     }
 
@@ -71,44 +71,44 @@ public class CustomerService extends OrganizationScopedService {
     }
 
     public Response update(UUID id, Update dto) {
-        Customer c = load(id);
-        mapper.update(dto, c);
-        Customer saved = repo.save(c);
+        Customer customer = load(id);
+        mapper.update(dto, customer);
+        Customer saved = repo.save(customer);
         searchEvents.upsert(orgId(), SearchEntityType.CUSTOMER, saved.getId());
         return mapper.toResponse(saved);
     }
 
     public void archive(UUID id) {
-        Customer c = load(id);
-        c.setArchived(true);
-        repo.save(c);
+        Customer customer = load(id);
+        customer.setArchived(true);
+        repo.save(customer);
         searchEvents.delete(orgId(), SearchEntityType.CUSTOMER, id);
     }
 
     @Transactional(readOnly = true)
-    public Page<Response> search(Search f, Pageable pageable) {
+    public Page<Response> search(Search filter, Pageable pageable) {
         UUID org = orgId();
-        Specification<Customer> s = (r, q, b) -> b.equal(r.get("organizationId"), org);
+        Specification<Customer> spec = (root, query, cb) -> cb.equal(root.get("organizationId"), org);
         // Default: hide archived (soft-deleted) customers unless explicitly requested
-        if (f.archived() == null) {
-            s = s.and((r, q, b) -> b.equal(r.get("archived"), false));
+        if (filter.archived() == null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("archived"), false));
         } else {
-            s = s.and((r, q, b) -> b.equal(r.get("archived"), f.archived()));
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("archived"), filter.archived()));
         }
-        if (f.search() != null && !f.search().isBlank()) {
-            String p = "%" + f.search().toLowerCase() + "%";
-            s = s.and((r, q, b) -> b.or(
-                    b.like(b.lower(r.get("customerName")), p),
-                    b.like(b.lower(r.get("customerCode")), p),
-                    b.like(b.lower(r.get("phone")), p)));
+        if (filter.search() != null && !filter.search().isBlank()) {
+            String likePattern = "%" + filter.search().toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.or(
+                    cb.like(cb.lower(root.get("customerName")), likePattern),
+                    cb.like(cb.lower(root.get("customerCode")), likePattern),
+                    cb.like(cb.lower(root.get("phone")), likePattern)));
         }
-        return repo.findAll(s, pageable).map(mapper::toResponse);
+        return repo.findAll(spec, pageable).map(mapper::toResponse);
     }
 
     @Transactional(readOnly = true)
     public Statement statement(UUID id) {
-        Customer c = load(id);
-        return new Statement(c.getOpeningBalance(), BigDecimal.ZERO, c.getOpeningBalance());
+        Customer customer = load(id);
+        return new Statement(customer.getOpeningBalance(), BigDecimal.ZERO, customer.getOpeningBalance());
     }
 
     @Transactional(readOnly = true)

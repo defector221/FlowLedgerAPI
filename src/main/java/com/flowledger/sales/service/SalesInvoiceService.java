@@ -60,30 +60,30 @@ public class SalesInvoiceService {
     private final ObjectProvider<AiWorkflowGateService> workflowGate;
 
     public SalesInvoiceService(
-            SalesInvoiceRepository r,
-            InventoryService i,
+            SalesInvoiceRepository salesInvoiceRepository,
+            InventoryService inventoryService,
             ProductRepository products,
             UnitRepository units,
             WarehouseRepository warehouses,
             OrganizationSettingsRepository orgSettings,
-            OrganizationRepository o,
+            OrganizationRepository organizationRepository,
             CustomerRepository customers,
-            DocumentNumberService n,
-            GstCalculationService g,
+            DocumentNumberService documentNumberService,
+            GstCalculationService gstCalculationService,
             SearchIndexEventPublisher searchEvents,
             AccountingPostingService accounting,
             SubscriptionService subscriptions,
             ObjectProvider<AiWorkflowGateService> workflowGate) {
-        repo = r;
-        inventory = i;
+        repo = salesInvoiceRepository;
+        inventory = inventoryService;
         this.products = products;
         this.units = units;
         this.warehouses = warehouses;
         this.orgSettings = orgSettings;
-        orgs = o;
+        orgs = organizationRepository;
         this.customers = customers;
-        numbers = n;
-        gst = g;
+        numbers = documentNumberService;
+        gst = gstCalculationService;
         this.searchEvents = searchEvents;
         this.accounting = accounting;
         this.subscriptions = subscriptions;
@@ -92,78 +92,79 @@ public class SalesInvoiceService {
 
     @Transactional
     public InvoiceDetail createDraft(Invoice d) {
-        Organization o = orgs.findById(TenantContext.getOrganizationId())
+        Organization organization = orgs.findById(TenantContext.getOrganizationId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found"));
-        subscriptions.checkCanCreateInvoice(o.getId());
-        SalesInvoice i = new SalesInvoice();
-        i.setOrganizationId(o.getId());
-        apply(i, d);
-        ensureWarehouseForStockedItems(i);
-        if (i.getInvoiceNumber() == null || i.getInvoiceNumber().isBlank()) {
-            i.setInvoiceNumber(numbers.next(
-                    o.getId(),
+        subscriptions.checkCanCreateInvoice(organization.getId());
+        SalesInvoice invoice = new SalesInvoice();
+        invoice.setOrganizationId(organization.getId());
+        apply(invoice, d);
+        ensureWarehouseForStockedItems(invoice);
+        if (invoice.getInvoiceNumber() == null || invoice.getInvoiceNumber().isBlank()) {
+            invoice.setInvoiceNumber(numbers.next(
+                    organization.getId(),
                     "SALES_INVOICE",
-                    o.getInvoicePrefix(),
-                    o.getInvoiceNumberFormat(),
-                    o.getFinancialYearStart(),
-                    i.getInvoiceDate()));
+                    organization.getInvoicePrefix(),
+                    organization.getInvoiceNumberFormat(),
+                    organization.getFinancialYearStart(),
+                    invoice.getInvoiceDate()));
         }
-        recalculate(i, o);
-        SalesInvoice saved = repo.save(i);
+        recalculate(invoice, organization);
+        SalesInvoice saved = repo.save(invoice);
         searchEvents.upsert(saved.getOrganizationId(), SearchEntityType.SALES_INVOICE, saved.getId());
         return toDetail(saved);
     }
 
     @Transactional
     public InvoiceDetail updateDraft(UUID id, Invoice d) {
-        SalesInvoice i = load(id);
-        if (i.getStatus() != SalesInvoice.Status.DRAFT)
+        SalesInvoice invoice = load(id);
+        if (invoice.getStatus() != SalesInvoice.Status.DRAFT)
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only draft invoices can be updated");
-        Organization o = orgs.findById(i.getOrganizationId()).orElseThrow();
-        apply(i, d);
-        ensureWarehouseForStockedItems(i);
-        recalculate(i, o);
-        SalesInvoice saved = repo.save(i);
+        Organization organization = orgs.findById(invoice.getOrganizationId()).orElseThrow();
+        apply(invoice, d);
+        ensureWarehouseForStockedItems(invoice);
+        recalculate(invoice, organization);
+        SalesInvoice saved = repo.save(invoice);
         searchEvents.upsert(saved.getOrganizationId(), SearchEntityType.SALES_INVOICE, saved.getId());
         return toDetail(saved);
     }
 
     @Transactional
     public InvoiceDetail confirm(UUID id) {
-        SalesInvoice i = load(id);
-        if (i.getStatus() == SalesInvoice.Status.CANCELLED)
+        SalesInvoice invoice = load(id);
+        if (invoice.getStatus() == SalesInvoice.Status.CANCELLED)
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled invoice cannot be confirmed");
-        if (i.getStatus() == SalesInvoice.Status.CONFIRMED && i.isInventoryPosted()) return toDetail(i);
+        if (invoice.getStatus() == SalesInvoice.Status.CONFIRMED && invoice.isInventoryPosted())
+            return toDetail(invoice);
         AiWorkflowGateService gate = workflowGate.getIfAvailable();
         if (gate != null) {
-            gate.requireApproved("SALES_INVOICE", i.getId(), i.getGrandTotal(), "confirm invoice");
+            gate.requireApproved("SALES_INVOICE", invoice.getId(), invoice.getGrandTotal(), "confirm invoice");
         }
-        Organization o = orgs.findById(i.getOrganizationId()).orElseThrow();
-        if (i.getInvoiceNumber() == null || i.getInvoiceNumber().isBlank())
-            i.setInvoiceNumber(numbers.next(
-                    o.getId(),
+        Organization organization = orgs.findById(invoice.getOrganizationId()).orElseThrow();
+        if (invoice.getInvoiceNumber() == null || invoice.getInvoiceNumber().isBlank())
+            invoice.setInvoiceNumber(numbers.next(
+                    organization.getId(),
                     "SALES_INVOICE",
-                    o.getInvoicePrefix(),
-                    o.getInvoiceNumberFormat(),
-                    o.getFinancialYearStart(),
-                    i.getInvoiceDate()));
-        if (i.getDueDate() == null) {
-            LocalDate invoiceDate = i.getInvoiceDate() != null ? i.getInvoiceDate() : LocalDate.now();
-            i.setDueDate(resolveDueDate(i.getCustomerId(), invoiceDate));
+                    organization.getInvoicePrefix(),
+                    organization.getInvoiceNumberFormat(),
+                    organization.getFinancialYearStart(),
+                    invoice.getInvoiceDate()));
+        if (invoice.getDueDate() == null) {
+            LocalDate invoiceDate = invoice.getInvoiceDate() != null ? invoice.getInvoiceDate() : LocalDate.now();
+            invoice.setDueDate(resolveDueDate(invoice.getCustomerId(), invoiceDate));
         }
-        recalculate(i, o);
-        if (!i.isInventoryPosted()) {
-            List<SalesInvoiceItem> stockableLines = stockableLines(i.getItems());
+        recalculate(invoice, organization);
+        if (!invoice.isInventoryPosted()) {
+            List<SalesInvoiceItem> stockableLines = stockableLines(invoice.getItems());
             if (!stockableLines.isEmpty()) {
-                ensureWarehouseForStockedItems(i);
-                if (i.getWarehouseId() == null)
+                ensureWarehouseForStockedItems(invoice);
+                if (invoice.getWarehouseId() == null)
                     throw new ResponseStatusException(
                             HttpStatus.BAD_REQUEST, "Warehouse is required when confirming stocked products");
                 for (var line : stockableLines) {
                     BigDecimal available = inventory
-                            .getStock(line.getProductId(), i.getWarehouseId())
+                            .getStock(line.getProductId(), invoice.getWarehouseId())
                             .available();
-                    if (!o.isAllowNegativeStock() && available.compareTo(line.getQuantity()) < 0) {
+                    if (!organization.isAllowNegativeStock() && available.compareTo(line.getQuantity()) < 0) {
                         String productLabel = products.findById(line.getProductId())
                                 .map(Product::getName)
                                 .filter(name -> name != null && !name.isBlank())
@@ -182,25 +183,25 @@ public class SalesInvoiceService {
                     inventory.postTransaction(new PostTransaction(
                             Type.SALE,
                             line.getProductId(),
-                            i.getWarehouseId(),
+                            invoice.getWarehouseId(),
                             BigDecimal.ZERO,
                             line.getQuantity(),
                             "SALES_INVOICE",
-                            i.getId(),
-                            i.getInvoiceNumber(),
-                            "invoice:" + i.getId() + ":" + line.getId(),
+                            invoice.getId(),
+                            invoice.getInvoiceNumber(),
+                            "invoice:" + invoice.getId() + ":" + line.getId(),
                             null,
                             null,
                             null,
                             null,
-                            i.getNotes(),
-                            i.getInvoiceDate()));
+                            invoice.getNotes(),
+                            invoice.getInvoiceDate()));
                 }
             }
-            i.setInventoryPosted(true);
+            invoice.setInventoryPosted(true);
         }
-        i.setStatus(SalesInvoice.Status.CONFIRMED);
-        SalesInvoice saved = repo.save(i);
+        invoice.setStatus(SalesInvoice.Status.CONFIRMED);
+        SalesInvoice saved = repo.save(invoice);
         accounting.postSalesInvoice(saved);
         searchEvents.upsert(saved.getOrganizationId(), SearchEntityType.SALES_INVOICE, saved.getId());
         return toDetail(saved);
@@ -208,21 +209,21 @@ public class SalesInvoiceService {
 
     @Transactional
     public InvoiceDetail cancel(UUID id) {
-        SalesInvoice i = load(id);
-        if (i.getStatus() == SalesInvoice.Status.CANCELLED) return toDetail(i);
-        if (i.isInventoryPosted()) {
-            for (var line : stockableLines(i.getItems())) {
-                if (i.getWarehouseId() == null) continue;
+        SalesInvoice invoice = load(id);
+        if (invoice.getStatus() == SalesInvoice.Status.CANCELLED) return toDetail(invoice);
+        if (invoice.isInventoryPosted()) {
+            for (var line : stockableLines(invoice.getItems())) {
+                if (invoice.getWarehouseId() == null) continue;
                 inventory.postTransaction(new PostTransaction(
                         Type.SALES_RETURN,
                         line.getProductId(),
-                        i.getWarehouseId(),
+                        invoice.getWarehouseId(),
                         line.getQuantity(),
                         BigDecimal.ZERO,
                         "SALES_INVOICE_CANCEL",
-                        i.getId(),
-                        i.getInvoiceNumber(),
-                        "invoice-cancel:" + i.getId() + ":" + line.getId(),
+                        invoice.getId(),
+                        invoice.getInvoiceNumber(),
+                        "invoice-cancel:" + invoice.getId() + ":" + line.getId(),
                         null,
                         null,
                         null,
@@ -231,13 +232,14 @@ public class SalesInvoiceService {
                         LocalDate.now()));
             }
         }
-        i.setInventoryPosted(false);
-        i.setStatus(SalesInvoice.Status.CANCELLED);
-        if (i.getAccountingStatus() == AccountingStatus.POSTED) {
-            accounting.reverseDocumentJournal(i.getOrganizationId(), JournalSource.SALES_INVOICE, i.getId());
-            i.setAccountingStatus(AccountingStatus.REVERSED);
+        invoice.setInventoryPosted(false);
+        invoice.setStatus(SalesInvoice.Status.CANCELLED);
+        if (invoice.getAccountingStatus() == AccountingStatus.POSTED) {
+            accounting.reverseDocumentJournal(
+                    invoice.getOrganizationId(), JournalSource.SALES_INVOICE, invoice.getId());
+            invoice.setAccountingStatus(AccountingStatus.REVERSED);
         }
-        SalesInvoice saved = repo.save(i);
+        SalesInvoice saved = repo.save(invoice);
         searchEvents.upsert(saved.getOrganizationId(), SearchEntityType.SALES_INVOICE, saved.getId());
         return toDetail(saved);
     }
@@ -250,8 +252,8 @@ public class SalesInvoiceService {
     @Transactional(readOnly = true)
     public List<SalesInvoice> list(String status, UUID customerId) {
         return repo.findByOrganizationIdOrderByInvoiceDateDesc(TenantContext.getOrganizationId()).stream()
-                .filter(i -> status == null || i.getStatus().name().equals(status))
-                .filter(i -> customerId == null || customerId.equals(i.getCustomerId()))
+                .filter(invoice -> status == null || invoice.getStatus().name().equals(status))
+                .filter(invoice -> customerId == null || customerId.equals(invoice.getCustomerId()))
                 .toList();
     }
 
@@ -260,45 +262,45 @@ public class SalesInvoiceService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
     }
 
-    private void apply(SalesInvoice i, Invoice d) {
-        i.setCustomerId(d.customerId());
+    private void apply(SalesInvoice invoice, Invoice d) {
+        invoice.setCustomerId(d.customerId());
         LocalDate invoiceDate = d.invoiceDate() == null ? LocalDate.now() : d.invoiceDate();
-        i.setInvoiceDate(invoiceDate);
-        i.setDueDate(d.dueDate() != null ? d.dueDate() : resolveDueDate(d.customerId(), invoiceDate));
-        i.setWarehouseId(d.warehouseId());
-        i.setSalesOrderId(d.salesOrderId());
-        i.setDeliveryChallanId(d.deliveryChallanId());
-        i.setBillingAddress(d.billingAddress());
-        i.setShippingAddress(d.shippingAddress());
-        i.setPlaceOfSupply(d.placeOfSupply());
-        i.setTaxInclusive(Boolean.TRUE.equals(d.taxInclusive()));
-        i.setShippingCharges(z(d.shippingCharges()));
-        i.setAdditionalCharges(z(d.additionalCharges()));
-        i.setRoundOff(z(d.roundOff()));
-        i.setNotes(d.notes());
-        i.setTermsAndConditions(d.termsAndConditions());
-        i.setTemplateId(d.templateId());
-        i.getItems().clear();
+        invoice.setInvoiceDate(invoiceDate);
+        invoice.setDueDate(d.dueDate() != null ? d.dueDate() : resolveDueDate(d.customerId(), invoiceDate));
+        invoice.setWarehouseId(d.warehouseId());
+        invoice.setSalesOrderId(d.salesOrderId());
+        invoice.setDeliveryChallanId(d.deliveryChallanId());
+        invoice.setBillingAddress(d.billingAddress());
+        invoice.setShippingAddress(d.shippingAddress());
+        invoice.setPlaceOfSupply(d.placeOfSupply());
+        invoice.setTaxInclusive(Boolean.TRUE.equals(d.taxInclusive()));
+        invoice.setShippingCharges(z(d.shippingCharges()));
+        invoice.setAdditionalCharges(z(d.additionalCharges()));
+        invoice.setRoundOff(z(d.roundOff()));
+        invoice.setNotes(d.notes());
+        invoice.setTermsAndConditions(d.termsAndConditions());
+        invoice.setTemplateId(d.templateId());
+        invoice.getItems().clear();
         int n = 0;
         for (Item dline : d.items()) {
-            SalesInvoiceItem l = new SalesInvoiceItem();
-            l.setSalesInvoice(i);
-            l.setProductId(dline.productId());
-            l.setDescription(dline.description());
-            l.setHsnSacCode(dline.hsnSacCode());
-            l.setQuantity(dline.quantity());
-            l.setUnitId(dline.unitId());
-            l.setRate(dline.rate());
-            l.setDiscountPercent(z(dline.discountPercent()));
-            l.setTaxRate(z(dline.taxRate()));
+            SalesInvoiceItem line = new SalesInvoiceItem();
+            line.setSalesInvoice(invoice);
+            line.setProductId(dline.productId());
+            line.setDescription(dline.description());
+            line.setHsnSacCode(dline.hsnSacCode());
+            line.setQuantity(dline.quantity());
+            line.setUnitId(dline.unitId());
+            line.setRate(dline.rate());
+            line.setDiscountPercent(z(dline.discountPercent()));
+            line.setTaxRate(z(dline.taxRate()));
             String taxType = TaxSplitDefaults.normalizeTaxType(dline.taxType());
             String strategy = TaxSplitDefaults.normalizeStrategy(dline.splitStrategy(), taxType);
-            l.setTaxType(taxType);
-            l.setSplitStrategy(strategy);
-            l.setCgstSharePercent(TaxSplitDefaults.cgstShare(strategy, taxType, dline.cgstSharePercent()));
-            l.setSgstSharePercent(TaxSplitDefaults.sgstShare(strategy, taxType, dline.sgstSharePercent()));
-            l.setLineOrder(n++);
-            i.getItems().add(l);
+            line.setTaxType(taxType);
+            line.setSplitStrategy(strategy);
+            line.setCgstSharePercent(TaxSplitDefaults.cgstShare(strategy, taxType, dline.cgstSharePercent()));
+            line.setSgstSharePercent(TaxSplitDefaults.sgstShare(strategy, taxType, dline.sgstSharePercent()));
+            line.setLineOrder(n++);
+            invoice.getItems().add(line);
         }
     }
 
@@ -307,7 +309,7 @@ public class SalesInvoiceService {
         if (customerId != null) {
             days = customers
                     .findByIdAndOrganizationId(customerId, TenantContext.getOrganizationId())
-                    .map(c -> parsePaymentTermsDays(c.getPaymentTerms()))
+                    .map(customer -> parsePaymentTermsDays(customer.getPaymentTerms()))
                     .orElse(30);
         }
         return invoiceDate.plusDays(days);
@@ -327,9 +329,9 @@ public class SalesInvoiceService {
         return 30;
     }
 
-    private void ensureWarehouseForStockedItems(SalesInvoice i) {
-        if (!stockableLines(i.getItems()).isEmpty() && i.getWarehouseId() == null) {
-            i.setWarehouseId(resolveDefaultWarehouseId());
+    private void ensureWarehouseForStockedItems(SalesInvoice invoice) {
+        if (!stockableLines(invoice.getItems()).isEmpty() && invoice.getWarehouseId() == null) {
+            invoice.setWarehouseId(resolveDefaultWarehouseId());
         }
     }
 
@@ -337,7 +339,7 @@ public class SalesInvoiceService {
         UUID org = TenantContext.getOrganizationId();
         UUID fromSettings = orgSettings
                 .findByOrganizationId(org)
-                .map(s -> s.getDefaultWarehouseId())
+                .map(settings -> settings.getDefaultWarehouseId())
                 .orElse(null);
         if (fromSettings != null) {
             var found = warehouses.findByIdAndOrganizationId(fromSettings, org);
@@ -353,76 +355,78 @@ public class SalesInvoiceService {
                         HttpStatus.BAD_REQUEST, "Create a warehouse before invoicing stocked products"));
     }
 
-    private void recalculate(SalesInvoice i, Organization o) {
+    private void recalculate(SalesInvoice invoice, Organization organization) {
         BigDecimal sub = BigDecimal.ZERO,
                 disc = BigDecimal.ZERO,
                 taxable = BigDecimal.ZERO,
                 cgst = BigDecimal.ZERO,
                 sgst = BigDecimal.ZERO,
                 igst = BigDecimal.ZERO;
-        String orgState = o.getStateCode() == null || o.getStateCode().isBlank()
+        String orgState = organization.getStateCode() == null
+                        || organization.getStateCode().isBlank()
                 ? "00"
-                : o.getStateCode().trim();
-        String pos = i.getPlaceOfSupply() == null || i.getPlaceOfSupply().isBlank()
-                ? orgState
-                : i.getPlaceOfSupply().trim();
-        for (var l : i.getItems()) {
-            BigDecimal discount = l.getQuantity()
-                    .multiply(l.getRate())
-                    .multiply(l.getDiscountPercent())
+                : organization.getStateCode().trim();
+        String pos =
+                invoice.getPlaceOfSupply() == null || invoice.getPlaceOfSupply().isBlank()
+                        ? orgState
+                        : invoice.getPlaceOfSupply().trim();
+        for (var line : invoice.getItems()) {
+            BigDecimal discount = line.getQuantity()
+                    .multiply(line.getRate())
+                    .multiply(line.getDiscountPercent())
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-            var r = gst.calculate(new GstCalculationDtos.Request(
+            var gstResult = gst.calculate(new GstCalculationDtos.Request(
                     orgState,
                     pos,
-                    l.getTaxRate(),
-                    i.isTaxInclusive(),
-                    l.getQuantity(),
-                    l.getRate(),
+                    line.getTaxRate(),
+                    invoice.isTaxInclusive(),
+                    line.getQuantity(),
+                    line.getRate(),
                     discount,
-                    l.getTaxType(),
-                    l.getSplitStrategy(),
-                    l.getCgstSharePercent(),
-                    l.getSgstSharePercent()));
-            l.setDiscountAmount(discount);
-            l.setTaxableAmount(r.taxable());
-            l.setCgstAmount(r.cgst());
-            l.setSgstAmount(r.sgst());
-            l.setIgstAmount(r.igst().add(r.otherTax()));
-            applyComponentRates(l, r);
-            l.setLineTotal(r.lineTotal());
-            sub = sub.add(l.getQuantity().multiply(l.getRate()));
+                    line.getTaxType(),
+                    line.getSplitStrategy(),
+                    line.getCgstSharePercent(),
+                    line.getSgstSharePercent()));
+            line.setDiscountAmount(discount);
+            line.setTaxableAmount(gstResult.taxable());
+            line.setCgstAmount(gstResult.cgst());
+            line.setSgstAmount(gstResult.sgst());
+            line.setIgstAmount(gstResult.igst().add(gstResult.otherTax()));
+            applyComponentRates(line, gstResult);
+            line.setLineTotal(gstResult.lineTotal());
+            sub = sub.add(line.getQuantity().multiply(line.getRate()));
             disc = disc.add(discount);
-            taxable = taxable.add(r.taxable());
-            cgst = cgst.add(r.cgst());
-            sgst = sgst.add(r.sgst());
-            igst = igst.add(r.igst()).add(r.otherTax());
+            taxable = taxable.add(gstResult.taxable());
+            cgst = cgst.add(gstResult.cgst());
+            sgst = sgst.add(gstResult.sgst());
+            igst = igst.add(gstResult.igst()).add(gstResult.otherTax());
         }
-        i.setSubtotal(sub);
-        i.setDiscountTotal(disc);
-        i.setTaxableAmount(taxable);
-        i.setCgstTotal(cgst);
-        i.setSgstTotal(sgst);
-        i.setIgstTotal(igst);
-        i.setGrandTotal(i.getItems().stream()
+        invoice.setSubtotal(sub);
+        invoice.setDiscountTotal(disc);
+        invoice.setTaxableAmount(taxable);
+        invoice.setCgstTotal(cgst);
+        invoice.setSgstTotal(sgst);
+        invoice.setIgstTotal(igst);
+        invoice.setGrandTotal(invoice.getItems().stream()
                 .map(SalesInvoiceItem::getLineTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .add(i.getShippingCharges())
-                .add(i.getAdditionalCharges())
-                .add(i.getRoundOff()));
-        i.setOutstandingAmount(i.getGrandTotal().subtract(i.getAmountPaid()));
+                .add(invoice.getShippingCharges())
+                .add(invoice.getAdditionalCharges())
+                .add(invoice.getRoundOff()));
+        invoice.setOutstandingAmount(invoice.getGrandTotal().subtract(invoice.getAmountPaid()));
     }
 
-    private InvoiceDetail toDetail(SalesInvoice i) {
-        UUID org = i.getOrganizationId();
-        final String warehouseName = i.getWarehouseId() == null
+    private InvoiceDetail toDetail(SalesInvoice invoice) {
+        UUID org = invoice.getOrganizationId();
+        final String warehouseName = invoice.getWarehouseId() == null
                 ? null
                 : warehouses
-                        .findByIdAndOrganizationId(i.getWarehouseId(), org)
+                        .findByIdAndOrganizationId(invoice.getWarehouseId(), org)
                         .map(Warehouse::getWarehouseName)
                         .orElse(null);
-        Map<UUID, Product> productById = loadProducts(i.getItems(), org);
-        Map<UUID, String> unitNameById = loadUnitNames(i.getItems(), productById, org);
-        List<InvoiceItemDetail> items = i.getItems().stream()
+        Map<UUID, Product> productById = loadProducts(invoice.getItems(), org);
+        Map<UUID, String> unitNameById = loadUnitNames(invoice.getItems(), productById, org);
+        List<InvoiceItemDetail> items = invoice.getItems().stream()
                 .map(line -> {
                     Product product = productById.get(line.getProductId());
                     boolean stocked = isStockedProduct(product);
@@ -457,33 +461,33 @@ public class SalesInvoiceService {
                 })
                 .toList();
         return new InvoiceDetail(
-                i.getId(),
-                i.getInvoiceNumber(),
-                i.getInvoiceDate(),
-                i.getDueDate(),
-                i.getCustomerId(),
-                i.getWarehouseId(),
+                invoice.getId(),
+                invoice.getInvoiceNumber(),
+                invoice.getInvoiceDate(),
+                invoice.getDueDate(),
+                invoice.getCustomerId(),
+                invoice.getWarehouseId(),
                 warehouseName,
-                i.getStatus().name(),
-                i.getPaymentStatus(),
-                i.getSubtotal(),
-                i.getDiscountTotal(),
-                i.getTaxableAmount(),
-                i.getCgstTotal(),
-                i.getSgstTotal(),
-                i.getIgstTotal(),
-                i.getShippingCharges(),
-                i.getAdditionalCharges(),
-                i.getRoundOff(),
-                i.getGrandTotal(),
-                i.getAmountPaid(),
-                i.getOutstandingAmount(),
-                i.getNotes(),
-                i.getTermsAndConditions(),
-                i.getTemplateId(),
-                i.getBillingAddress(),
-                i.getShippingAddress(),
-                i.getPlaceOfSupply(),
+                invoice.getStatus().name(),
+                invoice.getPaymentStatus(),
+                invoice.getSubtotal(),
+                invoice.getDiscountTotal(),
+                invoice.getTaxableAmount(),
+                invoice.getCgstTotal(),
+                invoice.getSgstTotal(),
+                invoice.getIgstTotal(),
+                invoice.getShippingCharges(),
+                invoice.getAdditionalCharges(),
+                invoice.getRoundOff(),
+                invoice.getGrandTotal(),
+                invoice.getAmountPaid(),
+                invoice.getOutstandingAmount(),
+                invoice.getNotes(),
+                invoice.getTermsAndConditions(),
+                invoice.getTemplateId(),
+                invoice.getBillingAddress(),
+                invoice.getShippingAddress(),
+                invoice.getPlaceOfSupply(),
                 items);
     }
 
@@ -492,7 +496,7 @@ public class SalesInvoiceService {
         Set<UUID> ids = lines.stream().map(SalesInvoiceItem::getProductId).collect(Collectors.toSet());
         Map<UUID, Product> byId = new HashMap<>();
         for (UUID id : ids) {
-            products.findByIdAndOrganizationId(id, org).ifPresent(p -> byId.put(p.getId(), p));
+            products.findByIdAndOrganizationId(id, org).ifPresent(product -> byId.put(product.getId(), product));
         }
         return byId;
     }
@@ -508,15 +512,15 @@ public class SalesInvoiceService {
         for (UUID unitId : unitIds) {
             units.findByIdAndOrganizationId(unitId, org)
                     .or(() -> units.findById(unitId).filter(Unit::isSystemUnit))
-                    .ifPresent(u -> names.put(u.getId(), u.getName()));
+                    .ifPresent(unit -> names.put(unit.getId(), unit.getName()));
         }
         return names;
     }
 
-    private static void applyComponentRates(SalesInvoiceItem line, GstCalculationDtos.Response r) {
+    private static void applyComponentRates(SalesInvoiceItem line, GstCalculationDtos.Response gstResult) {
         BigDecimal rate = line.getTaxRate();
         BigDecimal hundred = BigDecimal.valueOf(100);
-        if (r.cgst().signum() > 0 || r.sgst().signum() > 0) {
+        if (gstResult.cgst().signum() > 0 || gstResult.sgst().signum() > 0) {
             BigDecimal cgstShare =
                     line.getCgstSharePercent() == null ? new BigDecimal("50") : line.getCgstSharePercent();
             BigDecimal sgstShare =
@@ -524,7 +528,7 @@ public class SalesInvoiceService {
             line.setCgstRate(rate.multiply(cgstShare).divide(hundred, 4, RoundingMode.HALF_UP));
             line.setSgstRate(rate.multiply(sgstShare).divide(hundred, 4, RoundingMode.HALF_UP));
             line.setIgstRate(BigDecimal.ZERO);
-        } else if (r.igst().signum() > 0 || r.otherTax().signum() > 0) {
+        } else if (gstResult.igst().signum() > 0 || gstResult.otherTax().signum() > 0) {
             line.setCgstRate(BigDecimal.ZERO);
             line.setSgstRate(BigDecimal.ZERO);
             line.setIgstRate(rate);

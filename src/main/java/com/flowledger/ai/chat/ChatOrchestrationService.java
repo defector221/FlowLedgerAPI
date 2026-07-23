@@ -243,18 +243,48 @@ public class ChatOrchestrationService {
     }
 
     private Set<String> selectToolsForMessage(Set<String> allowed, String message) {
-        String m = message == null ? "" : message.toLowerCase(Locale.ROOT);
+        String normalizedMessage = message == null ? "" : message.toLowerCase(Locale.ROOT);
         java.util.LinkedHashSet<String> selected = new java.util.LinkedHashSet<>();
-        addIf(allowed, selected, "inventory", m, "stock", "inventory", "reorder", "warehouse");
-        addIf(allowed, selected, "sales", m, "sales", "invoice", "revenue", "pipeline");
-        addIf(allowed, selected, "purchase", m, "purchase", "po", "grn", "vendor");
-        addIf(allowed, selected, "payment", m, "payment", "receivable", "payable", "cash", "collect", "overdue");
-        addIf(allowed, selected, "gst", m, "gst", "tax", "cgst", "sgst", "igst");
-        addIf(allowed, selected, "customer", m, "customer", "crm");
-        addIf(allowed, selected, "supplier", m, "supplier", "vendor");
-        addIf(allowed, selected, "accounting", m, "ledger", "journal", "trial", "p&l", "balance sheet", "reconcile");
-        addIf(allowed, selected, "report", m, "report", "gstr");
-        addIf(allowed, selected, "dashboard", m, "dashboard", "overview", "kpi", "summary", "budget", "profit");
+        addIf(allowed, selected, "inventory", normalizedMessage, "stock", "inventory", "reorder", "warehouse");
+        addIf(allowed, selected, "sales", normalizedMessage, "sales", "invoice", "revenue", "pipeline");
+        addIf(allowed, selected, "purchase", normalizedMessage, "purchase", "po", "grn", "vendor");
+        addIf(
+                allowed,
+                selected,
+                "payment",
+                normalizedMessage,
+                "payment",
+                "receivable",
+                "payable",
+                "cash",
+                "collect",
+                "overdue");
+        addIf(allowed, selected, "gst", normalizedMessage, "gst", "tax", "cgst", "sgst", "igst");
+        addIf(allowed, selected, "customer", normalizedMessage, "customer", "crm");
+        addIf(allowed, selected, "supplier", normalizedMessage, "supplier", "vendor");
+        addIf(
+                allowed,
+                selected,
+                "accounting",
+                normalizedMessage,
+                "ledger",
+                "journal",
+                "trial",
+                "p&l",
+                "balance sheet",
+                "reconcile");
+        addIf(allowed, selected, "report", normalizedMessage, "report", "gstr");
+        addIf(
+                allowed,
+                selected,
+                "dashboard",
+                normalizedMessage,
+                "dashboard",
+                "overview",
+                "kpi",
+                "summary",
+                "budget",
+                "profit");
         return selected;
     }
 
@@ -294,13 +324,13 @@ public class ChatOrchestrationService {
     }
 
     private void seedDoc(UUID org, String title, String type, String content) {
-        AiKnowledgeDocument d = new AiKnowledgeDocument();
-        d.setOrganizationId(org);
-        d.setTitle(title);
-        d.setDocType(type);
-        d.setContent(content);
-        d.setContentHash(EmbeddingPipeline.sha256(content));
-        AiKnowledgeDocument saved = knowledgeDocuments.save(d);
+        AiKnowledgeDocument document = new AiKnowledgeDocument();
+        document.setOrganizationId(org);
+        document.setTitle(title);
+        document.setDocType(type);
+        document.setContent(content);
+        document.setContentHash(EmbeddingPipeline.sha256(content));
+        AiKnowledgeDocument saved = knowledgeDocuments.save(document);
         try {
             embeddingPipeline.embedKnowledge(saved);
         } catch (Exception ignored) {

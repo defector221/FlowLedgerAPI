@@ -8,14 +8,14 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/tax")
 public class GstCalculationController {
-    private final GstCalculationService s;
+    private final GstCalculationService gstCalculationService;
 
-    public GstCalculationController(GstCalculationService s) {
-        this.s = s;
+    public GstCalculationController(GstCalculationService gstCalculationService) {
+        this.gstCalculationService = gstCalculationService;
     }
 
     @PostMapping("/calculate")
-    public Response calculate(@Valid @RequestBody Request r) {
-        return s.calculate(r);
+    public Response calculate(@Valid @RequestBody Request request) {
+        return gstCalculationService.calculate(request);
     }
 }

@@ -19,10 +19,10 @@ public class ReportService {
     private EntityManager em;
 
     @SuppressWarnings("unchecked")
-    public List<Map<String, Object>> report(String name, ReportFilter f) {
+    public List<Map<String, Object>> report(String name, ReportFilter filter) {
         UUID org = TenantContext.getOrganizationId();
-        LocalDate from = f.from() == null ? LocalDate.now().minusMonths(12) : f.from();
-        LocalDate to = f.to() == null ? LocalDate.now() : f.to();
+        LocalDate from = filter.from() == null ? LocalDate.now().minusMonths(12) : filter.from();
+        LocalDate to = filter.to() == null ? LocalDate.now() : filter.to();
         String sql =
                 switch (name) {
                     case "sales", "gstr1" ->
@@ -182,26 +182,26 @@ public class ReportService {
                         """;
                     default -> throw new IllegalArgumentException("Unsupported report: " + name);
                 };
-        Query q = em.createNativeQuery(sql).setParameter("org", org);
+        Query nativeQuery = em.createNativeQuery(sql).setParameter("org", org);
         if (sql.contains(":from")) {
-            q.setParameter("from", from).setParameter("to", to);
+            nativeQuery.setParameter("from", from).setParameter("to", to);
         }
-        List<?> raw = q.getResultList();
+        List<?> raw = nativeQuery.getResultList();
         List<String> cols = columns(name);
         List<Map<String, Object>> result = new ArrayList<>();
         for (Object item : raw) {
-            Object[] row = item instanceof Object[] arr ? arr : new Object[] {item};
-            Map<String, Object> m = new LinkedHashMap<>();
-            for (int i = 0; i < row.length; i++) {
-                m.put(i < cols.size() ? cols.get(i) : "value" + i, row[i]);
+            Object[] values = item instanceof Object[] arr ? arr : new Object[] {item};
+            Map<String, Object> row = new LinkedHashMap<>();
+            for (int i = 0; i < values.length; i++) {
+                row.put(i < cols.size() ? cols.get(i) : "value" + i, values[i]);
             }
-            result.add(m);
+            result.add(row);
         }
         return result;
     }
 
-    private List<String> columns(String n) {
-        return switch (n) {
+    private List<String> columns(String reportName) {
+        return switch (reportName) {
             case "sales", "gstr1" ->
                 List.of("date", "number", "customer", "subtotal", "discount", "cgst", "sgst", "igst", "grandTotal");
             case "purchase" ->

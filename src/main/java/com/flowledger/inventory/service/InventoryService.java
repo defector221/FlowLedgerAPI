@@ -25,52 +25,52 @@ public class InventoryService {
     private final SalesInvoiceRepository salesInvoices;
 
     public InventoryService(
-            InventoryTransactionRepository t,
-            InventoryBatchRepository b,
-            SerialNumberRepository s,
-            ProductRepository p,
+            InventoryTransactionRepository transactionRepository,
+            InventoryBatchRepository batchRepository,
+            SerialNumberRepository serialRepository,
+            ProductRepository productRepository,
             SalesInvoiceRepository salesInvoices) {
-        txns = t;
-        batches = b;
-        serials = s;
-        products = p;
+        txns = transactionRepository;
+        batches = batchRepository;
+        serials = serialRepository;
+        products = productRepository;
         this.salesInvoices = salesInvoices;
     }
 
     @Transactional
-    public InventoryTransaction postTransaction(PostTransaction d) {
+    public InventoryTransaction postTransaction(PostTransaction request) {
         UUID org = TenantContext.getOrganizationId();
-        if (d.idempotencyKey() != null && !d.idempotencyKey().isBlank()) {
-            var existing = txns.findByOrganizationIdAndIdempotencyKey(org, d.idempotencyKey());
+        if (request.idempotencyKey() != null && !request.idempotencyKey().isBlank()) {
+            var existing = txns.findByOrganizationIdAndIdempotencyKey(org, request.idempotencyKey());
             if (existing.isPresent()) return existing.get();
         }
-        BigDecimal in = n(d.inward()), out = n(d.outward());
+        BigDecimal in = n(request.inward()), out = n(request.outward());
         if (in.signum() < 0
                 || out.signum() < 0
                 || (in.signum() > 0 && out.signum() > 0)
                 || in.signum() == 0 && out.signum() == 0)
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "Specify exactly one positive inward or outward quantity");
-        InventoryTransaction e = new InventoryTransaction();
-        e.setOrganizationId(org);
-        e.setTransactionType(d.type());
-        e.setProductId(d.productId());
-        e.setWarehouseId(d.warehouseId());
-        e.setTransactionDate(d.transactionDate() == null ? LocalDate.now() : d.transactionDate());
-        e.setInwardQty(in);
-        e.setOutwardQty(out);
-        e.setReferenceType(d.referenceType());
-        e.setReferenceId(d.referenceId());
-        e.setReferenceNumber(d.referenceNumber());
-        e.setIdempotencyKey(blank(d.idempotencyKey()));
-        e.setBatchNumber(blank(d.batchNumber()));
-        e.setSerialNumber(blank(d.serialNumber()));
-        e.setExpiryDate(d.expiryDate());
-        e.setUnitCost(d.unitCost());
-        e.setNotes(d.notes());
-        e = txns.save(e);
-        updateBatchAndSerial(e);
-        return e;
+        InventoryTransaction transaction = new InventoryTransaction();
+        transaction.setOrganizationId(org);
+        transaction.setTransactionType(request.type());
+        transaction.setProductId(request.productId());
+        transaction.setWarehouseId(request.warehouseId());
+        transaction.setTransactionDate(request.transactionDate() == null ? LocalDate.now() : request.transactionDate());
+        transaction.setInwardQty(in);
+        transaction.setOutwardQty(out);
+        transaction.setReferenceType(request.referenceType());
+        transaction.setReferenceId(request.referenceId());
+        transaction.setReferenceNumber(request.referenceNumber());
+        transaction.setIdempotencyKey(blank(request.idempotencyKey()));
+        transaction.setBatchNumber(blank(request.batchNumber()));
+        transaction.setSerialNumber(blank(request.serialNumber()));
+        transaction.setExpiryDate(request.expiryDate());
+        transaction.setUnitCost(request.unitCost());
+        transaction.setNotes(request.notes());
+        transaction = txns.save(transaction);
+        updateBatchAndSerial(transaction);
+        return transaction;
     }
 
     @Transactional(readOnly = true)
@@ -88,16 +88,17 @@ public class InventoryService {
             draftReserved.put(productId, qty);
         }
         return products.findAll().stream()
-                .filter(p -> org.equals(p.getOrganizationId()) && p.isActive() && isStockedProduct(p))
+                .filter(product ->
+                        org.equals(product.getOrganizationId()) && product.isActive() && isStockedProduct(product))
                 .sorted(Comparator.comparing(Product::getName, String.CASE_INSENSITIVE_ORDER))
-                .map(p -> new StockPosition(
-                        p.getId(),
-                        p.getName(),
-                        p.getSku(),
-                        txns.stockBalance(org, p.getId(), null),
-                        draftReserved.getOrDefault(p.getId(), BigDecimal.ZERO),
-                        n(p.getMinimumStockLevel()),
-                        n(p.getReorderLevel())))
+                .map(product -> new StockPosition(
+                        product.getId(),
+                        product.getName(),
+                        product.getSku(),
+                        txns.stockBalance(org, product.getId(), null),
+                        draftReserved.getOrDefault(product.getId(), BigDecimal.ZERO),
+                        n(product.getMinimumStockLevel()),
+                        n(product.getReorderLevel())))
                 .toList();
     }
 
@@ -113,29 +114,30 @@ public class InventoryService {
                                 org, product, warehouse, start, end);
         BigDecimal running = BigDecimal.ZERO;
         List<Ledger> result = new ArrayList<>();
-        for (var e : rows) {
-            running = running.add(e.getInwardQty()).subtract(e.getOutwardQty());
+        for (var transaction : rows) {
+            running = running.add(transaction.getInwardQty()).subtract(transaction.getOutwardQty());
             result.add(new Ledger(
-                    e.getTransactionDate(),
-                    e.getTransactionType(),
-                    e.getReferenceNumber(),
-                    e.getInwardQty(),
-                    e.getOutwardQty(),
+                    transaction.getTransactionDate(),
+                    transaction.getTransactionType(),
+                    transaction.getReferenceNumber(),
+                    transaction.getInwardQty(),
+                    transaction.getOutwardQty(),
                     running));
         }
         return result;
     }
 
     @Transactional
-    public InventoryTransaction adjustStock(Adjustment d) {
-        BigDecimal q = d.quantity();
-        if (q.signum() == 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Adjustment cannot be zero");
+    public InventoryTransaction adjustStock(Adjustment request) {
+        BigDecimal quantity = request.quantity();
+        if (quantity.signum() == 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Adjustment cannot be zero");
         return postTransaction(new PostTransaction(
                 Type.STOCK_ADJUSTMENT,
-                d.productId(),
-                d.warehouseId(),
-                q.signum() > 0 ? q : BigDecimal.ZERO,
-                q.signum() < 0 ? q.abs() : BigDecimal.ZERO,
+                request.productId(),
+                request.warehouseId(),
+                quantity.signum() > 0 ? quantity : BigDecimal.ZERO,
+                quantity.signum() < 0 ? quantity.abs() : BigDecimal.ZERO,
                 "ADJUSTMENT",
                 null,
                 null,
@@ -144,21 +146,21 @@ public class InventoryService {
                 null,
                 null,
                 null,
-                d.notes(),
+                request.notes(),
                 LocalDate.now()));
     }
 
     @Transactional
-    public void transferStock(Transfer d) {
-        if (d.fromWarehouseId().equals(d.toWarehouseId()))
+    public void transferStock(Transfer request) {
+        if (request.fromWarehouseId().equals(request.toWarehouseId()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouses must differ");
         String key = UUID.randomUUID().toString();
         postTransaction(new PostTransaction(
                 Type.STOCK_TRANSFER,
-                d.productId(),
-                d.fromWarehouseId(),
+                request.productId(),
+                request.fromWarehouseId(),
                 BigDecimal.ZERO,
-                d.quantity(),
+                request.quantity(),
                 "STOCK_TRANSFER",
                 null,
                 null,
@@ -167,13 +169,13 @@ public class InventoryService {
                 null,
                 null,
                 null,
-                d.notes(),
+                request.notes(),
                 LocalDate.now()));
         postTransaction(new PostTransaction(
                 Type.STOCK_TRANSFER,
-                d.productId(),
-                d.toWarehouseId(),
-                d.quantity(),
+                request.productId(),
+                request.toWarehouseId(),
+                request.quantity(),
                 BigDecimal.ZERO,
                 "STOCK_TRANSFER",
                 null,
@@ -183,17 +185,17 @@ public class InventoryService {
                 null,
                 null,
                 null,
-                d.notes(),
+                request.notes(),
                 LocalDate.now()));
     }
 
     @Transactional
-    public InventoryTransaction openingStock(Adjustment d) {
+    public InventoryTransaction openingStock(Adjustment request) {
         return postTransaction(new PostTransaction(
                 Type.OPENING_STOCK,
-                d.productId(),
-                d.warehouseId(),
-                d.quantity(),
+                request.productId(),
+                request.warehouseId(),
+                request.quantity(),
                 BigDecimal.ZERO,
                 "OPENING_STOCK",
                 null,
@@ -203,7 +205,7 @@ public class InventoryService {
                 null,
                 null,
                 null,
-                d.notes(),
+                request.notes(),
                 LocalDate.now()));
     }
 
@@ -211,13 +213,15 @@ public class InventoryService {
     public List<Alert> lowStockAlerts(boolean reorder) {
         UUID org = TenantContext.getOrganizationId();
         return products.findAll().stream()
-                .filter(p -> org.equals(p.getOrganizationId()) && p.isActive() && isStockedProduct(p))
-                .map(p -> new Alert(
-                        p.getId(),
-                        p.getName(),
-                        txns.stockBalance(org, p.getId(), null),
-                        reorder ? n(p.getReorderLevel()) : n(p.getMinimumStockLevel())))
-                .filter(a -> a.threshold().signum() > 0 && a.available().compareTo(a.threshold()) <= 0)
+                .filter(product ->
+                        org.equals(product.getOrganizationId()) && product.isActive() && isStockedProduct(product))
+                .map(product -> new Alert(
+                        product.getId(),
+                        product.getName(),
+                        txns.stockBalance(org, product.getId(), null),
+                        reorder ? n(product.getReorderLevel()) : n(product.getMinimumStockLevel())))
+                .filter(alert ->
+                        alert.threshold().signum() > 0 && alert.available().compareTo(alert.threshold()) <= 0)
                 .toList();
     }
 
@@ -279,40 +283,45 @@ public class InventoryService {
         return true;
     }
 
-    private void updateBatchAndSerial(InventoryTransaction e) {
-        BigDecimal delta = e.getInwardQty().subtract(e.getOutwardQty());
-        if (e.getBatchNumber() != null) {
-            InventoryBatch b = batches.findByOrganizationIdAndProductIdAndWarehouseIdAndBatchNumber(
-                            e.getOrganizationId(), e.getProductId(), e.getWarehouseId(), e.getBatchNumber())
+    private void updateBatchAndSerial(InventoryTransaction transaction) {
+        BigDecimal delta = transaction.getInwardQty().subtract(transaction.getOutwardQty());
+        if (transaction.getBatchNumber() != null) {
+            InventoryBatch batch = batches.findByOrganizationIdAndProductIdAndWarehouseIdAndBatchNumber(
+                            transaction.getOrganizationId(),
+                            transaction.getProductId(),
+                            transaction.getWarehouseId(),
+                            transaction.getBatchNumber())
                     .orElseGet(InventoryBatch::new);
-            if (b.getId() == null) {
-                b.setOrganizationId(e.getOrganizationId());
-                b.setProductId(e.getProductId());
-                b.setWarehouseId(e.getWarehouseId());
-                b.setBatchNumber(e.getBatchNumber());
-                b.setExpiryDate(e.getExpiryDate());
-                b.setQuantity(BigDecimal.ZERO);
+            if (batch.getId() == null) {
+                batch.setOrganizationId(transaction.getOrganizationId());
+                batch.setProductId(transaction.getProductId());
+                batch.setWarehouseId(transaction.getWarehouseId());
+                batch.setBatchNumber(transaction.getBatchNumber());
+                batch.setExpiryDate(transaction.getExpiryDate());
+                batch.setQuantity(BigDecimal.ZERO);
             }
-            b.setQuantity(n(b.getQuantity()).add(delta));
-            batches.save(b);
+            batch.setQuantity(n(batch.getQuantity()).add(delta));
+            batches.save(batch);
         }
-        if (e.getSerialNumber() != null) {
-            SerialNumber s = serials.findByOrganizationIdAndProductIdAndSerialNumber(
-                            e.getOrganizationId(), e.getProductId(), e.getSerialNumber())
+        if (transaction.getSerialNumber() != null) {
+            SerialNumber serial = serials.findByOrganizationIdAndProductIdAndSerialNumber(
+                            transaction.getOrganizationId(), transaction.getProductId(), transaction.getSerialNumber())
                     .orElseGet(SerialNumber::new);
-            if (s.getId() == null) {
-                s.setOrganizationId(e.getOrganizationId());
-                s.setProductId(e.getProductId());
-                s.setSerialNumber(e.getSerialNumber());
+            if (serial.getId() == null) {
+                serial.setOrganizationId(transaction.getOrganizationId());
+                serial.setProductId(transaction.getProductId());
+                serial.setSerialNumber(transaction.getSerialNumber());
             }
-            s.setWarehouseId(e.getWarehouseId());
-            s.setStatus(delta.signum() >= 0 ? SerialNumber.Status.IN_STOCK : SerialNumber.Status.SOLD);
-            serials.save(s);
+            serial.setWarehouseId(transaction.getWarehouseId());
+            serial.setStatus(delta.signum() >= 0 ? SerialNumber.Status.IN_STOCK : SerialNumber.Status.SOLD);
+            serials.save(serial);
         }
     }
 
-    private static boolean isStockedProduct(Product p) {
-        return p.getItemType() == null || p.getItemType().isBlank() || "PRODUCT".equalsIgnoreCase(p.getItemType());
+    private static boolean isStockedProduct(Product product) {
+        return product.getItemType() == null
+                || product.getItemType().isBlank()
+                || "PRODUCT".equalsIgnoreCase(product.getItemType());
     }
 
     private static UUID toUuid(Object value) {

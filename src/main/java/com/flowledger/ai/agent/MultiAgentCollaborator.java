@@ -67,30 +67,30 @@ public class MultiAgentCollaborator {
 
     private List<AiAgentType> pickSpecialists(String message) {
         LinkedHashSet<AiAgentType> picked = new LinkedHashSet<>();
-        String m = message == null ? "" : message.toLowerCase(Locale.ROOT);
+        String normalizedMessage = message == null ? "" : message.toLowerCase(Locale.ROOT);
 
         // Always include the keyword-primary specialist first
         picked.add(selector.suggestSpecialist(message));
 
-        if (containsAny(m, "cash", "profit", "budget", "receivable", "payable", "working capital")) {
+        if (containsAny(normalizedMessage, "cash", "profit", "budget", "receivable", "payable", "working capital")) {
             picked.add(AiAgentType.CFO);
         }
-        if (containsAny(m, "stock", "inventory", "reorder")) {
+        if (containsAny(normalizedMessage, "stock", "inventory", "reorder")) {
             picked.add(AiAgentType.INVENTORY_PLANNER);
         }
-        if (containsAny(m, "gst", "tax")) {
+        if (containsAny(normalizedMessage, "gst", "tax")) {
             picked.add(AiAgentType.GST_EXPERT);
         }
-        if (containsAny(m, "purchase", "vendor", "supplier", "procurement")) {
+        if (containsAny(normalizedMessage, "purchase", "vendor", "supplier", "procurement")) {
             picked.add(AiAgentType.PROCUREMENT);
         }
-        if (containsAny(m, "overdue", "collect", "aging")) {
+        if (containsAny(normalizedMessage, "overdue", "collect", "aging")) {
             picked.add(AiAgentType.COLLECTIONS);
         }
-        if (containsAny(m, "sales", "customer", "pipeline", "revenue")) {
+        if (containsAny(normalizedMessage, "sales", "customer", "pipeline", "revenue")) {
             picked.add(AiAgentType.SALES_COACH);
         }
-        if (containsAny(m, "journal", "reconcile", "ledger")) {
+        if (containsAny(normalizedMessage, "journal", "reconcile", "ledger")) {
             picked.add(AiAgentType.ACCOUNTANT);
         }
 

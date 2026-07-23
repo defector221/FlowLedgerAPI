@@ -9,14 +9,19 @@ import com.flowledger.ai.provider.GeminiProvider;
 import com.flowledger.ai.provider.OllamaProvider;
 import com.flowledger.ai.provider.OpenAIProvider;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
 @Configuration
 @ConditionalOnAiEnabled
+@Slf4j
 public class AiAutoConfiguration {
 
+    public AiAutoConfiguration() {
+        log.info("FlowLedger AI module enabled — registering AI providers and routes");
+    }
     @Bean
     OpenAIProvider openAIProvider(
             AiProperties properties, ObjectMapper objectMapper, RestClient.Builder restClientBuilder) {

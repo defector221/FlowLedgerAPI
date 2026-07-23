@@ -49,9 +49,9 @@ class WorkflowDraftServiceTest {
     @Test
     void suggestAndCreatePersistsDraft() {
         when(drafts.save(any())).thenAnswer(inv -> {
-            AiWorkflowDraft d = inv.getArgument(0);
-            d.setId(UUID.randomUUID());
-            return d;
+            AiWorkflowDraft draft = inv.getArgument(0);
+            draft.setId(UUID.randomUUID());
+            return draft;
         });
         AiDtos.WorkflowDraftResponse res =
                 service.suggestAndCreate(new AiDtos.WorkflowNlSuggestRequest("Approve purchase orders over 50k"));

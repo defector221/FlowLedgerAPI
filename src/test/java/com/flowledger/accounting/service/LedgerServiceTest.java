@@ -78,9 +78,9 @@ class LedgerServiceTest {
 
     @Test
     void customerLedgerBuildsRunningBalanceFromJoinedRows() {
-        Customer c = new Customer();
-        c.setId(customerId);
-        customer.set(Optional.of(c));
+        Customer customerEntity = new Customer();
+        customerEntity.setId(customerId);
+        customer.set(Optional.of(customerEntity));
 
         UUID journalId = UUID.randomUUID();
         UUID accountId = UUID.randomUUID();
@@ -128,9 +128,9 @@ class LedgerServiceTest {
     @Test
     void accountLedgerReturnsEmptyWhenNoPostedLines() {
         UUID accountId = UUID.randomUUID();
-        Account a = new Account();
-        a.setId(accountId);
-        account.set(Optional.of(a));
+        Account accountEntity = new Account();
+        accountEntity.setId(accountId);
+        account.set(Optional.of(accountEntity));
         assertTrue(service.accountLedger(accountId, null, null).isEmpty());
     }
 

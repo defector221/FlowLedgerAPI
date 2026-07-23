@@ -48,11 +48,11 @@ class ChartOfAccountsBootstrapServiceTest {
         when(accounts.existsByOrganizationIdAndSystemAccountKeyIsNotNull(orgId)).thenReturn(false);
         when(accounts.findByOrganizationIdAndAccountCode(any(), any())).thenReturn(Optional.empty());
         when(accounts.save(any())).thenAnswer(inv -> {
-            Account a = inv.getArgument(0);
-            if (a.getId() == null) {
-                a.setId(UUID.randomUUID());
+            Account account = inv.getArgument(0);
+            if (account.getId() == null) {
+                account.setId(UUID.randomUUID());
             }
-            return a;
+            return account;
         });
         when(fiscalYears.findByOrganizationIdAndCurrentTrue(orgId)).thenReturn(Optional.empty());
     }

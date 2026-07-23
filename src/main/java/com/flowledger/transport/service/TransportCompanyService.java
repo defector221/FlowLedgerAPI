@@ -40,48 +40,48 @@ public class TransportCompanyService {
         if (repository.existsByOrganizationIdAndCodeIgnoreCaseAndDeletedFalse(org(), code)) {
             conflict("Company code already exists");
         }
-        TransportCompany e = new TransportCompany();
-        e.setOrganizationId(org());
-        apply(e, r, code);
-        audit(e, true);
-        return map(repository.save(e));
+        TransportCompany company = new TransportCompany();
+        company.setOrganizationId(org());
+        apply(company, r, code);
+        audit(company, true);
+        return map(repository.save(company));
     }
 
     public CompanyResponse update(UUID id, CompanyRequest r) {
-        TransportCompany e = load(id);
+        TransportCompany company = load(id);
         String code = r.code() == null || r.code().isBlank()
-                ? e.getCode()
+                ? company.getCode()
                 : r.code().trim().toUpperCase(Locale.ROOT);
-        if (!e.getCode().equalsIgnoreCase(code)
+        if (!company.getCode().equalsIgnoreCase(code)
                 && repository.existsByOrganizationIdAndCodeIgnoreCaseAndDeletedFalse(org(), code)) {
             conflict("Company code already exists");
         }
-        apply(e, r, code);
-        audit(e, false);
-        return map(repository.save(e));
+        apply(company, r, code);
+        audit(company, false);
+        return map(repository.save(company));
     }
 
     public void delete(UUID id) {
-        TransportCompany e = load(id);
-        e.setDeleted(true);
-        e.setStatus("INACTIVE");
-        audit(e, false);
+        TransportCompany company = load(id);
+        company.setDeleted(true);
+        company.setStatus("INACTIVE");
+        audit(company, false);
     }
 
-    private void apply(TransportCompany e, CompanyRequest r, String code) {
-        e.setName(r.name());
-        e.setCode(code);
-        e.setGstin(r.gstin());
-        e.setPan(r.pan());
-        e.setEmail(r.email());
-        e.setPhone(r.phone());
-        e.setAddress(r.address());
-        e.setCity(r.city());
-        e.setState(r.state());
-        e.setStateCode(r.stateCode());
-        e.setCountry(r.country() == null ? "India" : r.country());
-        e.setStatus(r.status() == null ? "ACTIVE" : r.status());
-        e.setNotes(r.notes());
+    private void apply(TransportCompany company, CompanyRequest r, String code) {
+        company.setName(r.name());
+        company.setCode(code);
+        company.setGstin(r.gstin());
+        company.setPan(r.pan());
+        company.setEmail(r.email());
+        company.setPhone(r.phone());
+        company.setAddress(r.address());
+        company.setCity(r.city());
+        company.setState(r.state());
+        company.setStateCode(r.stateCode());
+        company.setCountry(r.country() == null ? "India" : r.country());
+        company.setStatus(r.status() == null ? "ACTIVE" : r.status());
+        company.setNotes(r.notes());
     }
 
     private String resolveCode(String provided, String name) {
@@ -100,33 +100,33 @@ public class TransportCompanyService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transport company not found"));
     }
 
-    private CompanyResponse map(TransportCompany e) {
+    private CompanyResponse map(TransportCompany company) {
         return new CompanyResponse(
-                e.getId(),
-                e.getName(),
-                e.getCode(),
-                e.getGstin(),
-                e.getPan(),
-                e.getEmail(),
-                e.getPhone(),
-                e.getAddress(),
-                e.getCity(),
-                e.getState(),
-                e.getStateCode(),
-                e.getCountry(),
-                e.getStatus(),
-                e.getNotes(),
-                e.getVersion());
+                company.getId(),
+                company.getName(),
+                company.getCode(),
+                company.getGstin(),
+                company.getPan(),
+                company.getEmail(),
+                company.getPhone(),
+                company.getAddress(),
+                company.getCity(),
+                company.getState(),
+                company.getStateCode(),
+                company.getCountry(),
+                company.getStatus(),
+                company.getNotes(),
+                company.getVersion());
     }
 
     private UUID org() {
         return TenantContext.getOrganizationId();
     }
 
-    private void audit(TransportCompany e, boolean created) {
+    private void audit(TransportCompany company, boolean created) {
         TenantContext.userId().ifPresent(u -> {
-            if (created) e.setCreatedBy(u);
-            e.setUpdatedBy(u);
+            if (created) company.setCreatedBy(u);
+            company.setUpdatedBy(u);
         });
     }
 

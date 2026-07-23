@@ -82,8 +82,8 @@ public class AiWorkflowGateService {
         var pending = requests.findFirstByOrganizationIdAndEntityTypeAndEntityIdAndStatusOrderByRequestedAtDesc(
                 org, documentType, entityId, ApprovalStatus.PENDING);
         if (pending.isPresent()) {
-            ApprovalRequest p = pending.get();
-            String stepHint = describeCurrentStep(p);
+            ApprovalRequest pendingRequest = pending.get();
+            String stepHint = describeCurrentStep(pendingRequest);
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Awaiting workflow approval for "
@@ -150,7 +150,7 @@ public class AiWorkflowGateService {
                 .findByOrganizationIdAndStatusOrderByRequestedAtDesc(
                         TenantContext.getOrganizationId(), ApprovalStatus.PENDING)
                 .stream()
-                .filter(r -> DOCUMENT_TYPES.contains(r.getEntityType()))
+                .filter(approvalRequest -> DOCUMENT_TYPES.contains(approvalRequest.getEntityType()))
                 .toList();
     }
 
@@ -356,8 +356,8 @@ public class AiWorkflowGateService {
                 && conditions.has("documentTypes")
                 && conditions.get("documentTypes").isArray()) {
             boolean listed = false;
-            for (JsonNode n : conditions.get("documentTypes")) {
-                if (doc.equalsIgnoreCase(n.asText())) {
+            for (JsonNode node : conditions.get("documentTypes")) {
+                if (doc.equalsIgnoreCase(node.asText())) {
                     listed = true;
                     break;
                 }
@@ -383,9 +383,10 @@ public class AiWorkflowGateService {
     private List<WorkflowStep> approvalStepsFromDraft(AiWorkflowDraft draft) {
         List<WorkflowStep> raw = parseStepsSnapshot(draft.getStepsJson());
         List<WorkflowStep> approval = raw.stream()
-                .filter(s -> s.role() == null || !SKIP_ROLES.contains(s.role().toUpperCase(Locale.ROOT)))
-                .filter(s -> {
-                    String action = s.action() == null ? "" : s.action().toUpperCase(Locale.ROOT);
+                .filter(step ->
+                        step.role() == null || !SKIP_ROLES.contains(step.role().toUpperCase(Locale.ROOT)))
+                .filter(step -> {
+                    String action = step.action() == null ? "" : step.action().toUpperCase(Locale.ROOT);
                     return action.isBlank() || APPROVAL_ACTIONS.contains(action);
                 })
                 .sorted(Comparator.comparingInt(WorkflowStep::order))
@@ -395,15 +396,15 @@ public class AiWorkflowGateService {
         }
         List<WorkflowStep> renumbered = new ArrayList<>();
         for (int i = 0; i < approval.size(); i++) {
-            WorkflowStep s = approval.get(i);
+            WorkflowStep step = approval.get(i);
             renumbered.add(new WorkflowStep(
                     i + 1,
-                    s.role() == null || s.role().isBlank()
+                    step.role() == null || step.role().isBlank()
                             ? "ORGANIZATION_ADMIN"
-                            : s.role().toUpperCase(Locale.ROOT),
-                    s.action() == null || s.action().isBlank()
+                            : step.role().toUpperCase(Locale.ROOT),
+                    step.action() == null || step.action().isBlank()
                             ? "APPROVE"
-                            : s.action().toUpperCase(Locale.ROOT)));
+                            : step.action().toUpperCase(Locale.ROOT)));
         }
         return renumbered;
     }
@@ -414,10 +415,10 @@ public class AiWorkflowGateService {
             return List.of();
         }
         List<WorkflowStep> steps = new ArrayList<>();
-        for (JsonNode n : root) {
-            int order = n.has("order") ? n.get("order").asInt(steps.size() + 1) : steps.size() + 1;
-            String role = n.has("role") ? n.get("role").asText(null) : null;
-            String action = n.has("action") ? n.get("action").asText(null) : null;
+        for (JsonNode node : root) {
+            int order = node.has("order") ? node.get("order").asInt(steps.size() + 1) : steps.size() + 1;
+            String role = node.has("role") ? node.get("role").asText(null) : null;
+            String action = node.has("action") ? node.get("action").asText(null) : null;
             steps.add(new WorkflowStep(order, role, action));
         }
         steps.sort(Comparator.comparingInt(WorkflowStep::order));
@@ -426,12 +427,12 @@ public class AiWorkflowGateService {
 
     private String toStepsJson(List<WorkflowStep> steps) {
         ArrayNode arr = objectMapper.createArrayNode();
-        for (WorkflowStep s : steps) {
-            ObjectNode n = objectMapper.createObjectNode();
-            n.put("order", s.order());
-            n.put("role", s.role());
-            n.put("action", s.action());
-            arr.add(n);
+        for (WorkflowStep step : steps) {
+            ObjectNode node = objectMapper.createObjectNode();
+            node.put("order", step.order());
+            node.put("role", step.role());
+            node.put("action", step.action());
+            arr.add(node);
         }
         return arr.toString();
     }
@@ -448,11 +449,16 @@ public class AiWorkflowGateService {
     }
 
     private String describeCurrentStep(ApprovalRequest request) {
-        ApprovalProgress p = progressOf(request);
-        if (p.currentStepRole() == null) {
-            return "step " + p.currentStep() + "/" + p.totalSteps();
+        ApprovalProgress progress = progressOf(request);
+        if (progress.currentStepRole() == null) {
+            return "step " + progress.currentStep() + "/" + progress.totalSteps();
         }
-        return "step " + p.currentStep() + "/" + p.totalSteps() + " · " + humanize(p.currentStepRole());
+        return "step "
+                + progress.currentStep()
+                + "/"
+                + progress.totalSteps()
+                + " · "
+                + humanize(progress.currentStepRole());
     }
 
     private static String buildRemarks(
@@ -490,13 +496,13 @@ public class AiWorkflowGateService {
     }
 
     private void saveAction(UUID requestId, String value, String remarks) {
-        ApprovalAction a = new ApprovalAction();
-        a.setRequestId(requestId);
-        a.setAction(value);
-        a.setActorId(TenantContext.userId().orElse(null));
-        a.setActedAt(OffsetDateTime.now());
-        a.setRemarks(remarks);
-        actions.save(a);
+        ApprovalAction action = new ApprovalAction();
+        action.setRequestId(requestId);
+        action.setAction(value);
+        action.setActorId(TenantContext.userId().orElse(null));
+        action.setActedAt(OffsetDateTime.now());
+        action.setRemarks(remarks);
+        actions.save(action);
     }
 
     public record WorkflowStep(int order, String role, String action) {}

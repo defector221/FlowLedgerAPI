@@ -33,9 +33,11 @@ public class PurchaseOrderService {
     private final SupplierCatalogService supplierCatalog;
 
     public PurchaseOrderService(
-            DocumentNumberService n, OrganizationRepository o, SupplierCatalogService supplierCatalog) {
-        numbers = n;
-        organizations = o;
+            DocumentNumberService documentNumberService,
+            OrganizationRepository organizationRepository,
+            SupplierCatalogService supplierCatalog) {
+        numbers = documentNumberService;
+        organizations = organizationRepository;
         this.supplierCatalog = supplierCatalog;
     }
 
@@ -144,61 +146,70 @@ public class PurchaseOrderService {
         totals(po);
     }
 
-    private void calculate(PurchaseOrderItem x) {
-        BigDecimal gross = x.getQuantity().multiply(x.getRate());
-        x.setDiscountAmount(
-                gross.multiply(x.getDiscountPercent()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
-        x.setTaxableAmount(gross.subtract(x.getDiscountAmount()));
-        BigDecimal tax =
-                x.getTaxableAmount().multiply(x.getTaxRate()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-        String strategy = TaxSplitDefaults.normalizeStrategy(x.getSplitStrategy(), x.getTaxType());
+    private void calculate(PurchaseOrderItem item) {
+        BigDecimal gross = item.getQuantity().multiply(item.getRate());
+        item.setDiscountAmount(
+                gross.multiply(item.getDiscountPercent()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
+        item.setTaxableAmount(gross.subtract(item.getDiscountAmount()));
+        BigDecimal tax = item.getTaxableAmount()
+                .multiply(item.getTaxRate())
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        String strategy = TaxSplitDefaults.normalizeStrategy(item.getSplitStrategy(), item.getTaxType());
         switch (strategy) {
             case "NO_SPLIT_IGST", "NO_SPLIT_OTHER" -> {
-                x.setCgstAmount(BigDecimal.ZERO);
-                x.setSgstAmount(BigDecimal.ZERO);
-                x.setIgstAmount(tax);
+                item.setCgstAmount(BigDecimal.ZERO);
+                item.setSgstAmount(BigDecimal.ZERO);
+                item.setIgstAmount(tax);
             }
             default -> {
-                BigDecimal cgstShare = x.getCgstSharePercent() == null ? new BigDecimal("50") : x.getCgstSharePercent();
-                x.setCgstAmount(tax.multiply(cgstShare).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
-                x.setSgstAmount(tax.subtract(x.getCgstAmount()));
-                x.setIgstAmount(BigDecimal.ZERO);
+                BigDecimal cgstShare =
+                        item.getCgstSharePercent() == null ? new BigDecimal("50") : item.getCgstSharePercent();
+                item.setCgstAmount(tax.multiply(cgstShare).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
+                item.setSgstAmount(tax.subtract(item.getCgstAmount()));
+                item.setIgstAmount(BigDecimal.ZERO);
             }
         }
-        x.setLineTotal(x.getTaxableAmount().add(tax));
+        item.setLineTotal(item.getTaxableAmount().add(tax));
     }
 
     private void totals(PurchaseOrder po) {
         po.setSubtotal(po.getItems().stream()
-                .map(i -> i.getQuantity().multiply(i.getRate()))
+                .map(item -> item.getQuantity().multiply(item.getRate()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
         po.setDiscountTotal(po.getItems().stream()
                 .map(PurchaseOrderItem::getDiscountAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
         po.setTaxTotal(po.getItems().stream()
-                .map(i -> i.getCgstAmount().add(i.getSgstAmount()).add(i.getIgstAmount()))
+                .map(item -> item.getCgstAmount().add(item.getSgstAmount()).add(item.getIgstAmount()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
         po.setGrandTotal(
                 po.getItems().stream().map(PurchaseOrderItem::getLineTotal).reduce(BigDecimal.ZERO, BigDecimal::add));
     }
 
     private String number(String type, String prefix, LocalDate date) {
-        Organization o =
+        Organization organization =
                 organizations.findById(TenantContext.getOrganizationId()).orElseThrow();
-        return numbers.next(o.getId(), type, prefix, "{PREFIX}/{FY}/{SEQ:6}", o.getFinancialYearStart(), date);
+        return numbers.next(
+                organization.getId(),
+                type,
+                prefix,
+                "{PREFIX}/{FY}/{SEQ:6}",
+                organization.getFinancialYearStart(),
+                date);
     }
 
-    private PurchaseOrder owned(PurchaseOrder p) {
-        if (!p.getOrganizationId().equals(TenantContext.getOrganizationId())) throw missing("Purchase order");
-        return p;
+    private PurchaseOrder owned(PurchaseOrder purchaseOrder) {
+        if (!purchaseOrder.getOrganizationId().equals(TenantContext.getOrganizationId()))
+            throw missing("Purchase order");
+        return purchaseOrder;
     }
 
-    private ResponseStatusException missing(String s) {
-        return new ResponseStatusException(HttpStatus.NOT_FOUND, s + " not found");
+    private ResponseStatusException missing(String label) {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, label + " not found");
     }
 
-    private ResponseStatusException conflict(String s) {
-        return new ResponseStatusException(HttpStatus.CONFLICT, s);
+    private ResponseStatusException conflict(String message) {
+        return new ResponseStatusException(HttpStatus.CONFLICT, message);
     }
 
     private static BigDecimal z(BigDecimal v) {

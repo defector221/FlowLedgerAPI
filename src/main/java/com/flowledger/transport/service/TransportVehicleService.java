@@ -37,43 +37,43 @@ public class TransportVehicleService {
     public VehicleResponse create(VehicleRequest r) {
         if (repository.existsByOrganizationIdAndVehicleNumberIgnoreCaseAndDeletedFalse(org(), r.vehicleNumber()))
             conflict();
-        TransportVehicle e = new TransportVehicle();
-        e.setOrganizationId(org());
-        apply(e, r);
-        audit(e, true);
-        return map(repository.save(e));
+        TransportVehicle vehicle = new TransportVehicle();
+        vehicle.setOrganizationId(org());
+        apply(vehicle, r);
+        audit(vehicle, true);
+        return map(repository.save(vehicle));
     }
 
     public VehicleResponse update(UUID id, VehicleRequest r) {
-        TransportVehicle e = load(id);
-        if (!e.getVehicleNumber().equalsIgnoreCase(r.vehicleNumber())
+        TransportVehicle vehicle = load(id);
+        if (!vehicle.getVehicleNumber().equalsIgnoreCase(r.vehicleNumber())
                 && repository.existsByOrganizationIdAndVehicleNumberIgnoreCaseAndDeletedFalse(org(), r.vehicleNumber()))
             conflict();
-        apply(e, r);
-        audit(e, false);
-        return map(repository.save(e));
+        apply(vehicle, r);
+        audit(vehicle, false);
+        return map(repository.save(vehicle));
     }
 
     public void delete(UUID id) {
-        TransportVehicle e = load(id);
-        e.setDeleted(true);
-        e.setCurrentStatus(VehicleStatus.INACTIVE);
-        audit(e, false);
+        TransportVehicle vehicle = load(id);
+        vehicle.setDeleted(true);
+        vehicle.setCurrentStatus(VehicleStatus.INACTIVE);
+        audit(vehicle, false);
     }
 
-    private void apply(TransportVehicle e, VehicleRequest r) {
-        e.setCompanyId(r.companyId());
-        e.setVehicleNumber(r.vehicleNumber());
-        e.setVehicleType(r.vehicleType());
-        e.setCapacity(r.capacity());
-        e.setCapacityUnit(r.capacityUnit());
-        e.setOwnership(r.ownership());
-        e.setDriverId(r.driverId());
-        e.setFitnessExpiry(r.fitnessExpiry());
-        e.setInsuranceExpiry(r.insuranceExpiry());
-        e.setPermitExpiry(r.permitExpiry());
-        e.setCurrentStatus(r.currentStatus() == null ? VehicleStatus.AVAILABLE : r.currentStatus());
-        e.setNotes(r.notes());
+    private void apply(TransportVehicle vehicle, VehicleRequest r) {
+        vehicle.setCompanyId(r.companyId());
+        vehicle.setVehicleNumber(r.vehicleNumber());
+        vehicle.setVehicleType(r.vehicleType());
+        vehicle.setCapacity(r.capacity());
+        vehicle.setCapacityUnit(r.capacityUnit());
+        vehicle.setOwnership(r.ownership());
+        vehicle.setDriverId(r.driverId());
+        vehicle.setFitnessExpiry(r.fitnessExpiry());
+        vehicle.setInsuranceExpiry(r.insuranceExpiry());
+        vehicle.setPermitExpiry(r.permitExpiry());
+        vehicle.setCurrentStatus(r.currentStatus() == null ? VehicleStatus.AVAILABLE : r.currentStatus());
+        vehicle.setNotes(r.notes());
     }
 
     private TransportVehicle load(UUID id) {
@@ -82,32 +82,32 @@ public class TransportVehicleService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vehicle not found"));
     }
 
-    private VehicleResponse map(TransportVehicle e) {
+    private VehicleResponse map(TransportVehicle vehicle) {
         return new VehicleResponse(
-                e.getId(),
-                e.getCompanyId(),
-                e.getVehicleNumber(),
-                e.getVehicleType(),
-                e.getCapacity(),
-                e.getCapacityUnit(),
-                e.getOwnership(),
-                e.getDriverId(),
-                e.getFitnessExpiry(),
-                e.getInsuranceExpiry(),
-                e.getPermitExpiry(),
-                e.getCurrentStatus(),
-                e.getNotes(),
-                e.getVersion());
+                vehicle.getId(),
+                vehicle.getCompanyId(),
+                vehicle.getVehicleNumber(),
+                vehicle.getVehicleType(),
+                vehicle.getCapacity(),
+                vehicle.getCapacityUnit(),
+                vehicle.getOwnership(),
+                vehicle.getDriverId(),
+                vehicle.getFitnessExpiry(),
+                vehicle.getInsuranceExpiry(),
+                vehicle.getPermitExpiry(),
+                vehicle.getCurrentStatus(),
+                vehicle.getNotes(),
+                vehicle.getVersion());
     }
 
     private UUID org() {
         return TenantContext.getOrganizationId();
     }
 
-    private void audit(TransportVehicle e, boolean c) {
+    private void audit(TransportVehicle vehicle, boolean created) {
         TenantContext.userId().ifPresent(u -> {
-            if (c) e.setCreatedBy(u);
-            e.setUpdatedBy(u);
+            if (created) vehicle.setCreatedBy(u);
+            vehicle.setUpdatedBy(u);
         });
     }
 

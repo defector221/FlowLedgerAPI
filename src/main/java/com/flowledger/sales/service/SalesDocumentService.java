@@ -86,28 +86,28 @@ public class SalesDocumentService {
     @Transactional
     public Quotation createQuotation(QuotationRequest request) {
         Organization org = organization();
-        Quotation q = new Quotation();
-        q.setOrganizationId(orgId());
-        q.setStatus(Quotation.Status.DRAFT);
-        applyQuotation(q, request, org);
-        q.setQuotationNumber(numbers.next(
+        Quotation quotation = new Quotation();
+        quotation.setOrganizationId(orgId());
+        quotation.setStatus(Quotation.Status.DRAFT);
+        applyQuotation(quotation, request, org);
+        quotation.setQuotationNumber(numbers.next(
                 org.getId(),
                 "QUOTATION",
                 org.getQuotationPrefix(),
                 NUMBER_FORMAT,
                 org.getFinancialYearStart(),
-                q.getQuotationDate()));
-        return quotations.save(q);
+                quotation.getQuotationDate()));
+        return quotations.save(quotation);
     }
 
     @Transactional
     public Quotation updateQuotation(UUID id, QuotationRequest request) {
-        Quotation q = getQuotation(id);
-        if (q.getStatus() != Quotation.Status.DRAFT) {
+        Quotation quotation = getQuotation(id);
+        if (quotation.getStatus() != Quotation.Status.DRAFT) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only draft quotations can be updated");
         }
-        applyQuotation(q, request, organization());
-        return quotations.save(q);
+        applyQuotation(quotation, request, organization());
+        return quotations.save(quotation);
     }
 
     @Transactional(readOnly = true)
@@ -124,39 +124,39 @@ public class SalesDocumentService {
 
     @Transactional
     public Quotation cancelQuotation(UUID id) {
-        Quotation q = getQuotation(id);
-        if (q.getStatus() == Quotation.Status.CANCELLED) {
-            return q;
+        Quotation quotation = getQuotation(id);
+        if (quotation.getStatus() == Quotation.Status.CANCELLED) {
+            return quotation;
         }
-        if (q.getStatus() == Quotation.Status.CONVERTED) {
+        if (quotation.getStatus() == Quotation.Status.CONVERTED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Converted quotation cannot be cancelled");
         }
-        q.setStatus(Quotation.Status.CANCELLED);
-        return quotations.save(q);
+        quotation.setStatus(Quotation.Status.CANCELLED);
+        return quotations.save(quotation);
     }
 
     @Transactional
     public SalesOrder convertQuotationToOrder(UUID quotationId) {
-        Quotation q = getQuotation(quotationId);
-        if (q.getConvertedToOrderId() != null) {
-            return orders.findByIdAndOrganizationId(q.getConvertedToOrderId(), orgId())
+        Quotation quotation = getQuotation(quotationId);
+        if (quotation.getConvertedToOrderId() != null) {
+            return orders.findByIdAndOrganizationId(quotation.getConvertedToOrderId(), orgId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Converted order missing"));
         }
-        if (q.getStatus() == Quotation.Status.CANCELLED) {
+        if (quotation.getStatus() == Quotation.Status.CANCELLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled quotation cannot be converted");
         }
-        gate("QUOTATION", q.getId(), q.getGrandTotal(), "convert to sales order");
+        gate("QUOTATION", quotation.getId(), quotation.getGrandTotal(), "convert to sales order");
         Organization org = organization();
         SalesOrder order = new SalesOrder();
         order.setOrganizationId(orgId());
-        order.setCustomerId(q.getCustomerId());
+        order.setCustomerId(quotation.getCustomerId());
         order.setOrderDate(LocalDate.now());
-        order.setQuotationId(q.getId());
-        order.setBillingAddress(q.getBillingAddress());
-        order.setShippingAddress(q.getShippingAddress());
-        order.setPlaceOfSupply(q.getPlaceOfSupply());
-        order.setTermsAndConditions(q.getTermsAndConditions());
-        order.setNotes(q.getNotes());
+        order.setQuotationId(quotation.getId());
+        order.setBillingAddress(quotation.getBillingAddress());
+        order.setShippingAddress(quotation.getShippingAddress());
+        order.setPlaceOfSupply(quotation.getPlaceOfSupply());
+        order.setTermsAndConditions(quotation.getTermsAndConditions());
+        order.setNotes(quotation.getNotes());
         order.setOrderNumber(numbers.next(
                 org.getId(),
                 "SALES_ORDER",
@@ -164,45 +164,54 @@ public class SalesDocumentService {
                 NUMBER_FORMAT,
                 org.getFinancialYearStart(),
                 order.getOrderDate()));
-        order.setSubtotal(q.getSubtotal());
-        order.setDiscountTotal(q.getDiscountTotal());
-        order.setTaxTotal(q.getTaxTotal());
-        order.setGrandTotal(q.getGrandTotal());
+        order.setSubtotal(quotation.getSubtotal());
+        order.setDiscountTotal(quotation.getDiscountTotal());
+        order.setTaxTotal(quotation.getTaxTotal());
+        order.setGrandTotal(quotation.getGrandTotal());
         order.setStatus(SalesOrder.Status.CONFIRMED);
         int i = 0;
-        for (QuotationItem qi : q.getItems()) {
+        for (QuotationItem quotationItem : quotation.getItems()) {
             SalesOrderItem item = new SalesOrderItem();
             item.setSalesOrder(order);
-            item.setProductId(qi.getProductId());
-            item.setDescription(qi.getDescription());
-            item.setHsnSacCode(qi.getHsnSacCode());
-            item.setQuantity(qi.getQuantity());
-            item.setUnitId(qi.getUnitId());
-            item.setRate(qi.getRate());
-            item.setDiscountPercent(qi.getDiscountPercent());
-            item.setDiscountAmount(qi.getDiscountAmount());
-            item.setTaxRate(qi.getTaxRate());
-            item.setTaxType(qi.getTaxType() == null || qi.getTaxType().isBlank() ? "GST" : qi.getTaxType());
+            item.setProductId(quotationItem.getProductId());
+            item.setDescription(quotationItem.getDescription());
+            item.setHsnSacCode(quotationItem.getHsnSacCode());
+            item.setQuantity(quotationItem.getQuantity());
+            item.setUnitId(quotationItem.getUnitId());
+            item.setRate(quotationItem.getRate());
+            item.setDiscountPercent(quotationItem.getDiscountPercent());
+            item.setDiscountAmount(quotationItem.getDiscountAmount());
+            item.setTaxRate(quotationItem.getTaxRate());
+            item.setTaxType(
+                    quotationItem.getTaxType() == null
+                                    || quotationItem.getTaxType().isBlank()
+                            ? "GST"
+                            : quotationItem.getTaxType());
             item.setSplitStrategy(
-                    qi.getSplitStrategy() == null || qi.getSplitStrategy().isBlank()
+                    quotationItem.getSplitStrategy() == null
+                                    || quotationItem.getSplitStrategy().isBlank()
                             ? "PLACE_OF_SUPPLY"
-                            : qi.getSplitStrategy());
+                            : quotationItem.getSplitStrategy());
             item.setCgstSharePercent(
-                    qi.getCgstSharePercent() == null ? new BigDecimal("50") : qi.getCgstSharePercent());
+                    quotationItem.getCgstSharePercent() == null
+                            ? new BigDecimal("50")
+                            : quotationItem.getCgstSharePercent());
             item.setSgstSharePercent(
-                    qi.getSgstSharePercent() == null ? new BigDecimal("50") : qi.getSgstSharePercent());
-            item.setTaxableAmount(qi.getTaxableAmount());
-            item.setCgstAmount(qi.getCgstAmount());
-            item.setSgstAmount(qi.getSgstAmount());
-            item.setIgstAmount(qi.getIgstAmount());
-            item.setLineTotal(qi.getLineTotal());
+                    quotationItem.getSgstSharePercent() == null
+                            ? new BigDecimal("50")
+                            : quotationItem.getSgstSharePercent());
+            item.setTaxableAmount(quotationItem.getTaxableAmount());
+            item.setCgstAmount(quotationItem.getCgstAmount());
+            item.setSgstAmount(quotationItem.getSgstAmount());
+            item.setIgstAmount(quotationItem.getIgstAmount());
+            item.setLineTotal(quotationItem.getLineTotal());
             item.setLineOrder(i++);
             order.getItems().add(item);
         }
         SalesOrder saved = orders.save(order);
-        q.setConvertedToOrderId(saved.getId());
-        q.setStatus(Quotation.Status.CONVERTED);
-        quotations.save(q);
+        quotation.setConvertedToOrderId(saved.getId());
+        quotation.setStatus(Quotation.Status.CONVERTED);
+        quotations.save(quotation);
         return saved;
     }
 
@@ -285,13 +294,13 @@ public class SalesDocumentService {
                 org.getFinancialYearStart(),
                 challan.getChallanDate()));
         int i = 0;
-        for (SalesOrderItem oi : order.getItems()) {
+        for (SalesOrderItem orderItem : order.getItems()) {
             DeliveryChallanItem item = new DeliveryChallanItem();
             item.setDeliveryChallan(challan);
-            item.setProductId(oi.getProductId());
-            item.setDescription(oi.getDescription());
-            item.setQuantity(oi.getQuantity());
-            item.setUnitId(oi.getUnitId());
+            item.setProductId(orderItem.getProductId());
+            item.setDescription(orderItem.getDescription());
+            item.setQuantity(orderItem.getQuantity());
+            item.setUnitId(orderItem.getUnitId());
             item.setLineOrder(i++);
             challan.getItems().add(item);
         }
@@ -389,48 +398,53 @@ public class SalesDocumentService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot return a cancelled invoice");
         }
         Organization org = organization();
-        SalesReturn sr = new SalesReturn();
-        sr.setOrganizationId(orgId());
-        sr.setSalesInvoiceId(invoice.getId());
-        sr.setCustomerId(invoice.getCustomerId());
-        sr.setReturnDate(request.returnDate() == null ? LocalDate.now() : request.returnDate());
-        sr.setStatus("DRAFT");
-        sr.setNotes(request.notes());
-        sr.setReturnNumber(numbers.next(
-                org.getId(), "SALES_RETURN", "SR", NUMBER_FORMAT, org.getFinancialYearStart(), sr.getReturnDate()));
+        SalesReturn salesReturn = new SalesReturn();
+        salesReturn.setOrganizationId(orgId());
+        salesReturn.setSalesInvoiceId(invoice.getId());
+        salesReturn.setCustomerId(invoice.getCustomerId());
+        salesReturn.setReturnDate(request.returnDate() == null ? LocalDate.now() : request.returnDate());
+        salesReturn.setStatus("DRAFT");
+        salesReturn.setNotes(request.notes());
+        salesReturn.setReturnNumber(numbers.next(
+                org.getId(),
+                "SALES_RETURN",
+                "SR",
+                NUMBER_FORMAT,
+                org.getFinancialYearStart(),
+                salesReturn.getReturnDate()));
         BigDecimal total = BigDecimal.ZERO;
         int i = 0;
-        for (ReturnItem ri : request.items()) {
+        for (ReturnItem returnItem : request.items()) {
             SalesReturnItem item = new SalesReturnItem();
-            item.setSalesReturn(sr);
-            item.setProductId(ri.productId());
-            item.setQuantity(ri.quantity());
-            item.setRate(ri.rate());
-            item.setLineTotal(ri.quantity().multiply(ri.rate()).setScale(2, RoundingMode.HALF_UP));
+            item.setSalesReturn(salesReturn);
+            item.setProductId(returnItem.productId());
+            item.setQuantity(returnItem.quantity());
+            item.setRate(returnItem.rate());
+            item.setLineTotal(returnItem.quantity().multiply(returnItem.rate()).setScale(2, RoundingMode.HALF_UP));
             item.setLineOrder(i++);
             total = total.add(item.getLineTotal());
-            sr.getItems().add(item);
+            salesReturn.getItems().add(item);
         }
-        sr.setGrandTotal(total);
-        return returns.save(sr);
+        salesReturn.setGrandTotal(total);
+        return returns.save(salesReturn);
     }
 
     @Transactional
     public SalesReturn confirmReturn(UUID id) {
-        SalesReturn sr = getReturn(id);
-        if ("CANCELLED".equals(sr.getStatus())) {
+        SalesReturn salesReturn = getReturn(id);
+        if ("CANCELLED".equals(salesReturn.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled return cannot be confirmed");
         }
-        if ("CONFIRMED".equals(sr.getStatus()) && sr.isInventoryPosted()) {
-            return sr;
+        if ("CONFIRMED".equals(salesReturn.getStatus()) && salesReturn.isInventoryPosted()) {
+            return salesReturn;
         }
-        SalesInvoice invoice = invoices.findByIdAndOrganizationId(sr.getSalesInvoiceId(), orgId())
+        SalesInvoice invoice = invoices.findByIdAndOrganizationId(salesReturn.getSalesInvoiceId(), orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
         if (invoice.getWarehouseId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invoice has no warehouse for stock return");
         }
-        if (!sr.isInventoryPosted()) {
-            for (SalesReturnItem line : sr.getItems()) {
+        if (!salesReturn.isInventoryPosted()) {
+            for (SalesReturnItem line : salesReturn.getItems()) {
                 inventory.postTransaction(new PostTransaction(
                         Type.SALES_RETURN,
                         line.getProductId(),
@@ -438,20 +452,20 @@ public class SalesDocumentService {
                         line.getQuantity(),
                         BigDecimal.ZERO,
                         "SALES_RETURN",
-                        sr.getId(),
-                        sr.getReturnNumber(),
-                        "sales-return:" + sr.getId() + ":" + line.getId(),
+                        salesReturn.getId(),
+                        salesReturn.getReturnNumber(),
+                        "sales-return:" + salesReturn.getId() + ":" + line.getId(),
                         null,
                         null,
                         null,
                         null,
-                        sr.getNotes(),
-                        sr.getReturnDate()));
+                        salesReturn.getNotes(),
+                        salesReturn.getReturnDate()));
             }
-            sr.setInventoryPosted(true);
+            salesReturn.setInventoryPosted(true);
         }
-        sr.setStatus("CONFIRMED");
-        SalesReturn saved = returns.save(sr);
+        salesReturn.setStatus("CONFIRMED");
+        SalesReturn saved = returns.save(salesReturn);
         accounting.postSalesReturn(saved);
         return saved;
     }
@@ -482,18 +496,23 @@ public class SalesDocumentService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
         }
         Organization org = organization();
-        CreditNote cn = new CreditNote();
-        cn.setOrganizationId(orgId());
-        cn.setCustomerId(request.customerId());
-        cn.setSalesReturnId(request.salesReturnId());
-        cn.setSalesInvoiceId(request.salesInvoiceId());
-        cn.setCreditNoteDate(request.creditNoteDate() == null ? LocalDate.now() : request.creditNoteDate());
-        cn.setAmount(request.amount());
-        cn.setNotes(request.notes());
-        cn.setStatus("ISSUED");
-        cn.setCreditNoteNumber(numbers.next(
-                org.getId(), "CREDIT_NOTE", "CN", NUMBER_FORMAT, org.getFinancialYearStart(), cn.getCreditNoteDate()));
-        CreditNote saved = creditNotes.save(cn);
+        CreditNote creditNote = new CreditNote();
+        creditNote.setOrganizationId(orgId());
+        creditNote.setCustomerId(request.customerId());
+        creditNote.setSalesReturnId(request.salesReturnId());
+        creditNote.setSalesInvoiceId(request.salesInvoiceId());
+        creditNote.setCreditNoteDate(request.creditNoteDate() == null ? LocalDate.now() : request.creditNoteDate());
+        creditNote.setAmount(request.amount());
+        creditNote.setNotes(request.notes());
+        creditNote.setStatus("ISSUED");
+        creditNote.setCreditNoteNumber(numbers.next(
+                org.getId(),
+                "CREDIT_NOTE",
+                "CN",
+                NUMBER_FORMAT,
+                org.getFinancialYearStart(),
+                creditNote.getCreditNoteDate()));
+        CreditNote saved = creditNotes.save(creditNote);
         accounting.postCreditNote(saved);
         return saved;
     }
@@ -514,19 +533,19 @@ public class SalesDocumentService {
 
     private SalesInvoice createInvoiceFromOrder(SalesOrder order, UUID warehouseId, UUID challanId) {
         var requestItems = order.getItems().stream()
-                .map(i -> new Item(
-                        i.getProductId(),
-                        i.getDescription(),
-                        i.getHsnSacCode(),
-                        i.getQuantity(),
-                        i.getUnitId(),
-                        i.getRate(),
-                        i.getDiscountPercent(),
-                        i.getTaxRate(),
-                        i.getTaxType(),
-                        i.getSplitStrategy(),
-                        i.getCgstSharePercent(),
-                        i.getSgstSharePercent()))
+                .map(orderLine -> new Item(
+                        orderLine.getProductId(),
+                        orderLine.getDescription(),
+                        orderLine.getHsnSacCode(),
+                        orderLine.getQuantity(),
+                        orderLine.getUnitId(),
+                        orderLine.getRate(),
+                        orderLine.getDiscountPercent(),
+                        orderLine.getTaxRate(),
+                        orderLine.getTaxType(),
+                        orderLine.getSplitStrategy(),
+                        orderLine.getCgstSharePercent(),
+                        orderLine.getSgstSharePercent()))
                 .toList();
         var request = new Invoice(
                 order.getCustomerId(),
@@ -552,46 +571,46 @@ public class SalesDocumentService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
     }
 
-    private void applyQuotation(Quotation q, QuotationRequest request, Organization org) {
-        q.setCustomerId(request.customerId());
-        q.setQuotationDate(request.quotationDate() == null ? LocalDate.now() : request.quotationDate());
-        q.setExpiryDate(request.expiryDate());
-        q.setBillingAddress(request.billingAddress());
-        q.setShippingAddress(request.shippingAddress());
-        q.setPlaceOfSupply(request.placeOfSupply());
-        q.setNotes(request.notes());
-        q.setTermsAndConditions(request.termsAndConditions());
-        q.getItems().clear();
+    private void applyQuotation(Quotation quotation, QuotationRequest request, Organization org) {
+        quotation.setCustomerId(request.customerId());
+        quotation.setQuotationDate(request.quotationDate() == null ? LocalDate.now() : request.quotationDate());
+        quotation.setExpiryDate(request.expiryDate());
+        quotation.setBillingAddress(request.billingAddress());
+        quotation.setShippingAddress(request.shippingAddress());
+        quotation.setPlaceOfSupply(request.placeOfSupply());
+        quotation.setNotes(request.notes());
+        quotation.setTermsAndConditions(request.termsAndConditions());
+        quotation.getItems().clear();
         LineTotals totals = buildPricedItems(request.items(), request.placeOfSupply(), org, (item, line, order) -> {
-            QuotationItem qi = new QuotationItem();
-            qi.setQuotation(q);
-            qi.setProductId(item.productId());
-            qi.setDescription(item.description());
-            qi.setHsnSacCode(item.hsnSacCode());
-            qi.setQuantity(item.quantity());
-            qi.setUnitId(item.unitId());
-            qi.setRate(item.rate());
-            qi.setDiscountPercent(z(item.discountPercent()));
-            qi.setDiscountAmount(line.discount());
-            qi.setTaxRate(z(item.taxRate()));
+            QuotationItem quotationItem = new QuotationItem();
+            quotationItem.setQuotation(quotation);
+            quotationItem.setProductId(item.productId());
+            quotationItem.setDescription(item.description());
+            quotationItem.setHsnSacCode(item.hsnSacCode());
+            quotationItem.setQuantity(item.quantity());
+            quotationItem.setUnitId(item.unitId());
+            quotationItem.setRate(item.rate());
+            quotationItem.setDiscountPercent(z(item.discountPercent()));
+            quotationItem.setDiscountAmount(line.discount());
+            quotationItem.setTaxRate(z(item.taxRate()));
             String taxType = TaxSplitDefaults.normalizeTaxType(item.taxType());
             String strategy = TaxSplitDefaults.normalizeStrategy(item.splitStrategy(), taxType);
-            qi.setTaxType(taxType);
-            qi.setSplitStrategy(strategy);
-            qi.setCgstSharePercent(TaxSplitDefaults.cgstShare(strategy, taxType, item.cgstSharePercent()));
-            qi.setSgstSharePercent(TaxSplitDefaults.sgstShare(strategy, taxType, item.sgstSharePercent()));
-            qi.setTaxableAmount(line.taxable());
-            qi.setCgstAmount(line.cgst());
-            qi.setSgstAmount(line.sgst());
-            qi.setIgstAmount(line.igst());
-            qi.setLineTotal(line.lineTotal());
-            qi.setLineOrder(order);
-            q.getItems().add(qi);
+            quotationItem.setTaxType(taxType);
+            quotationItem.setSplitStrategy(strategy);
+            quotationItem.setCgstSharePercent(TaxSplitDefaults.cgstShare(strategy, taxType, item.cgstSharePercent()));
+            quotationItem.setSgstSharePercent(TaxSplitDefaults.sgstShare(strategy, taxType, item.sgstSharePercent()));
+            quotationItem.setTaxableAmount(line.taxable());
+            quotationItem.setCgstAmount(line.cgst());
+            quotationItem.setSgstAmount(line.sgst());
+            quotationItem.setIgstAmount(line.igst());
+            quotationItem.setLineTotal(line.lineTotal());
+            quotationItem.setLineOrder(order);
+            quotation.getItems().add(quotationItem);
         });
-        q.setSubtotal(totals.subtotal());
-        q.setDiscountTotal(totals.discountTotal());
-        q.setTaxTotal(totals.taxTotal());
-        q.setGrandTotal(totals.grandTotal());
+        quotation.setSubtotal(totals.subtotal());
+        quotation.setDiscountTotal(totals.discountTotal());
+        quotation.setTaxTotal(totals.taxTotal());
+        quotation.setGrandTotal(totals.grandTotal());
     }
 
     private void applyOrder(SalesOrder order, OrderRequest request, Organization org) {
@@ -606,30 +625,30 @@ public class SalesDocumentService {
         order.setTermsAndConditions(request.termsAndConditions());
         order.getItems().clear();
         LineTotals totals = buildPricedItems(request.items(), request.placeOfSupply(), org, (item, line, n) -> {
-            SalesOrderItem oi = new SalesOrderItem();
-            oi.setSalesOrder(order);
-            oi.setProductId(item.productId());
-            oi.setDescription(item.description());
-            oi.setHsnSacCode(item.hsnSacCode());
-            oi.setQuantity(item.quantity());
-            oi.setUnitId(item.unitId());
-            oi.setRate(item.rate());
-            oi.setDiscountPercent(z(item.discountPercent()));
-            oi.setDiscountAmount(line.discount());
-            oi.setTaxRate(z(item.taxRate()));
+            SalesOrderItem orderItem = new SalesOrderItem();
+            orderItem.setSalesOrder(order);
+            orderItem.setProductId(item.productId());
+            orderItem.setDescription(item.description());
+            orderItem.setHsnSacCode(item.hsnSacCode());
+            orderItem.setQuantity(item.quantity());
+            orderItem.setUnitId(item.unitId());
+            orderItem.setRate(item.rate());
+            orderItem.setDiscountPercent(z(item.discountPercent()));
+            orderItem.setDiscountAmount(line.discount());
+            orderItem.setTaxRate(z(item.taxRate()));
             String taxType = TaxSplitDefaults.normalizeTaxType(item.taxType());
             String strategy = TaxSplitDefaults.normalizeStrategy(item.splitStrategy(), taxType);
-            oi.setTaxType(taxType);
-            oi.setSplitStrategy(strategy);
-            oi.setCgstSharePercent(TaxSplitDefaults.cgstShare(strategy, taxType, item.cgstSharePercent()));
-            oi.setSgstSharePercent(TaxSplitDefaults.sgstShare(strategy, taxType, item.sgstSharePercent()));
-            oi.setTaxableAmount(line.taxable());
-            oi.setCgstAmount(line.cgst());
-            oi.setSgstAmount(line.sgst());
-            oi.setIgstAmount(line.igst());
-            oi.setLineTotal(line.lineTotal());
-            oi.setLineOrder(n);
-            order.getItems().add(oi);
+            orderItem.setTaxType(taxType);
+            orderItem.setSplitStrategy(strategy);
+            orderItem.setCgstSharePercent(TaxSplitDefaults.cgstShare(strategy, taxType, item.cgstSharePercent()));
+            orderItem.setSgstSharePercent(TaxSplitDefaults.sgstShare(strategy, taxType, item.sgstSharePercent()));
+            orderItem.setTaxableAmount(line.taxable());
+            orderItem.setCgstAmount(line.cgst());
+            orderItem.setSgstAmount(line.sgst());
+            orderItem.setIgstAmount(line.igst());
+            orderItem.setLineTotal(line.lineTotal());
+            orderItem.setLineOrder(n);
+            order.getItems().add(orderItem);
         });
         order.setSubtotal(totals.subtotal());
         order.setDiscountTotal(totals.discountTotal());
@@ -646,13 +665,13 @@ public class SalesDocumentService {
         challan.setTransportRequired(Boolean.TRUE.equals(request.transportRequired()));
         challan.getItems().clear();
         int i = 0;
-        for (ChallanItem ci : request.items()) {
+        for (ChallanItem challanItem : request.items()) {
             DeliveryChallanItem item = new DeliveryChallanItem();
             item.setDeliveryChallan(challan);
-            item.setProductId(ci.productId());
-            item.setDescription(ci.description());
-            item.setQuantity(ci.quantity());
-            item.setUnitId(ci.unitId());
+            item.setProductId(challanItem.productId());
+            item.setDescription(challanItem.description());
+            item.setQuantity(challanItem.quantity());
+            item.setUnitId(challanItem.unitId());
             item.setLineOrder(i++);
             challan.getItems().add(item);
         }
@@ -679,7 +698,7 @@ public class SalesDocumentService {
                     .multiply(item.rate())
                     .multiply(z(item.discountPercent()))
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-            var r = gst.calculate(new GstCalculationDtos.Request(
+            var gstResult = gst.calculate(new GstCalculationDtos.Request(
                     state.isBlank() ? "00" : state,
                     supply.isBlank() ? "00" : supply,
                     z(item.taxRate()),
@@ -694,12 +713,20 @@ public class SalesDocumentService {
             consumer.accept(
                     item,
                     new CalculatedLine(
-                            discount, r.taxable(), r.cgst(), r.sgst(), r.igst().add(r.otherTax()), r.lineTotal()),
+                            discount,
+                            gstResult.taxable(),
+                            gstResult.cgst(),
+                            gstResult.sgst(),
+                            gstResult.igst().add(gstResult.otherTax()),
+                            gstResult.lineTotal()),
                     n++);
             sub = sub.add(item.quantity().multiply(item.rate()));
             disc = disc.add(discount);
-            tax = tax.add(r.cgst()).add(r.sgst()).add(r.igst()).add(r.otherTax());
-            grand = grand.add(r.lineTotal());
+            tax = tax.add(gstResult.cgst())
+                    .add(gstResult.sgst())
+                    .add(gstResult.igst())
+                    .add(gstResult.otherTax());
+            grand = grand.add(gstResult.lineTotal());
         }
         return new LineTotals(sub, disc, tax, grand);
     }

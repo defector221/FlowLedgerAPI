@@ -85,23 +85,23 @@ class AccountingPostingServiceTest {
         period.setName("Jul");
         when(periods.findCovering(eq(orgId), any())).thenReturn(Optional.of(period));
         for (SystemAccountKey key : SystemAccountKey.values()) {
-            Account a = new Account();
-            a.setId(UUID.randomUUID());
-            a.setOrganizationId(orgId);
-            a.setSystemAccountKey(key);
-            a.setActive(true);
-            a.setAllowManualPosting(true);
-            a.setAccountName(key.name());
-            when(accounts.findByOrganizationIdAndSystemAccountKey(orgId, key)).thenReturn(Optional.of(a));
-            when(accounts.findByIdAndOrganizationId(a.getId(), orgId)).thenReturn(Optional.of(a));
-            when(accounts.findById(a.getId())).thenReturn(Optional.of(a));
+            Account account = new Account();
+            account.setId(UUID.randomUUID());
+            account.setOrganizationId(orgId);
+            account.setSystemAccountKey(key);
+            account.setActive(true);
+            account.setAllowManualPosting(true);
+            account.setAccountName(key.name());
+            when(accounts.findByOrganizationIdAndSystemAccountKey(orgId, key)).thenReturn(Optional.of(account));
+            when(accounts.findByIdAndOrganizationId(account.getId(), orgId)).thenReturn(Optional.of(account));
+            when(accounts.findById(account.getId())).thenReturn(Optional.of(account));
         }
         when(journals.save(any(JournalEntry.class))).thenAnswer((Answer<JournalEntry>) invocation -> {
-            JournalEntry e = invocation.getArgument(0);
-            if (e.getId() == null) {
-                e.setId(UUID.randomUUID());
+            JournalEntry journalEntry = invocation.getArgument(0);
+            if (journalEntry.getId() == null) {
+                journalEntry.setId(UUID.randomUUID());
             }
-            return e;
+            return journalEntry;
         });
         when(lines.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }

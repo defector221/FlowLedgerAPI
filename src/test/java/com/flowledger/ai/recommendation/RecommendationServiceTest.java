@@ -64,11 +64,11 @@ class RecommendationServiceTest {
     @Test
     void createDefaultsToNewStatus() {
         when(repository.save(any(AiRecommendation.class))).thenAnswer(inv -> {
-            AiRecommendation r = inv.getArgument(0);
-            if (r.getId() == null) {
-                r.setId(UUID.randomUUID());
+            AiRecommendation recommendation = inv.getArgument(0);
+            if (recommendation.getId() == null) {
+                recommendation.setId(UUID.randomUUID());
             }
-            return r;
+            return recommendation;
         });
 
         AiDtos.RecommendationResponse resp = service.create(new AiDtos.RecommendationCreateRequest(
@@ -117,9 +117,9 @@ class RecommendationServiceTest {
         when(paymentService.list()).thenReturn(List.of());
         when(salesInvoiceService.list(isNull(), isNull())).thenReturn(List.of());
         when(repository.save(any(AiRecommendation.class))).thenAnswer(inv -> {
-            AiRecommendation r = inv.getArgument(0);
-            r.setId(UUID.randomUUID());
-            return r;
+            AiRecommendation recommendation = inv.getArgument(0);
+            recommendation.setId(UUID.randomUUID());
+            return recommendation;
         });
 
         int created = generator.generateHeuristics();

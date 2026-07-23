@@ -35,31 +35,36 @@ public class KnowledgeService {
                 || request.content().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "title and content are required");
         }
-        AiKnowledgeDocument d = new AiKnowledgeDocument();
-        d.setOrganizationId(TenantContext.getOrganizationId());
-        d.setTitle(request.title().trim());
-        d.setDocType(
+        AiKnowledgeDocument document = new AiKnowledgeDocument();
+        document.setOrganizationId(TenantContext.getOrganizationId());
+        document.setTitle(request.title().trim());
+        document.setDocType(
                 request.docType() == null || request.docType().isBlank()
                         ? "GENERAL"
                         : request.docType().trim());
-        d.setContent(request.content());
-        d.setContentHash(EmbeddingPipeline.sha256(request.content()));
-        AiKnowledgeDocument saved = documents.save(d);
+        document.setContent(request.content());
+        document.setContentHash(EmbeddingPipeline.sha256(request.content()));
+        AiKnowledgeDocument saved = documents.save(document);
         embeddingPipeline.embedKnowledge(saved);
         return toDto(saved);
     }
 
     @Transactional(readOnly = true)
-    public List<AiDtos.KnowledgeResponse> search(String q) {
+    public List<AiDtos.KnowledgeResponse> search(String query) {
         UUID org = TenantContext.getOrganizationId();
-        List<AiKnowledgeDocument> docs = (q == null || q.isBlank())
+        List<AiKnowledgeDocument> docs = (query == null || query.isBlank())
                 ? documents.findByOrganizationIdOrderByUpdatedAtDesc(org)
-                : ragService.retrieve(org, q, 20);
+                : ragService.retrieve(org, query, 20);
         return docs.stream().map(this::toDto).toList();
     }
 
-    private AiDtos.KnowledgeResponse toDto(AiKnowledgeDocument d) {
+    private AiDtos.KnowledgeResponse toDto(AiKnowledgeDocument document) {
         return new AiDtos.KnowledgeResponse(
-                d.getId(), d.getTitle(), d.getDocType(), d.getContent(), d.getCreatedAt(), d.getUpdatedAt());
+                document.getId(),
+                document.getTitle(),
+                document.getDocType(),
+                document.getContent(),
+                document.getCreatedAt(),
+                document.getUpdatedAt());
     }
 }

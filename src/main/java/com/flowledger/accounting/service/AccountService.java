@@ -272,24 +272,24 @@ public class AccountService {
                         .toList());
     }
 
-    private static AccountResponse toResponse(Account a) {
+    private static AccountResponse toResponse(Account account) {
         return new AccountResponse(
-                a.getId(),
-                a.getOrganizationId(),
-                a.getAccountCode(),
-                a.getAccountName(),
-                a.getDescription(),
-                a.getAccountType(),
-                a.getAccountSubType(),
-                a.getParentAccountId(),
-                a.getSystemAccountKey(),
-                a.isSystemAccount(),
-                a.isEditable(),
-                a.isDeletable(),
-                a.getStatus(),
-                a.isActive(),
-                a.isAllowManualPosting(),
-                a.getOpeningDebit(),
-                a.getOpeningCredit());
+                account.getId(),
+                account.getOrganizationId(),
+                account.getAccountCode(),
+                account.getAccountName(),
+                account.getDescription(),
+                account.getAccountType(),
+                account.getAccountSubType(),
+                account.getParentAccountId(),
+                account.getSystemAccountKey(),
+                account.isSystemAccount(),
+                account.isEditable(),
+                account.isDeletable(),
+                account.getStatus(),
+                account.isActive(),
+                account.isAllowManualPosting(),
+                account.getOpeningDebit(),
+                account.getOpeningCredit());
     }
 }
