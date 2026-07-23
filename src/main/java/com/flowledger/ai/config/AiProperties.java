@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @Setter
 @ConfigurationProperties(prefix = "flowledger.ai")
 public class AiProperties {
-    private boolean enabled = false;
+    private boolean enabled = true;
     private String provider = "OPENAI";
     private boolean chatEnabled = true;
     private boolean ragEnabled = true;

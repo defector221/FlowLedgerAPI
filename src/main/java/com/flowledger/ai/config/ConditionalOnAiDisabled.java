@@ -7,12 +7,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
+/** Active when AI is explicitly turned off. */
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@ConditionalOnProperty(
-        prefix = "flowledger.ai",
-        name = "enabled",
-        havingValue = "true",
-        matchIfMissing = true)
-public @interface ConditionalOnAiEnabled {}
+@ConditionalOnProperty(prefix = "flowledger.ai", name = "enabled", havingValue = "false")
+public @interface ConditionalOnAiDisabled {}
