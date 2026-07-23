@@ -227,6 +227,17 @@ public class SalesInvoiceService {
     public InvoiceDetail cancel(UUID id) {
         SalesInvoice invoice = load(id);
         if (invoice.getStatus() == SalesInvoice.Status.CANCELLED) return toDetail(invoice);
+        if (invoice.getAmountPaid() != null && invoice.getAmountPaid().signum() > 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Cannot cancel an invoice with payments recorded. Reverse or cancel the payment first.");
+        }
+        if (invoice.getStatus() == SalesInvoice.Status.PAID
+                || invoice.getStatus() == SalesInvoice.Status.PARTIALLY_PAID) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Cannot cancel a paid or partially paid invoice. Reverse or cancel the payment first.");
+        }
         if (invoice.isInventoryPosted()) {
             for (var line : stockableLines(invoice.getItems())) {
                 if (invoice.getWarehouseId() == null) continue;
@@ -506,6 +517,7 @@ public class SalesInvoiceService {
                 invoice.getPlaceOfSupply(),
                 invoice.getSalesOrderId(),
                 invoice.getDeliveryChallanId(),
+                invoice.getCreatedAt(),
                 items);
     }
 

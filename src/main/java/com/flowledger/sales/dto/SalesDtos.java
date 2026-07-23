@@ -151,5 +151,6 @@ public final class SalesDtos {
             String placeOfSupply,
             UUID salesOrderId,
             UUID deliveryChallanId,
+            OffsetDateTime createdAt,
             List<InvoiceItemDetail> items) {}
 }
