@@ -1,5 +1,6 @@
 package com.flowledger.purchase.controller;
 
+import com.flowledger.common.dto.PageResponse;
 import com.flowledger.purchase.dto.PurchaseDtos.*;
 import com.flowledger.purchase.entity.*;
 import com.flowledger.purchase.service.DebitNoteService;
@@ -10,6 +11,8 @@ import com.flowledger.purchase.service.PurchaseReturnService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,13 +45,18 @@ public class PurchaseController {
     }
 
     @GetMapping("/orders")
-    public List<PurchaseOrder> orders() {
-        return orders.list();
+    public PageResponse<PurchaseOrder> orders(@PageableDefault(size = 20) Pageable pageable) {
+        return orders.list(pageable);
     }
 
     @GetMapping("/orders/{id}")
     public PurchaseOrder order(@PathVariable UUID id) {
         return orders.get(id);
+    }
+
+    @GetMapping("/orders/{id}/fulfillment")
+    public OrderFulfillment orderFulfillment(@PathVariable UUID id) {
+        return invoices.fulfillment(id);
     }
 
     @PutMapping("/orders/{id}")
@@ -78,6 +86,16 @@ public class PurchaseController {
         return grns.fromPurchaseOrder(poId, r);
     }
 
+    @GetMapping("/grn/{id}")
+    public GoodsReceipt grn(@PathVariable UUID id) {
+        return grns.get(id);
+    }
+
+    @PutMapping("/grn/{id}")
+    public GoodsReceipt updateGrn(@PathVariable UUID id, @Valid @RequestBody GrnRequest r) {
+        return grns.update(id, r);
+    }
+
     @PostMapping("/grn/{id}/confirm")
     public GoodsReceipt confirmGrn(@PathVariable UUID id) {
         return grns.confirm(id);
@@ -89,8 +107,14 @@ public class PurchaseController {
     }
 
     @GetMapping("/grn")
-    public List<GoodsReceipt> grns() {
-        return grns.list();
+    public PageResponse<GoodsReceipt> grns(
+            @PageableDefault(size = 20) Pageable pageable, @RequestParam(required = false) UUID purchaseOrderId) {
+        return grns.list(pageable, purchaseOrderId);
+    }
+
+    @GetMapping("/grn/by-order/{poId}")
+    public List<GoodsReceipt> grnsByOrder(@PathVariable UUID poId) {
+        return grns.listByPurchaseOrder(poId);
     }
 
     @PostMapping("/invoices/from-order/{poId}")
@@ -101,6 +125,11 @@ public class PurchaseController {
     @PostMapping("/invoices/from-grn/{grnId}")
     public PurchaseInvoice invoiceFromGrn(@PathVariable UUID grnId, @Valid @RequestBody InvoiceRequest r) {
         return invoices.fromGrn(grnId, r);
+    }
+
+    @PutMapping("/invoices/{id}")
+    public PurchaseInvoice updateInvoice(@PathVariable UUID id, @Valid @RequestBody InvoiceRequest r) {
+        return invoices.update(id, r);
     }
 
     @PostMapping("/invoices/{id}/confirm")
@@ -119,8 +148,21 @@ public class PurchaseController {
     }
 
     @GetMapping("/invoices")
-    public List<PurchaseInvoice> invoices() {
-        return invoices.list();
+    public PageResponse<PurchaseInvoice> invoices(
+            @PageableDefault(size = 20) Pageable pageable,
+            @RequestParam(required = false) UUID purchaseOrderId,
+            @RequestParam(required = false) UUID goodsReceiptId) {
+        return invoices.list(pageable, purchaseOrderId, goodsReceiptId);
+    }
+
+    @GetMapping("/invoices/by-order/{poId}")
+    public List<PurchaseInvoice> invoicesByOrder(@PathVariable UUID poId) {
+        return invoices.listByPurchaseOrder(poId);
+    }
+
+    @GetMapping("/invoices/by-grn/{grnId}")
+    public List<PurchaseInvoice> invoicesByGrn(@PathVariable UUID grnId) {
+        return invoices.listByGoodsReceipt(grnId);
     }
 
     @PostMapping("/returns")
@@ -130,8 +172,8 @@ public class PurchaseController {
     }
 
     @GetMapping("/returns")
-    public List<PurchaseReturn> returns() {
-        return returns.list();
+    public PageResponse<PurchaseReturn> returns(@PageableDefault(size = 20) Pageable pageable) {
+        return returns.list(pageable);
     }
 
     @PostMapping("/returns/{id}/confirm")

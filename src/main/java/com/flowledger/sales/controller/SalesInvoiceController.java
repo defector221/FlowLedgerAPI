@@ -1,10 +1,14 @@
 package com.flowledger.sales.controller;
 
+import com.flowledger.common.dto.PageResponse;
 import com.flowledger.sales.dto.SalesDtos.*;
 import com.flowledger.sales.entity.SalesInvoice;
 import com.flowledger.sales.service.SalesInvoiceService;
 import jakarta.validation.Valid;
 import java.util.*;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -44,8 +48,10 @@ public class SalesInvoiceController {
     }
 
     @GetMapping
-    public List<SalesInvoice> list(
-            @RequestParam(required = false) String status, @RequestParam(required = false) UUID customerId) {
-        return service.list(status, customerId);
+    public PageResponse<SalesInvoice> list(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) UUID customerId,
+            @PageableDefault(size = 20, sort = "invoiceDate", direction = Sort.Direction.DESC) Pageable pageable) {
+        return service.list(status, customerId, pageable);
     }
 }

@@ -6,6 +6,7 @@ import com.flowledger.purchase.service.PurchaseOrderService;
 import dev.langchain4j.agent.tool.Tool;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -19,7 +20,8 @@ public class PurchaseTool {
 
     @Tool("Summarize purchase orders")
     public String summarize(String query) {
-        List<PurchaseOrder> orders = purchaseOrderService.list();
+        List<PurchaseOrder> orders =
+                purchaseOrderService.list(PageRequest.of(0, 50)).content();
         String sample = orders.stream()
                 .limit(10)
                 .map(o -> o.getPoNumber()

@@ -1,12 +1,14 @@
 package com.flowledger.sales.controller;
 
+import com.flowledger.common.dto.PageResponse;
 import com.flowledger.sales.dto.SalesDtos.*;
 import com.flowledger.sales.entity.*;
 import com.flowledger.sales.service.SalesDocumentService;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,8 +25,8 @@ public class SalesDocumentController {
     // ── Quotations ──────────────────────────────────────────────────────────
 
     @GetMapping("/quotations")
-    public List<Quotation> quotations() {
-        return service.listQuotations();
+    public PageResponse<Quotation> quotations(@PageableDefault(size = 20) Pageable pageable) {
+        return service.listQuotations(pageable);
     }
 
     @GetMapping("/quotations/{id}")
@@ -56,8 +58,8 @@ public class SalesDocumentController {
     // ── Orders ──────────────────────────────────────────────────────────────
 
     @GetMapping("/orders")
-    public List<SalesOrder> orders() {
-        return service.listOrders();
+    public PageResponse<SalesOrder> orders(@PageableDefault(size = 20) Pageable pageable) {
+        return service.listOrders(pageable);
     }
 
     @GetMapping("/orders/{id}")
@@ -94,8 +96,8 @@ public class SalesDocumentController {
     // ── Challans ────────────────────────────────────────────────────────────
 
     @GetMapping("/challans")
-    public List<DeliveryChallan> challans() {
-        return service.listChallans();
+    public PageResponse<DeliveryChallan> challans(@PageableDefault(size = 20) Pageable pageable) {
+        return service.listChallans(pageable);
     }
 
     @GetMapping("/challans/{id}")
@@ -138,8 +140,8 @@ public class SalesDocumentController {
     // ── Returns ─────────────────────────────────────────────────────────────
 
     @GetMapping("/returns")
-    public List<SalesReturn> returns() {
-        return service.listReturns();
+    public PageResponse<SalesReturn> returns(@PageableDefault(size = 20) Pageable pageable) {
+        return service.listReturns(pageable);
     }
 
     @GetMapping("/returns/{id}")
@@ -161,8 +163,8 @@ public class SalesDocumentController {
     // ── Credit notes ────────────────────────────────────────────────────────
 
     @GetMapping("/credit-notes")
-    public List<CreditNote> creditNotes() {
-        return service.listCreditNotes();
+    public PageResponse<CreditNote> creditNotes(@PageableDefault(size = 20) Pageable pageable) {
+        return service.listCreditNotes(pageable);
     }
 
     @GetMapping("/credit-notes/{id}")

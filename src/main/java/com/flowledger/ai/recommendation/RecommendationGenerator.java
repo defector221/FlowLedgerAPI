@@ -19,6 +19,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -165,7 +166,8 @@ public class RecommendationGenerator {
     private int seedCustomerCreditRisks(UUID org, UUID customerId) {
         int created = 0;
         try {
-            List<SalesInvoice> invoices = salesInvoiceService.list(null, null);
+            List<SalesInvoice> invoices =
+                    salesInvoiceService.list(null, null, Pageable.unpaged()).content();
             Map<UUID, BigDecimal> outstandingByCustomer = invoices.stream()
                     .filter(i -> i.getOutstandingAmount() != null
                             && i.getOutstandingAmount().signum() > 0
@@ -209,7 +211,8 @@ public class RecommendationGenerator {
 
     private int seedCashFlowRisk(UUID org) {
         try {
-            List<SalesInvoice> invoices = salesInvoiceService.list(null, null);
+            List<SalesInvoice> invoices =
+                    salesInvoiceService.list(null, null, Pageable.unpaged()).content();
             BigDecimal totalOutstanding = invoices.stream()
                     .map(SalesInvoice::getOutstandingAmount)
                     .filter(a -> a != null && a.signum() > 0)

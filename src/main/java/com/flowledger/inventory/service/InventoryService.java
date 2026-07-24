@@ -1,5 +1,6 @@
 package com.flowledger.inventory.service;
 
+import com.flowledger.common.dto.PageResponse;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
 import com.flowledger.finance.voucher.adapter.StockAdjustmentVoucherBuilder;
@@ -13,6 +14,7 @@ import com.flowledger.sales.repository.SalesInvoiceRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -128,6 +130,15 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public List<StockPosition> stockOverview() {
+        return stockOverviewList(null);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<StockPosition> stockOverview(String q, Pageable pageable) {
+        return PageResponse.slice(stockOverviewList(q), pageable);
+    }
+
+    private List<StockPosition> stockOverviewList(String q) {
         UUID org = TenantContext.getOrganizationId();
         Map<UUID, BigDecimal> draftReserved = new HashMap<>();
         for (Object[] row : salesInvoices.sumDraftQuantitiesByProduct(org)) {
@@ -135,6 +146,7 @@ public class InventoryService {
             BigDecimal qty = row[1] instanceof BigDecimal bd ? bd : new BigDecimal(row[1].toString());
             draftReserved.put(productId, qty);
         }
+        String needle = q == null ? "" : q.trim().toLowerCase();
         return products.findAll().stream()
                 .filter(product ->
                         org.equals(product.getOrganizationId()) && product.isActive() && isStockedProduct(product))
@@ -147,11 +159,29 @@ public class InventoryService {
                         draftReserved.getOrDefault(product.getId(), BigDecimal.ZERO),
                         n(product.getMinimumStockLevel()),
                         n(product.getReorderLevel())))
+                .filter(row -> {
+                    if (needle.isEmpty()) return true;
+                    return (row.productName() != null
+                                    && row.productName().toLowerCase().contains(needle))
+                            || (row.sku() != null && row.sku().toLowerCase().contains(needle))
+                            || (row.productId() != null
+                                    && row.productId().toString().toLowerCase().contains(needle));
+                })
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<Ledger> getStockLedger(UUID product, UUID warehouse, LocalDate from, LocalDate to) {
+        return getStockLedgerList(product, warehouse, from, to);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<Ledger> getStockLedger(
+            UUID product, UUID warehouse, LocalDate from, LocalDate to, Pageable pageable) {
+        return PageResponse.slice(getStockLedgerList(product, warehouse, from, to), pageable);
+    }
+
+    private List<Ledger> getStockLedgerList(UUID product, UUID warehouse, LocalDate from, LocalDate to) {
         UUID org = TenantContext.getOrganizationId();
         LocalDate start = from == null ? LocalDate.of(1970, 1, 1) : from, end = to == null ? LocalDate.now() : to;
         List<InventoryTransaction> rows = warehouse == null

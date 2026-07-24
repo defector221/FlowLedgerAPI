@@ -1,9 +1,10 @@
 package com.flowledger.sales.repository;
 
 import com.flowledger.sales.entity.Quotation;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,5 +20,5 @@ public interface QuotationRepository extends JpaRepository<Quotation, UUID> {
             """)
     Optional<Quotation> findDetailedByIdAndOrganizationId(@Param("id") UUID id, @Param("org") UUID org);
 
-    List<Quotation> findByOrganizationIdOrderByQuotationDateDesc(UUID org);
+    Page<Quotation> findByOrganizationIdOrderByQuotationDateDesc(UUID org, Pageable pageable);
 }

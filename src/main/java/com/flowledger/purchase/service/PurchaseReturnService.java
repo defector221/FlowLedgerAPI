@@ -1,5 +1,6 @@
 package com.flowledger.purchase.service;
 
+import com.flowledger.common.dto.PageResponse;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
@@ -18,6 +19,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -110,12 +112,19 @@ public class PurchaseReturnService {
         return pr;
     }
 
-    public List<PurchaseReturn> list() {
-        return em.createQuery(
+    public PageResponse<PurchaseReturn> list(Pageable pageable) {
+        UUID org = TenantContext.getOrganizationId();
+        long total = em.createQuery("select count(p) from PurchaseReturn p where p.organizationId=:org", Long.class)
+                .setParameter("org", org)
+                .getSingleResult();
+        List<PurchaseReturn> content = em.createQuery(
                         "from PurchaseReturn p where p.organizationId=:org order by p.createdAt desc",
                         PurchaseReturn.class)
-                .setParameter("org", TenantContext.getOrganizationId())
+                .setParameter("org", org)
+                .setFirstResult((int) pageable.getOffset())
+                .setMaxResults(pageable.getPageSize())
                 .getResultList();
+        return PageResponse.of(content, pageable, total);
     }
 
     private String number(LocalDate d) {

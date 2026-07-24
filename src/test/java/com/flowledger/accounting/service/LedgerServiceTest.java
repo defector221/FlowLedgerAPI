@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageRequest;
 
 class LedgerServiceTest {
     UUID orgId = UUID.randomUUID();
@@ -68,12 +69,15 @@ class LedgerServiceTest {
     void customerLedgerRejectsInvalidDateRange() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> service.customerLedger(customerId, LocalDate.of(2026, 2, 1), LocalDate.of(2026, 1, 1)));
+                () -> service.customerLedger(
+                        customerId, LocalDate.of(2026, 2, 1), LocalDate.of(2026, 1, 1), PageRequest.of(0, 100)));
     }
 
     @Test
     void customerLedgerRequiresOrgCustomer() {
-        assertThrows(ResourceNotFoundException.class, () -> service.customerLedger(customerId, null, null));
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.customerLedger(customerId, null, null, PageRequest.of(0, 100)));
     }
 
     @Test
@@ -112,7 +116,8 @@ class LedgerServiceTest {
                         null,
                         2)));
 
-        List<LedgerLineResponse> result = service.customerLedger(customerId, null, null);
+        List<LedgerLineResponse> result = service.customerLedger(customerId, null, null, PageRequest.of(0, 100))
+                .content();
         assertEquals(2, result.size());
         assertEquals(new BigDecimal("100.0000"), result.get(0).runningBalance());
         assertEquals(new BigDecimal("60.0000"), result.get(1).runningBalance());
@@ -122,7 +127,9 @@ class LedgerServiceTest {
     @Test
     void accountLedgerRequiresOrgAccount() {
         UUID accountId = UUID.randomUUID();
-        assertThrows(ResourceNotFoundException.class, () -> service.accountLedger(accountId, null, null));
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.accountLedger(accountId, null, null, PageRequest.of(0, 100)));
     }
 
     @Test
@@ -131,7 +138,9 @@ class LedgerServiceTest {
         Account accountEntity = new Account();
         accountEntity.setId(accountId);
         account.set(Optional.of(accountEntity));
-        assertTrue(service.accountLedger(accountId, null, null).isEmpty());
+        assertTrue(service.accountLedger(accountId, null, null, PageRequest.of(0, 100))
+                .content()
+                .isEmpty());
     }
 
     @FunctionalInterface

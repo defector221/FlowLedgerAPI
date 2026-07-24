@@ -3,6 +3,7 @@ package com.flowledger.sales.service;
 import com.flowledger.accounting.domain.AccountingStatus;
 import com.flowledger.accounting.domain.JournalSource;
 import com.flowledger.ai.workflow.AiWorkflowGateService;
+import com.flowledger.common.dto.PageResponse;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.customer.repository.CustomerRepository;
@@ -29,6 +30,7 @@ import com.flowledger.tax.dto.GstCalculationDtos;
 import com.flowledger.tax.service.GstCalculationService;
 import com.flowledger.warehouse.entity.Warehouse;
 import com.flowledger.warehouse.repository.WarehouseRepository;
+import jakarta.persistence.criteria.Predicate;
 import java.math.*;
 import java.time.*;
 import java.util.*;
@@ -36,6 +38,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.*;
 import org.springframework.stereotype.*;
 import org.springframework.transaction.annotation.*;
@@ -281,11 +285,20 @@ public class SalesInvoiceService {
     }
 
     @Transactional(readOnly = true)
-    public List<SalesInvoice> list(String status, UUID customerId) {
-        return repo.findByOrganizationIdOrderByInvoiceDateDesc(TenantContext.getOrganizationId()).stream()
-                .filter(invoice -> status == null || invoice.getStatus().name().equals(status))
-                .filter(invoice -> customerId == null || customerId.equals(invoice.getCustomerId()))
-                .toList();
+    public PageResponse<SalesInvoice> list(String status, UUID customerId, Pageable pageable) {
+        UUID org = TenantContext.getOrganizationId();
+        Specification<SalesInvoice> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("organizationId"), org));
+            if (status != null && !status.isBlank()) {
+                predicates.add(cb.equal(root.get("status"), SalesInvoice.Status.valueOf(status)));
+            }
+            if (customerId != null) {
+                predicates.add(cb.equal(root.get("customerId"), customerId));
+            }
+            return cb.and(predicates.toArray(Predicate[]::new));
+        };
+        return PageResponse.from(repo.findAll(spec, pageable));
     }
 
     private SalesInvoice load(UUID id) {

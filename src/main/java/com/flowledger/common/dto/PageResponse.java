@@ -27,4 +27,11 @@ public record PageResponse<T>(List<T> content, int page, int size, long totalEle
                 total,
                 totalPages);
     }
+
+    /** For EntityManager-based queries that already fetched a single page plus a separate count. */
+    public static <T> PageResponse<T> of(List<T> content, Pageable pageable, long total) {
+        int pageSize = Math.max(1, pageable.getPageSize());
+        int totalPages = total == 0 ? 0 : (int) Math.ceil((double) total / pageSize);
+        return new PageResponse<>(content, Math.max(0, pageable.getPageNumber()), pageSize, total, totalPages);
+    }
 }

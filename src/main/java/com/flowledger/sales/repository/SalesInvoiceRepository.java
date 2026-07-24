@@ -8,10 +8,12 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface SalesInvoiceRepository extends JpaRepository<SalesInvoice, UUID> {
+public interface SalesInvoiceRepository
+        extends JpaRepository<SalesInvoice, UUID>, JpaSpecificationExecutor<SalesInvoice> {
     Optional<SalesInvoice> findByIdAndOrganizationId(UUID id, UUID org);
 
     @Query(
@@ -27,8 +29,6 @@ public interface SalesInvoiceRepository extends JpaRepository<SalesInvoice, UUID
     Optional<SalesInvoice> findByOrganizationIdAndSalesOrderIdAndDeliveryChallanIdIsNull(UUID org, UUID orderId);
 
     Optional<SalesInvoice> findByOrganizationIdAndDeliveryChallanId(UUID org, UUID challanId);
-
-    List<SalesInvoice> findByOrganizationIdOrderByInvoiceDateDesc(UUID org);
 
     Page<SalesInvoice> findByOrganizationId(UUID org, Pageable pageable);
 

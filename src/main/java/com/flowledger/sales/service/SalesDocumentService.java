@@ -1,6 +1,7 @@
 package com.flowledger.sales.service;
 
 import com.flowledger.ai.workflow.AiWorkflowGateService;
+import com.flowledger.common.dto.PageResponse;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.customer.entity.Customer;
@@ -28,6 +29,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -134,8 +136,8 @@ public class SalesDocumentService {
     }
 
     @Transactional(readOnly = true)
-    public List<Quotation> listQuotations() {
-        return quotations.findByOrganizationIdOrderByQuotationDateDesc(orgId());
+    public PageResponse<Quotation> listQuotations(Pageable pageable) {
+        return PageResponse.from(quotations.findByOrganizationIdOrderByQuotationDateDesc(orgId(), pageable));
     }
 
     @Transactional(readOnly = true)
@@ -276,8 +278,8 @@ public class SalesDocumentService {
     }
 
     @Transactional(readOnly = true)
-    public List<SalesOrder> listOrders() {
-        return orders.findByOrganizationIdOrderByOrderDateDesc(orgId());
+    public PageResponse<SalesOrder> listOrders(Pageable pageable) {
+        return PageResponse.from(orders.findByOrganizationIdOrderByOrderDateDesc(orgId(), pageable));
     }
 
     @Transactional(readOnly = true)
@@ -414,8 +416,8 @@ public class SalesDocumentService {
     }
 
     @Transactional(readOnly = true)
-    public List<DeliveryChallan> listChallans() {
-        return challans.findByOrganizationIdOrderByChallanDateDesc(orgId());
+    public PageResponse<DeliveryChallan> listChallans(Pageable pageable) {
+        return PageResponse.from(challans.findByOrganizationIdOrderByChallanDateDesc(orgId(), pageable));
     }
 
     @Transactional(readOnly = true)
@@ -565,8 +567,8 @@ public class SalesDocumentService {
     }
 
     @Transactional(readOnly = true)
-    public List<SalesReturn> listReturns() {
-        return returns.findByOrganizationIdOrderByReturnDateDesc(orgId());
+    public PageResponse<SalesReturn> listReturns(Pageable pageable) {
+        return PageResponse.from(returns.findByOrganizationIdOrderByReturnDateDesc(orgId(), pageable));
     }
 
     // ── Credit notes ────────────────────────────────────────────────────────
@@ -606,8 +608,8 @@ public class SalesDocumentService {
     }
 
     @Transactional(readOnly = true)
-    public List<CreditNote> listCreditNotes() {
-        return creditNotes.findByOrganizationIdOrderByCreditNoteDateDesc(orgId());
+    public PageResponse<CreditNote> listCreditNotes(Pageable pageable) {
+        return PageResponse.from(creditNotes.findByOrganizationIdOrderByCreditNoteDateDesc(orgId(), pageable));
     }
 
     @Transactional(readOnly = true)

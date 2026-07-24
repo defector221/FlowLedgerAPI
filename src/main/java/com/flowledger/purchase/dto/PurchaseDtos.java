@@ -59,4 +59,22 @@ public final class PurchaseDtos {
             LocalDate debitNoteDate,
             BigDecimal amount,
             String notes) {}
+
+    public record LineProgress(
+            UUID productId,
+            UUID unitId,
+            String description,
+            BigDecimal orderedQty,
+            BigDecimal receivedQty,
+            BigDecimal invoicedQty,
+            BigDecimal receivableQty,
+            BigDecimal billableQty) {}
+
+    public record OrderFulfillment(
+            UUID purchaseOrderId,
+            String poNumber,
+            String status,
+            List<LineProgress> lines,
+            List<UUID> goodsReceiptIds,
+            List<UUID> purchaseInvoiceIds) {}
 }

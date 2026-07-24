@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -104,7 +105,8 @@ public class ForecastService {
     }
 
     private ForecastResult salesMovingAverage() {
-        List<SalesInvoice> invoices = salesInvoiceService.list(null, null);
+        List<SalesInvoice> invoices =
+                salesInvoiceService.list(null, null, Pageable.unpaged()).content();
         Map<YearMonth, Integer> counts = new LinkedHashMap<>();
         YearMonth now = YearMonth.from(LocalDate.now());
         for (int i = 5; i >= 0; i--) {
@@ -141,7 +143,8 @@ public class ForecastService {
     }
 
     private ForecastResult cashflowStub() {
-        List<SalesInvoice> invoices = salesInvoiceService.list(null, null);
+        List<SalesInvoice> invoices =
+                salesInvoiceService.list(null, null, Pageable.unpaged()).content();
         BigDecimal outstanding = invoices.stream()
                 .map(SalesInvoice::getOutstandingAmount)
                 .filter(a -> a != null && a.signum() > 0)

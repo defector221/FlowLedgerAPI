@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.flowledger.ai.dto.AiDtos;
 import com.flowledger.ai.entity.AiRecommendation;
 import com.flowledger.ai.repository.AiRecommendationRepository;
+import com.flowledger.common.dto.PageResponse;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.inventory.dto.InventoryDtos.Alert;
 import com.flowledger.inventory.service.InventoryService;
@@ -28,6 +29,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class RecommendationServiceTest {
@@ -115,7 +117,8 @@ class RecommendationServiceTest {
                         eq(orgId), eq("INVENTORY_RISK"), eq(productId), anyList()))
                 .thenReturn(false);
         when(paymentService.list()).thenReturn(List.of());
-        when(salesInvoiceService.list(isNull(), isNull())).thenReturn(List.of());
+        when(salesInvoiceService.list(isNull(), isNull(), any(Pageable.class)))
+                .thenReturn(new PageResponse<>(List.of(), 0, 0, 0, 0));
         when(repository.save(any(AiRecommendation.class))).thenAnswer(inv -> {
             AiRecommendation recommendation = inv.getArgument(0);
             recommendation.setId(UUID.randomUUID());
@@ -136,7 +139,8 @@ class RecommendationServiceTest {
                         eq(orgId), eq("INVENTORY_RISK"), eq(productId), anyList()))
                 .thenReturn(true);
         when(paymentService.list()).thenReturn(List.of());
-        when(salesInvoiceService.list(isNull(), isNull())).thenReturn(List.of());
+        when(salesInvoiceService.list(isNull(), isNull(), any(Pageable.class)))
+                .thenReturn(new PageResponse<>(List.of(), 0, 0, 0, 0));
 
         int created = generator.generateHeuristics();
         assertEquals(0, created);

@@ -1,5 +1,6 @@
 package com.flowledger.inventory.controller;
 
+import com.flowledger.common.dto.PageResponse;
 import com.flowledger.inventory.dto.InventoryDtos.*;
 import com.flowledger.inventory.entity.InventoryTransaction;
 import com.flowledger.inventory.service.InventoryService;
@@ -8,6 +9,8 @@ import com.flowledger.report.service.ReportService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.*;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -35,17 +38,19 @@ public class InventoryController {
     }
 
     @GetMapping("/overview")
-    public List<StockPosition> overview() {
-        return service.stockOverview();
+    public PageResponse<StockPosition> overview(
+            @RequestParam(required = false) String q, @PageableDefault(size = 20) Pageable pageable) {
+        return service.stockOverview(q, pageable);
     }
 
     @GetMapping("/ledger/{productId}")
-    public List<Ledger> ledger(
+    public PageResponse<Ledger> ledger(
             @PathVariable UUID productId,
             @RequestParam(required = false) UUID warehouseId,
             @RequestParam(required = false) LocalDate from,
-            @RequestParam(required = false) LocalDate to) {
-        return service.getStockLedger(productId, warehouseId, from, to);
+            @RequestParam(required = false) LocalDate to,
+            @PageableDefault(size = 50) Pageable pageable) {
+        return service.getStockLedger(productId, warehouseId, from, to, pageable);
     }
 
     @PostMapping("/adjustments")

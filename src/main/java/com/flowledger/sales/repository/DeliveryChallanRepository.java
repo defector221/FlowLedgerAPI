@@ -2,6 +2,8 @@ package com.flowledger.sales.repository;
 
 import com.flowledger.sales.entity.DeliveryChallan;
 import java.util.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,5 +21,5 @@ public interface DeliveryChallanRepository extends JpaRepository<DeliveryChallan
 
     Optional<DeliveryChallan> findByOrganizationIdAndSalesOrderId(UUID org, UUID orderId);
 
-    List<DeliveryChallan> findByOrganizationIdOrderByChallanDateDesc(UUID org);
+    Page<DeliveryChallan> findByOrganizationIdOrderByChallanDateDesc(UUID org, Pageable pageable);
 }
