@@ -147,27 +147,30 @@ public class AccountingController {
     }
 
     @GetMapping("/ledgers/accounts/{id}")
-    public ApiResponse<List<LedgerLineResponse>> accountLedger(
+    public ApiResponse<PageResponse<LedgerLineResponse>> accountLedger(
             @PathVariable UUID id,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ApiResponse.of(ledgers.accountLedger(id, from, to));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @PageableDefault(size = 50) Pageable pageable) {
+        return ApiResponse.of(ledgers.accountLedger(id, from, to, pageable));
     }
 
     @GetMapping("/ledgers/customers/{id}")
-    public ApiResponse<List<LedgerLineResponse>> customerLedger(
+    public ApiResponse<PageResponse<LedgerLineResponse>> customerLedger(
             @PathVariable UUID id,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ApiResponse.of(ledgers.customerLedger(id, from, to));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @PageableDefault(size = 50) Pageable pageable) {
+        return ApiResponse.of(ledgers.customerLedger(id, from, to, pageable));
     }
 
     @GetMapping("/ledgers/suppliers/{id}")
-    public ApiResponse<List<LedgerLineResponse>> supplierLedger(
+    public ApiResponse<PageResponse<LedgerLineResponse>> supplierLedger(
             @PathVariable UUID id,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ApiResponse.of(ledgers.supplierLedger(id, from, to));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @PageableDefault(size = 50) Pageable pageable) {
+        return ApiResponse.of(ledgers.supplierLedger(id, from, to, pageable));
     }
 
     @GetMapping("/reports/trial-balance")
@@ -198,10 +201,11 @@ public class AccountingController {
     }
 
     @GetMapping("/reports/general-ledger")
-    public ApiResponse<List<GlLineResponse>> generalLedger(
+    public ApiResponse<PageResponse<GlLineResponse>> generalLedger(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ApiResponse.of(reports.generalLedger(from, to));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @PageableDefault(size = 50) Pageable pageable) {
+        return ApiResponse.of(reports.generalLedger(from, to, pageable));
     }
 
     @GetMapping("/reports/day-book")

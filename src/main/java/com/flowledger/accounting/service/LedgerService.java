@@ -5,6 +5,7 @@ import com.flowledger.accounting.dto.LedgerLineView;
 import com.flowledger.accounting.repository.AccountRepository;
 import com.flowledger.accounting.repository.JournalEntryLineRepository;
 import com.flowledger.accounting.util.AccountingMoney;
+import com.flowledger.common.dto.PageResponse;
 import com.flowledger.common.exception.ResourceNotFoundException;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.customer.repository.CustomerRepository;
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,32 +38,35 @@ public class LedgerService {
     }
 
     @Transactional(readOnly = true)
-    public List<LedgerLineResponse> accountLedger(UUID accountId, LocalDate from, LocalDate to) {
+    public PageResponse<LedgerLineResponse> accountLedger(
+            UUID accountId, LocalDate from, LocalDate to, Pageable pageable) {
         UUID org = TenantContext.getOrganizationId();
         validateDateRange(from, to);
         accounts.findByIdAndOrganizationId(accountId, org)
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
-        return build(lines.findPostedLedgerForAccount(org, accountId, from, to));
+        return PageResponse.slice(build(lines.findPostedLedgerForAccount(org, accountId, from, to)), pageable);
     }
 
     @Transactional(readOnly = true)
-    public List<LedgerLineResponse> customerLedger(UUID customerId, LocalDate from, LocalDate to) {
+    public PageResponse<LedgerLineResponse> customerLedger(
+            UUID customerId, LocalDate from, LocalDate to, Pageable pageable) {
         UUID org = TenantContext.getOrganizationId();
         validateDateRange(from, to);
         customers
                 .findByIdAndOrganizationId(customerId, org)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
-        return build(lines.findPostedLedgerForCustomer(org, customerId, from, to));
+        return PageResponse.slice(build(lines.findPostedLedgerForCustomer(org, customerId, from, to)), pageable);
     }
 
     @Transactional(readOnly = true)
-    public List<LedgerLineResponse> supplierLedger(UUID supplierId, LocalDate from, LocalDate to) {
+    public PageResponse<LedgerLineResponse> supplierLedger(
+            UUID supplierId, LocalDate from, LocalDate to, Pageable pageable) {
         UUID org = TenantContext.getOrganizationId();
         validateDateRange(from, to);
         suppliers
                 .findByIdAndOrganizationId(supplierId, org)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier not found"));
-        return build(lines.findPostedLedgerForSupplier(org, supplierId, from, to));
+        return PageResponse.slice(build(lines.findPostedLedgerForSupplier(org, supplierId, from, to)), pageable);
     }
 
     private List<LedgerLineResponse> build(List<LedgerLineView> journalLines) {

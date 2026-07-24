@@ -12,6 +12,7 @@ import com.flowledger.accounting.repository.AccountRepository;
 import com.flowledger.accounting.repository.JournalEntryLineRepository;
 import com.flowledger.accounting.repository.JournalEntryRepository;
 import com.flowledger.accounting.util.AccountingMoney;
+import com.flowledger.common.dto.PageResponse;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.FinancialYearUtil;
 import com.flowledger.finance.voucher.domain.VoucherStatus;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -211,6 +213,15 @@ public class AccountingReportService {
 
     @Transactional(readOnly = true)
     public List<GlLineResponse> generalLedger(LocalDate from, LocalDate to) {
+        return generalLedgerAll(from, to);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<GlLineResponse> generalLedger(LocalDate from, LocalDate to, Pageable pageable) {
+        return PageResponse.slice(generalLedgerAll(from, to), pageable);
+    }
+
+    private List<GlLineResponse> generalLedgerAll(LocalDate from, LocalDate to) {
         UUID org = TenantContext.getOrganizationId();
         List<GlLineResponse> result = new ArrayList<>();
         List<JournalEntry> entries = journals.findByOrganizationIdAndStatusAndEntryDateBetween(
