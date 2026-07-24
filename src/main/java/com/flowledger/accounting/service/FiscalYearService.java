@@ -70,6 +70,51 @@ public class FiscalYearService {
                 .toList();
     }
 
+    @Transactional
+    public PeriodResponse closePeriod(UUID periodId) {
+        AccountingPeriod period = loadPeriod(periodId);
+        if (period.getStatus() == PeriodStatus.LOCKED) {
+            throw new ConflictException("Locked periods cannot be closed");
+        }
+        if (period.getStatus() == PeriodStatus.CLOSED) {
+            return toResponse(period);
+        }
+        period.setStatus(PeriodStatus.CLOSED);
+        return toResponse(periods.save(period));
+    }
+
+    @Transactional
+    public PeriodResponse lockPeriod(UUID periodId) {
+        AccountingPeriod period = loadPeriod(periodId);
+        period.setStatus(PeriodStatus.LOCKED);
+        return toResponse(periods.save(period));
+    }
+
+    @Transactional
+    public FiscalYearResponse closeFiscalYear(UUID fiscalYearId) {
+        FiscalYear fiscalYear = fiscalYears
+                .findByIdAndOrganizationId(fiscalYearId, TenantContext.getOrganizationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Fiscal year not found: " + fiscalYearId));
+        if (fiscalYear.getStatus() == FiscalYearStatus.LOCKED) {
+            throw new ConflictException("Locked fiscal years cannot be closed");
+        }
+        List<AccountingPeriod> openPeriods =
+                periods.findByFiscalYearIdOrderByPeriodNumberAsc(fiscalYear.getId()).stream()
+                        .filter(p -> p.getStatus() == PeriodStatus.OPEN)
+                        .toList();
+        if (!openPeriods.isEmpty()) {
+            throw new BusinessException("Close or lock all open periods before closing the fiscal year");
+        }
+        fiscalYear.setStatus(FiscalYearStatus.CLOSED);
+        fiscalYear.setCurrent(false);
+        return toResponse(fiscalYears.save(fiscalYear));
+    }
+
+    private AccountingPeriod loadPeriod(UUID periodId) {
+        return periods.findByIdAndOrganizationId(periodId, TenantContext.getOrganizationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Accounting period not found: " + periodId));
+    }
+
     private void createMonthlyPeriods(UUID organizationId, FiscalYear fiscalYear) {
         LocalDate cursor = fiscalYear.getStartDate();
         int number = 1;

@@ -31,6 +31,15 @@ public final class PaymentDtos {
             String notes,
             List<@Valid Allocation> allocations) {}
 
+    /** Bank/cash transfer between two GL accounts (CONTRA). */
+    public record ContraRequest(
+            @NotNull UUID fromAccountId,
+            @NotNull UUID toAccountId,
+            @NotNull @DecimalMin("0.01") BigDecimal amount,
+            @NotNull LocalDate date,
+            String notes,
+            String transactionReference) {}
+
     public record AllocationResponse(
             UUID id, String documentType, UUID documentId, BigDecimal allocatedAmount, OffsetDateTime createdAt) {}
 
@@ -42,6 +51,8 @@ public final class PaymentDtos {
             Payment.Party partyType,
             UUID customerId,
             UUID supplierId,
+            UUID fromAccountId,
+            UUID toAccountId,
             BigDecimal amount,
             String paymentMode,
             String transactionReference,
@@ -80,6 +91,8 @@ public final class PaymentDtos {
                     payment.getPartyType(),
                     payment.getCustomerId(),
                     payment.getSupplierId(),
+                    payment.getFromAccountId(),
+                    payment.getToAccountId(),
                     amount,
                     payment.getPaymentMode(),
                     payment.getTransactionReference(),

@@ -2,11 +2,12 @@ package com.flowledger.sales.service;
 
 import com.flowledger.accounting.domain.AccountingStatus;
 import com.flowledger.accounting.domain.JournalSource;
-import com.flowledger.accounting.service.AccountingPostingService;
 import com.flowledger.ai.workflow.AiWorkflowGateService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.customer.repository.CustomerRepository;
+import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
+import com.flowledger.finance.voucher.adapter.SalesVoucherBuilder;
 import com.flowledger.inventory.dto.InventoryDtos.PostTransaction;
 import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.service.InventoryService;
@@ -55,7 +56,7 @@ public class SalesInvoiceService {
     private final DocumentNumberService numbers;
     private final GstCalculationService gst;
     private final SearchIndexEventPublisher searchEvents;
-    private final AccountingPostingService accounting;
+    private final DocumentVoucherFacade documentPosting;
     private final SubscriptionService subscriptions;
     private final ObjectProvider<AiWorkflowGateService> workflowGate;
 
@@ -71,7 +72,7 @@ public class SalesInvoiceService {
             DocumentNumberService documentNumberService,
             GstCalculationService gstCalculationService,
             SearchIndexEventPublisher searchEvents,
-            AccountingPostingService accounting,
+            DocumentVoucherFacade documentPosting,
             SubscriptionService subscriptions,
             ObjectProvider<AiWorkflowGateService> workflowGate) {
         repo = salesInvoiceRepository;
@@ -85,7 +86,7 @@ public class SalesInvoiceService {
         numbers = documentNumberService;
         gst = gstCalculationService;
         this.searchEvents = searchEvents;
-        this.accounting = accounting;
+        this.documentPosting = documentPosting;
         this.subscriptions = subscriptions;
         this.workflowGate = workflowGate;
     }
@@ -218,7 +219,7 @@ public class SalesInvoiceService {
         }
         invoice.setStatus(SalesInvoice.Status.CONFIRMED);
         SalesInvoice saved = repo.save(invoice);
-        accounting.postSalesInvoice(saved);
+        documentPosting.postSalesInvoice(saved);
         searchEvents.upsert(saved.getOrganizationId(), SearchEntityType.SALES_INVOICE, saved.getId());
         return toDetail(saved);
     }
@@ -262,8 +263,11 @@ public class SalesInvoiceService {
         invoice.setInventoryPosted(false);
         invoice.setStatus(SalesInvoice.Status.CANCELLED);
         if (invoice.getAccountingStatus() == AccountingStatus.POSTED) {
-            accounting.reverseDocumentJournal(
-                    invoice.getOrganizationId(), JournalSource.SALES_INVOICE, invoice.getId());
+            documentPosting.reverseDocument(
+                    invoice.getOrganizationId(),
+                    SalesVoucherBuilder.REFERENCE_TYPE,
+                    invoice.getId(),
+                    JournalSource.SALES_INVOICE);
             invoice.setAccountingStatus(AccountingStatus.REVERSED);
         }
         SalesInvoice saved = repo.save(invoice);

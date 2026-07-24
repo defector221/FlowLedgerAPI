@@ -1,11 +1,11 @@
 package com.flowledger.sales.service;
 
-import com.flowledger.accounting.service.AccountingPostingService;
 import com.flowledger.ai.workflow.AiWorkflowGateService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.customer.entity.Customer;
 import com.flowledger.customer.repository.CustomerRepository;
+import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
 import com.flowledger.inventory.dto.InventoryDtos.PostTransaction;
 import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.service.InventoryService;
@@ -51,7 +51,7 @@ public class SalesDocumentService {
     private final SalesInvoiceService invoiceService;
     private final GstCalculationService gst;
     private final InventoryService inventory;
-    private final AccountingPostingService accounting;
+    private final DocumentVoucherFacade documentPosting;
     private final ObjectProvider<AiWorkflowGateService> workflowGate;
     private final ShipmentRepository shipments;
 
@@ -76,7 +76,7 @@ public class SalesDocumentService {
             SalesInvoiceService invoiceService,
             GstCalculationService gst,
             InventoryService inventory,
-            AccountingPostingService accounting,
+            DocumentVoucherFacade documentPosting,
             ObjectProvider<AiWorkflowGateService> workflowGate,
             ShipmentRepository shipments) {
         this.quotations = quotations;
@@ -92,7 +92,7 @@ public class SalesDocumentService {
         this.invoiceService = invoiceService;
         this.gst = gst;
         this.inventory = inventory;
-        this.accounting = accounting;
+        this.documentPosting = documentPosting;
         this.workflowGate = workflowGate;
         this.shipments = shipments;
     }
@@ -554,7 +554,7 @@ public class SalesDocumentService {
         }
         salesReturn.setStatus("CONFIRMED");
         SalesReturn saved = returns.save(salesReturn);
-        accounting.postSalesReturn(saved);
+        documentPosting.postSalesReturn(saved);
         return saved;
     }
 
@@ -601,7 +601,7 @@ public class SalesDocumentService {
                 org.getFinancialYearStart(),
                 creditNote.getCreditNoteDate()));
         CreditNote saved = creditNotes.save(creditNote);
-        accounting.postCreditNote(saved);
+        documentPosting.postCreditNote(saved);
         return saved;
     }
 

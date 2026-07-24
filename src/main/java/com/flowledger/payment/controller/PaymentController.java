@@ -1,6 +1,7 @@
 package com.flowledger.payment.controller;
 
 import com.flowledger.payment.dto.PaymentDtos.Allocation;
+import com.flowledger.payment.dto.PaymentDtos.ContraRequest;
 import com.flowledger.payment.dto.PaymentDtos.PaymentRequest;
 import com.flowledger.payment.dto.PaymentDtos.PaymentResponse;
 import com.flowledger.payment.entity.Payment;
@@ -26,6 +27,12 @@ public class PaymentController {
     @ResponseStatus(HttpStatus.CREATED)
     public PaymentResponse create(@Valid @RequestBody PaymentRequest request) {
         return PaymentResponse.from(service.create(request));
+    }
+
+    @PostMapping("/contra")
+    @ResponseStatus(HttpStatus.CREATED)
+    public PaymentResponse createContra(@Valid @RequestBody ContraRequest request) {
+        return PaymentResponse.from(service.createContra(request));
     }
 
     @PostMapping("/{id}/allocations")

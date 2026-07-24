@@ -2,6 +2,7 @@ package com.flowledger.purchase.service;
 
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
+import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.purchase.dto.PurchaseDtos.DebitNoteRequest;
@@ -29,16 +30,19 @@ public class DebitNoteService {
     private final PurchaseInvoiceService invoices;
     private final DocumentNumberService numbers;
     private final OrganizationRepository organizations;
+    private final DocumentVoucherFacade documentPosting;
 
     public DebitNoteService(
             PurchaseReturnService returns,
             PurchaseInvoiceService invoices,
             DocumentNumberService numbers,
-            OrganizationRepository organizations) {
+            OrganizationRepository organizations,
+            DocumentVoucherFacade documentPosting) {
         this.returns = returns;
         this.invoices = invoices;
         this.numbers = numbers;
         this.organizations = organizations;
+        this.documentPosting = documentPosting;
     }
 
     public DebitNote create(DebitNoteRequest request) {
@@ -71,6 +75,7 @@ public class DebitNoteService {
         dn.setStatus("ISSUED");
         dn.setDebitNoteNumber(number(date));
         em.persist(dn);
+        documentPosting.postDebitNote(dn);
         return dn;
     }
 

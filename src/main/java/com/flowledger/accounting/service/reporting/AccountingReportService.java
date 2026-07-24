@@ -1,5 +1,6 @@
 package com.flowledger.accounting.service.reporting;
 
+import com.flowledger.accounting.domain.AccountSubType;
 import com.flowledger.accounting.domain.AccountType;
 import com.flowledger.accounting.domain.JournalStatus;
 import com.flowledger.accounting.domain.SystemAccountKey;
@@ -13,13 +14,19 @@ import com.flowledger.accounting.repository.JournalEntryRepository;
 import com.flowledger.accounting.util.AccountingMoney;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.FinancialYearUtil;
+import com.flowledger.finance.voucher.domain.VoucherStatus;
+import com.flowledger.finance.voucher.entity.Voucher;
+import com.flowledger.finance.voucher.repository.VoucherRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,12 +36,17 @@ public class AccountingReportService {
     private final AccountRepository accounts;
     private final JournalEntryRepository journals;
     private final JournalEntryLineRepository lines;
+    private final VoucherRepository vouchers;
 
     public AccountingReportService(
-            AccountRepository accounts, JournalEntryRepository journals, JournalEntryLineRepository lines) {
+            AccountRepository accounts,
+            JournalEntryRepository journals,
+            JournalEntryLineRepository lines,
+            VoucherRepository vouchers) {
         this.accounts = accounts;
         this.journals = journals;
         this.lines = lines;
+        this.vouchers = vouchers;
     }
 
     @Transactional(readOnly = true)
@@ -287,6 +299,247 @@ public class AccountingReportService {
                 .size();
         return new DashboardSummaryResponse(
                 receivables, payables, cashBank, pl.netProfit(), journalCount, journals.countUnbalancedPosted(org));
+    }
+
+    @Transactional(readOnly = true)
+    public DayBookResponse dayBook(LocalDate from, LocalDate to) {
+        UUID org = TenantContext.getOrganizationId();
+        LocalDate fromDate = from != null ? from : LocalDate.of(1970, 1, 1);
+        LocalDate toDate = to != null ? to : LocalDate.of(2999, 12, 31);
+
+        List<Voucher> postedVouchers =
+                vouchers.findPostedByOrganizationAndDateBetween(org, VoucherStatus.POSTED, fromDate, toDate);
+        if (!postedVouchers.isEmpty()) {
+            List<DayBookEntry> entries = new ArrayList<>();
+            BigDecimal totalDebit = AccountingMoney.zero();
+            BigDecimal totalCredit = AccountingMoney.zero();
+            for (Voucher voucher : postedVouchers) {
+                BigDecimal debit = AccountingMoney.normalize(voucher.getTotalDebit());
+                BigDecimal credit = AccountingMoney.normalize(voucher.getTotalCredit());
+                entries.add(new DayBookEntry(
+                        voucher.getId(),
+                        voucher.getVoucherNumber(),
+                        voucher.getVoucherDate(),
+                        voucher.getVoucherType() != null
+                                ? voucher.getVoucherType().name()
+                                : "VOUCHER",
+                        voucher.getNarration(),
+                        "VOUCHER",
+                        debit,
+                        credit));
+                totalDebit = totalDebit.add(debit);
+                totalCredit = totalCredit.add(credit);
+            }
+            return new DayBookResponse(from, to, "VOUCHER", entries, totalDebit, totalCredit, entries.size());
+        }
+
+        List<JournalEntry> entries =
+                journals.findByOrganizationIdAndStatusAndEntryDateBetween(org, JournalStatus.POSTED, fromDate, toDate);
+        entries.sort(Comparator.comparing(JournalEntry::getEntryDate)
+                .thenComparing(JournalEntry::getEntryNumber, Comparator.nullsLast(String::compareTo)));
+        List<DayBookEntry> rows = new ArrayList<>();
+        BigDecimal totalDebit = AccountingMoney.zero();
+        BigDecimal totalCredit = AccountingMoney.zero();
+        for (JournalEntry entry : entries) {
+            BigDecimal debit = AccountingMoney.normalize(entry.getTotalDebit());
+            BigDecimal credit = AccountingMoney.normalize(entry.getTotalCredit());
+            rows.add(new DayBookEntry(
+                    entry.getId(),
+                    entry.getEntryNumber(),
+                    entry.getEntryDate(),
+                    entry.getVoucherType() != null ? entry.getVoucherType().name() : "JOURNAL",
+                    entry.getDescription(),
+                    "JOURNAL",
+                    debit,
+                    credit));
+            totalDebit = totalDebit.add(debit);
+            totalCredit = totalCredit.add(credit);
+        }
+        return new DayBookResponse(from, to, "JOURNAL", rows, totalDebit, totalCredit, rows.size());
+    }
+
+    @Transactional(readOnly = true)
+    public CashBookResponse cashBook(LocalDate from, LocalDate to) {
+        return moneyBook(from, to, "CASH", SystemAccountKey.CASH, AccountSubType.CASH, "CASH");
+    }
+
+    @Transactional(readOnly = true)
+    public CashBookResponse bankBook(LocalDate from, LocalDate to) {
+        return moneyBook(from, to, "BANK", SystemAccountKey.BANK, AccountSubType.BANK, "BANK");
+    }
+
+    @Transactional(readOnly = true)
+    public CashFlowResponse cashFlow(LocalDate from, LocalDate to) {
+        UUID org = TenantContext.getOrganizationId();
+        LocalDate fromDate = from != null ? from : LocalDate.of(1970, 1, 1);
+        LocalDate toDate = to != null ? to : LocalDate.of(2999, 12, 31);
+
+        ProfitAndLossResponse pl = profitAndLoss(fromDate, toDate);
+        BigDecimal netProfit = AccountingMoney.normalize(pl.netProfit());
+
+        Map<UUID, MutableTotals> periodTotals = accumulate(org, fromDate, toDate);
+        BigDecimal arDelta = AccountingMoney.zero();
+        BigDecimal apDelta = AccountingMoney.zero();
+        BigDecimal inventoryDelta = AccountingMoney.zero();
+        for (Account account : accounts.findByOrganizationIdOrderByAccountCodeAsc(org)) {
+            MutableTotals t = periodTotals.getOrDefault(account.getId(), new MutableTotals());
+            BigDecimal movement = t.debit.subtract(t.credit);
+            if (matchesSystemOrSubtype(
+                            account, SystemAccountKey.ACCOUNTS_RECEIVABLE, AccountSubType.ACCOUNTS_RECEIVABLE)
+                    || containsIgnoreCase(account, "RECEIVABLE")
+                    || containsIgnoreCase(account, "DEBTOR")) {
+                arDelta = arDelta.add(movement);
+            } else if (matchesSystemOrSubtype(
+                            account, SystemAccountKey.ACCOUNTS_PAYABLE, AccountSubType.ACCOUNTS_PAYABLE)
+                    || containsIgnoreCase(account, "PAYABLE")
+                    || containsIgnoreCase(account, "CREDITOR")) {
+                // liability: credit increase is positive cash (AP increase)
+                apDelta = apDelta.add(t.credit.subtract(t.debit));
+            } else if (matchesSystemOrSubtype(account, SystemAccountKey.INVENTORY, AccountSubType.INVENTORY)
+                    || containsIgnoreCase(account, "INVENTORY")
+                    || containsIgnoreCase(account, "STOCK")) {
+                inventoryDelta = inventoryDelta.add(movement);
+            }
+        }
+
+        // Indirect: decrease in AR/Inventory = cash in; increase in AP = cash in
+        BigDecimal arAdjustment = arDelta.negate();
+        BigDecimal inventoryAdjustment = inventoryDelta.negate();
+        BigDecimal apAdjustment = apDelta;
+
+        List<NamedAmount> operatingItems = List.of(new NamedAmount("Net profit", netProfit));
+        CashFlowSection operating = new CashFlowSection("Operating", operatingItems, netProfit);
+
+        List<NamedAmount> wcItems = new ArrayList<>();
+        wcItems.add(new NamedAmount("Change in accounts receivable", arAdjustment));
+        wcItems.add(new NamedAmount("Change in inventory", inventoryAdjustment));
+        wcItems.add(new NamedAmount("Change in accounts payable", apAdjustment));
+        BigDecimal wcTotal = arAdjustment.add(inventoryAdjustment).add(apAdjustment);
+        CashFlowSection workingCapital = new CashFlowSection("Working capital", wcItems, wcTotal);
+
+        BigDecimal netOps = netProfit.add(wcTotal);
+
+        Set<UUID> cashBankIds = resolveMoneyAccountIds(
+                org,
+                Set.of(SystemAccountKey.CASH, SystemAccountKey.BANK),
+                Set.of(AccountSubType.CASH, AccountSubType.BANK),
+                Set.of("CASH", "BANK"));
+        BigDecimal openingCash = balanceOfAccounts(org, cashBankIds, null, fromDate.minusDays(1));
+        BigDecimal closingCash = balanceOfAccounts(org, cashBankIds, null, toDate);
+        BigDecimal netChange = closingCash.subtract(openingCash);
+
+        return new CashFlowResponse(
+                from, to, netProfit, operating, workingCapital, netOps, openingCash, closingCash, netChange);
+    }
+
+    private CashBookResponse moneyBook(
+            LocalDate from,
+            LocalDate to,
+            String bookType,
+            SystemAccountKey systemKey,
+            AccountSubType subType,
+            String nameToken) {
+        UUID org = TenantContext.getOrganizationId();
+        LocalDate fromDate = from != null ? from : LocalDate.of(1970, 1, 1);
+        LocalDate toDate = to != null ? to : LocalDate.of(2999, 12, 31);
+
+        Set<UUID> accountIds = resolveMoneyAccountIds(org, Set.of(systemKey), Set.of(subType), Set.of(nameToken));
+        Map<UUID, Account> accountMap = new HashMap<>();
+        for (Account account : accounts.findByOrganizationIdOrderByAccountCodeAsc(org)) {
+            if (accountIds.contains(account.getId())) {
+                accountMap.put(account.getId(), account);
+            }
+        }
+
+        BigDecimal opening = balanceOfAccounts(org, accountIds, null, fromDate.minusDays(1));
+
+        List<JournalEntry> entries =
+                journals.findByOrganizationIdAndStatusAndEntryDateBetween(org, JournalStatus.POSTED, fromDate, toDate);
+        entries.sort(Comparator.comparing(JournalEntry::getEntryDate)
+                .thenComparing(JournalEntry::getEntryNumber, Comparator.nullsLast(String::compareTo)));
+
+        List<CashBookLine> bookLines = new ArrayList<>();
+        BigDecimal running = opening;
+        BigDecimal totalDebit = AccountingMoney.zero();
+        BigDecimal totalCredit = AccountingMoney.zero();
+        for (JournalEntry entry : entries) {
+            for (JournalEntryLine line : lines.findByJournalEntryIdOrderByLineNumberAsc(entry.getId())) {
+                if (!accountIds.contains(line.getAccountId())) {
+                    continue;
+                }
+                Account account = accountMap.get(line.getAccountId());
+                BigDecimal debit = AccountingMoney.normalize(line.getDebitAmount());
+                BigDecimal credit = AccountingMoney.normalize(line.getCreditAmount());
+                running = running.add(debit).subtract(credit);
+                totalDebit = totalDebit.add(debit);
+                totalCredit = totalCredit.add(credit);
+                bookLines.add(new CashBookLine(
+                        entry.getId(),
+                        entry.getEntryNumber(),
+                        entry.getEntryDate(),
+                        line.getAccountId(),
+                        account != null ? account.getAccountCode() : null,
+                        account != null ? account.getAccountName() : null,
+                        line.getDescription() != null ? line.getDescription() : entry.getDescription(),
+                        debit,
+                        credit,
+                        running));
+            }
+        }
+        return new CashBookResponse(from, to, bookType, opening, bookLines, totalDebit, totalCredit, running);
+    }
+
+    private Set<UUID> resolveMoneyAccountIds(
+            UUID org, Set<SystemAccountKey> keys, Set<AccountSubType> subTypes, Set<String> tokens) {
+        Set<UUID> ids = new HashSet<>();
+        for (Account account : accounts.findByOrganizationIdOrderByAccountCodeAsc(org)) {
+            if (account.getSystemAccountKey() != null && keys.contains(account.getSystemAccountKey())) {
+                ids.add(account.getId());
+                continue;
+            }
+            if (account.getAccountSubType() != null && subTypes.contains(account.getAccountSubType())) {
+                ids.add(account.getId());
+                continue;
+            }
+            for (String token : tokens) {
+                if (containsIgnoreCase(account, token)) {
+                    ids.add(account.getId());
+                    break;
+                }
+            }
+        }
+        return ids;
+    }
+
+    private BigDecimal balanceOfAccounts(UUID org, Set<UUID> accountIds, LocalDate from, LocalDate to) {
+        if (accountIds.isEmpty()) {
+            return AccountingMoney.zero();
+        }
+        BigDecimal balance = AccountingMoney.zero();
+        Map<UUID, MutableTotals> totals = accumulate(org, from, to);
+        for (Account account : accounts.findByOrganizationIdOrderByAccountCodeAsc(org)) {
+            if (!accountIds.contains(account.getId())) {
+                continue;
+            }
+            MutableTotals t = totals.getOrDefault(account.getId(), new MutableTotals());
+            balance = balance.add(AccountingMoney.normalize(account.getOpeningDebit()))
+                    .subtract(AccountingMoney.normalize(account.getOpeningCredit()))
+                    .add(t.debit)
+                    .subtract(t.credit);
+        }
+        return balance;
+    }
+
+    private static boolean matchesSystemOrSubtype(Account account, SystemAccountKey key, AccountSubType subType) {
+        return account.getSystemAccountKey() == key || account.getAccountSubType() == subType;
+    }
+
+    private static boolean containsIgnoreCase(Account account, String token) {
+        String upper = token.toUpperCase();
+        return (account.getAccountCode() != null
+                        && account.getAccountCode().toUpperCase().contains(upper))
+                || (account.getAccountName() != null
+                        && account.getAccountName().toUpperCase().contains(upper));
     }
 
     private Map<UUID, MutableTotals> accumulate(UUID org, LocalDate from, LocalDate to) {

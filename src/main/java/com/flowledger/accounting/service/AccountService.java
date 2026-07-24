@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,7 @@ public class AccountService {
                 .toList();
     }
 
+    @Cacheable(cacheNames = "coaTree", key = "T(com.flowledger.common.tenant.TenantContext).getOrganizationId()")
     @Transactional(readOnly = true)
     public List<AccountTreeNode> tree() {
         UUID org = TenantContext.getOrganizationId();

@@ -17,7 +17,12 @@ public class OpenApiConfig {
     OpenAPI openAPI(
             @Value("${flowledger.app.public-api-url:https://apiflowledger.valiantxgroup.com}") String publicApiUrl) {
         return new OpenAPI()
-                .info(new Info().title("FlowLedger API").version("v1"))
+                .info(
+                        new Info()
+                                .title("FlowLedger API")
+                                .version("v1")
+                                .description(
+                                        "FlowLedger ERP API — Phase 1 foundation including Voucher Engine, Approvals, and Accounting."))
                 .servers(List.of(
                         new Server().url(publicApiUrl).description("Cloudflare tunnel"),
                         new Server().url("http://localhost:7070").description("Local")))

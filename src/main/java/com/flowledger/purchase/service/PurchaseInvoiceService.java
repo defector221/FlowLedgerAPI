@@ -2,9 +2,10 @@ package com.flowledger.purchase.service;
 
 import com.flowledger.accounting.domain.AccountingStatus;
 import com.flowledger.accounting.domain.JournalSource;
-import com.flowledger.accounting.service.AccountingPostingService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
+import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
+import com.flowledger.finance.voucher.adapter.PurchaseVoucherBuilder;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.purchase.dto.PurchaseDtos.InvoiceRequest;
@@ -42,7 +43,7 @@ public class PurchaseInvoiceService {
     private final OrganizationRepository organizations;
     private final GstCalculationService gst;
     private final SearchIndexEventPublisher searchEvents;
-    private final AccountingPostingService accounting;
+    private final DocumentVoucherFacade documentPosting;
 
     public PurchaseInvoiceService(
             GoodsReceiptService goodsReceiptService,
@@ -51,14 +52,14 @@ public class PurchaseInvoiceService {
             OrganizationRepository organizationRepository,
             GstCalculationService tax,
             SearchIndexEventPublisher searchEvents,
-            AccountingPostingService accounting) {
+            DocumentVoucherFacade documentPosting) {
         grns = goodsReceiptService;
         orders = purchaseOrderService;
         numbers = documentNumberService;
         organizations = organizationRepository;
         gst = tax;
         this.searchEvents = searchEvents;
-        this.accounting = accounting;
+        this.documentPosting = documentPosting;
     }
 
     public PurchaseInvoice fromGrn(UUID grnId, InvoiceRequest request) {
@@ -128,7 +129,7 @@ public class PurchaseInvoiceService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled invoice cannot be confirmed");
         if (!"DRAFT".equals(invoice.getStatus())) return invoice;
         invoice.setStatus(invoice.getOutstandingAmount().signum() == 0 ? "PAID" : "CONFIRMED");
-        accounting.postPurchaseInvoice(invoice);
+        documentPosting.postPurchaseInvoice(invoice);
         searchEvents.upsert(invoice.getOrganizationId(), SearchEntityType.PURCHASE_INVOICE, invoice.getId());
         return invoice;
     }
@@ -140,8 +141,11 @@ public class PurchaseInvoiceService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Paid invoice cannot be cancelled");
         invoice.setStatus("CANCELLED");
         if (invoice.getAccountingStatus() == AccountingStatus.POSTED) {
-            accounting.reverseDocumentJournal(
-                    invoice.getOrganizationId(), JournalSource.PURCHASE_INVOICE, invoice.getId());
+            documentPosting.reverseDocument(
+                    invoice.getOrganizationId(),
+                    PurchaseVoucherBuilder.REFERENCE_TYPE,
+                    invoice.getId(),
+                    JournalSource.PURCHASE_INVOICE);
             invoice.setAccountingStatus(AccountingStatus.REVERSED);
         }
         searchEvents.upsert(invoice.getOrganizationId(), SearchEntityType.PURCHASE_INVOICE, invoice.getId());

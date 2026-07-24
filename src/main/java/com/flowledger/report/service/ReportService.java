@@ -91,6 +91,52 @@ public class ReportService {
                           and i.status <> 'CANCELLED'
                         order by i.invoice_date
                         """;
+                    case "customer-aging" ->
+                        """
+                        select coalesce(c.customer_name, '') as customer,
+                               i.invoice_number as number,
+                               i.invoice_date as date,
+                               coalesce(i.due_date, i.invoice_date) as "dueDate",
+                               i.outstanding_amount as outstanding,
+                               greatest(0, (:to - coalesce(i.due_date, i.invoice_date))) as "daysOverdue",
+                               case
+                                 when (:to - coalesce(i.due_date, i.invoice_date)) <= 0 then 'CURRENT'
+                                 when (:to - coalesce(i.due_date, i.invoice_date)) <= 30 then '1-30'
+                                 when (:to - coalesce(i.due_date, i.invoice_date)) <= 60 then '31-60'
+                                 when (:to - coalesce(i.due_date, i.invoice_date)) <= 90 then '61-90'
+                                 else '90+'
+                               end as bucket
+                        from sales_invoices i
+                        left join customers c on c.id = i.customer_id
+                        where i.organization_id = :org
+                          and i.outstanding_amount > 0
+                          and i.status not in ('DRAFT', 'CANCELLED')
+                          and (:customer is null or i.customer_id = :customer)
+                        order by c.customer_name, i.invoice_date
+                        """;
+                    case "supplier-aging" ->
+                        """
+                        select coalesce(s.supplier_name, '') as supplier,
+                               i.invoice_number as number,
+                               i.invoice_date as date,
+                               coalesce(i.due_date, i.invoice_date) as "dueDate",
+                               i.outstanding_amount as outstanding,
+                               greatest(0, (:to - coalesce(i.due_date, i.invoice_date))) as "daysOverdue",
+                               case
+                                 when (:to - coalesce(i.due_date, i.invoice_date)) <= 0 then 'CURRENT'
+                                 when (:to - coalesce(i.due_date, i.invoice_date)) <= 30 then '1-30'
+                                 when (:to - coalesce(i.due_date, i.invoice_date)) <= 60 then '31-60'
+                                 when (:to - coalesce(i.due_date, i.invoice_date)) <= 90 then '61-90'
+                                 else '90+'
+                               end as bucket
+                        from purchase_invoices i
+                        left join suppliers s on s.id = i.supplier_id
+                        where i.organization_id = :org
+                          and i.outstanding_amount > 0
+                          and i.status not in ('DRAFT', 'CANCELLED')
+                          and (:supplier is null or i.supplier_id = :supplier)
+                        order by s.supplier_name, i.invoice_date
+                        """;
                     case "stock-ledger" ->
                         """
                         select t.transaction_date as date,
@@ -180,11 +226,45 @@ public class ReportService {
                           (select coalesce(sum(taxable_amount),0) from sales_invoices where organization_id=:org and status in ('CONFIRMED','PARTIALLY_PAID','PAID','OVERDUE') and invoice_date between :from and :to)
                             - (select coalesce(sum(taxable_amount),0) from purchase_invoices where organization_id=:org and status in ('CONFIRMED','PAID','PARTIALLY_PAID') and invoice_date between :from and :to) as "grossProfit"
                         """;
+                    case "stock-aging" ->
+                        """
+                        select coalesce(p.sku, '') as sku,
+                               coalesce(p.name, 'Unknown product') as product,
+                               coalesce(w.warehouse_code, '') as "warehouseCode",
+                               coalesce(w.warehouse_name, 'Unknown warehouse') as warehouse,
+                               l.qty_remaining as quantity,
+                               l.unit_cost as "unitCost",
+                               (l.qty_remaining * l.unit_cost) as value,
+                               l.received_at::date as "receivedDate",
+                               greatest(0, (:to - l.received_at::date)) as "ageDays",
+                               case
+                                 when (:to - l.received_at::date) <= 30 then '0-30'
+                                 when (:to - l.received_at::date) <= 60 then '31-60'
+                                 when (:to - l.received_at::date) <= 90 then '61-90'
+                                 when (:to - l.received_at::date) <= 180 then '91-180'
+                                 else '180+'
+                               end as bucket,
+                               l.method as "costingMethod"
+                        from inventory_cost_layers l
+                        left join products p on p.id = l.product_id
+                        left join warehouses w on w.id = l.warehouse_id
+                        where l.organization_id = :org
+                          and l.qty_remaining > 0
+                        order by coalesce(p.name, ''), greatest(0, (:to - l.received_at::date)) desc
+                        """;
                     default -> throw new IllegalArgumentException("Unsupported report: " + name);
                 };
         Query nativeQuery = em.createNativeQuery(sql).setParameter("org", org);
         if (sql.contains(":from")) {
             nativeQuery.setParameter("from", from).setParameter("to", to);
+        } else if (sql.contains(":to")) {
+            nativeQuery.setParameter("to", to);
+        }
+        if (sql.contains(":customer")) {
+            nativeQuery.setParameter("customer", filter.customer());
+        }
+        if (sql.contains(":supplier")) {
+            nativeQuery.setParameter("supplier", filter.supplier());
         }
         List<?> raw = nativeQuery.getResultList();
         List<String> cols = columns(name);
@@ -220,10 +300,27 @@ public class ReportService {
                         "purchaseDiscount",
                         "purchases",
                         "grossProfit");
+            case "stock-aging" ->
+                List.of(
+                        "sku",
+                        "product",
+                        "warehouseCode",
+                        "warehouse",
+                        "quantity",
+                        "unitCost",
+                        "value",
+                        "receivedDate",
+                        "ageDays",
+                        "bucket",
+                        "costingMethod");
             case "outstanding-receivables" ->
                 List.of("number", "date", "customer", "grandTotal", "amountPaid", "outstanding");
             case "outstanding-payables" ->
                 List.of("number", "date", "supplier", "grandTotal", "amountPaid", "outstanding");
+            case "customer-aging" ->
+                List.of("customer", "number", "date", "dueDate", "outstanding", "daysOverdue", "bucket");
+            case "supplier-aging" ->
+                List.of("supplier", "number", "date", "dueDate", "outstanding", "daysOverdue", "bucket");
             case "customer-statement" ->
                 List.of("customer", "number", "date", "grandTotal", "amountPaid", "outstanding");
             case "supplier-statement" ->

@@ -215,4 +215,58 @@ public final class AccountingDtos {
             BigDecimal netProfitMtd,
             long journalCountMtd,
             long unbalancedJournals) {}
+
+    public record DayBookEntry(
+            UUID id,
+            String documentNumber,
+            LocalDate documentDate,
+            String documentType,
+            String description,
+            String source,
+            BigDecimal totalDebit,
+            BigDecimal totalCredit) {}
+
+    public record DayBookResponse(
+            LocalDate fromDate,
+            LocalDate toDate,
+            String sourceType,
+            List<DayBookEntry> entries,
+            BigDecimal totalDebit,
+            BigDecimal totalCredit,
+            long entryCount) {}
+
+    public record CashBookLine(
+            UUID journalEntryId,
+            String entryNumber,
+            LocalDate entryDate,
+            UUID accountId,
+            String accountCode,
+            String accountName,
+            String description,
+            BigDecimal debitAmount,
+            BigDecimal creditAmount,
+            BigDecimal runningBalance) {}
+
+    public record CashBookResponse(
+            LocalDate fromDate,
+            LocalDate toDate,
+            String bookType,
+            BigDecimal openingBalance,
+            List<CashBookLine> lines,
+            BigDecimal totalDebit,
+            BigDecimal totalCredit,
+            BigDecimal closingBalance) {}
+
+    public record CashFlowSection(String name, List<NamedAmount> items, BigDecimal total) {}
+
+    public record CashFlowResponse(
+            LocalDate fromDate,
+            LocalDate toDate,
+            BigDecimal netProfit,
+            CashFlowSection operating,
+            CashFlowSection workingCapital,
+            BigDecimal netCashFromOperations,
+            BigDecimal openingCash,
+            BigDecimal closingCash,
+            BigDecimal netChangeInCash) {}
 }

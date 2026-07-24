@@ -2,6 +2,7 @@ package com.flowledger.customer.dto;
 
 import jakarta.validation.constraints.*;
 import java.math.*;
+import java.time.LocalDate;
 import java.util.*;
 
 public final class CustomerDtos {
@@ -68,5 +69,40 @@ public final class CustomerDtos {
 
     public record Search(String search, Boolean archived) {}
 
-    public record Statement(BigDecimal openingBalance, BigDecimal invoicesOutstanding, BigDecimal balance) {}
+    public record StatementEntry(
+            LocalDate date,
+            String documentType,
+            String documentNumber,
+            UUID documentId,
+            BigDecimal debit,
+            BigDecimal credit,
+            BigDecimal runningBalance) {}
+
+    public record Statement(
+            BigDecimal openingBalance,
+            BigDecimal invoicesOutstanding,
+            BigDecimal balance,
+            BigDecimal invoicesTotal,
+            BigDecimal receiptsTotal,
+            List<StatementEntry> entries) {}
+
+    public record AgingLine(
+            UUID documentId,
+            String documentNumber,
+            LocalDate documentDate,
+            LocalDate dueDate,
+            BigDecimal outstanding,
+            int daysOverdue,
+            String bucket) {}
+
+    public record AgingBuckets(
+            BigDecimal current,
+            BigDecimal days1To30,
+            BigDecimal days31To60,
+            BigDecimal days61To90,
+            BigDecimal daysOver90,
+            BigDecimal total) {}
+
+    public record AgingReport(
+            UUID customerId, String customerName, LocalDate asOf, AgingBuckets buckets, List<AgingLine> lines) {}
 }

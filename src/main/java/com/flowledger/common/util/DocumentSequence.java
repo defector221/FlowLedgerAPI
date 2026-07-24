@@ -2,7 +2,8 @@ package com.flowledger.common.util;
 
 import jakarta.persistence.*;
 import java.util.UUID;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
 @Table(name = "document_sequences")
@@ -14,6 +15,10 @@ public class DocumentSequence {
     private UUID id;
 
     private UUID organizationId;
+
+    @Column(name = "branch_id")
+    private UUID branchId;
+
     private String documentType;
     private String financialYear;
     private String prefix;

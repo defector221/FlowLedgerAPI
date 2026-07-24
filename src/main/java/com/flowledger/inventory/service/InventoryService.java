@@ -1,6 +1,8 @@
 package com.flowledger.inventory.service;
 
 import com.flowledger.common.tenant.TenantContext;
+import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
+import com.flowledger.finance.voucher.adapter.StockAdjustmentVoucherBuilder;
 import com.flowledger.inventory.dto.InventoryDtos.*;
 import com.flowledger.inventory.entity.*;
 import com.flowledger.inventory.entity.InventoryTransaction.Type;
@@ -23,18 +25,30 @@ public class InventoryService {
     private final SerialNumberRepository serials;
     private final ProductRepository products;
     private final SalesInvoiceRepository salesInvoices;
+    private final InventoryMovementValidator movementValidator;
+    private final InventoryCostingService costing;
+    private final StockAdjustmentVoucherBuilder stockAdjustmentBuilder;
+    private final DocumentVoucherFacade documentPosting;
 
     public InventoryService(
             InventoryTransactionRepository transactionRepository,
             InventoryBatchRepository batchRepository,
             SerialNumberRepository serialRepository,
             ProductRepository productRepository,
-            SalesInvoiceRepository salesInvoices) {
+            SalesInvoiceRepository salesInvoices,
+            InventoryMovementValidator movementValidator,
+            InventoryCostingService costing,
+            StockAdjustmentVoucherBuilder stockAdjustmentBuilder,
+            DocumentVoucherFacade documentPosting) {
         txns = transactionRepository;
         batches = batchRepository;
         serials = serialRepository;
         products = productRepository;
         this.salesInvoices = salesInvoices;
+        this.movementValidator = movementValidator;
+        this.costing = costing;
+        this.stockAdjustmentBuilder = stockAdjustmentBuilder;
+        this.documentPosting = documentPosting;
     }
 
     @Transactional
@@ -51,6 +65,9 @@ public class InventoryService {
                 || in.signum() == 0 && out.signum() == 0)
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "Specify exactly one positive inward or outward quantity");
+        if (out.signum() > 0) {
+            movementValidator.validateOutbound(org, request.productId(), request.warehouseId(), out);
+        }
         InventoryTransaction transaction = new InventoryTransaction();
         transaction.setOrganizationId(org);
         transaction.setTransactionType(request.type());
@@ -70,7 +87,38 @@ public class InventoryService {
         transaction.setNotes(request.notes());
         transaction = txns.save(transaction);
         updateBatchAndSerial(transaction);
+        applyCosting(transaction);
         return transaction;
+    }
+
+    private void applyCosting(InventoryTransaction transaction) {
+        UUID org = transaction.getOrganizationId();
+        if (transaction.getInwardQty().signum() > 0) {
+            BigDecimal unitCost = transaction.getUnitCost();
+            if (unitCost == null) {
+                unitCost = productPurchasePrice(transaction.getProductId());
+            }
+            costing.receive(
+                    org,
+                    transaction.getProductId(),
+                    transaction.getWarehouseId(),
+                    null,
+                    transaction.getInwardQty(),
+                    unitCost);
+            if (transaction.getUnitCost() == null) {
+                transaction.setUnitCost(unitCost);
+            }
+        } else if (transaction.getOutwardQty().signum() > 0) {
+            var consumed = costing.consume(
+                    org, transaction.getProductId(), transaction.getWarehouseId(), transaction.getOutwardQty());
+            if (transaction.getUnitCost() == null) {
+                transaction.setUnitCost(consumed.averageUnitCost());
+            }
+        }
+    }
+
+    private BigDecimal productPurchasePrice(UUID productId) {
+        return products.findById(productId).map(p -> n(p.getPurchasePrice())).orElse(BigDecimal.ZERO);
     }
 
     @Transactional(readOnly = true)
@@ -132,7 +180,7 @@ public class InventoryService {
         BigDecimal quantity = request.quantity();
         if (quantity.signum() == 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Adjustment cannot be zero");
-        return postTransaction(new PostTransaction(
+        InventoryTransaction transaction = postTransaction(new PostTransaction(
                 Type.STOCK_ADJUSTMENT,
                 request.productId(),
                 request.warehouseId(),
@@ -145,9 +193,29 @@ public class InventoryService {
                 null,
                 null,
                 null,
-                null,
+                request.unitCost(),
                 request.notes(),
                 LocalDate.now()));
+        postAdjustmentVoucher(transaction, quantity);
+        return transaction;
+    }
+
+    private void postAdjustmentVoucher(InventoryTransaction transaction, BigDecimal quantityDelta) {
+        BigDecimal unitCost = transaction.getUnitCost();
+        if (unitCost == null) {
+            unitCost = costing.currentUnitCost(
+                    transaction.getOrganizationId(), transaction.getProductId(), transaction.getWarehouseId());
+        }
+        BigDecimal amount = unitCost.multiply(quantityDelta.abs());
+        stockAdjustmentBuilder
+                .build(
+                        transaction.getOrganizationId(),
+                        transaction.getId(),
+                        transaction.getTransactionDate(),
+                        quantityDelta,
+                        amount,
+                        "Stock adjustment " + (transaction.getNotes() == null ? "" : transaction.getNotes()).trim())
+                .ifPresent(built -> documentPosting.postStockAdjustment(transaction.getOrganizationId(), built));
     }
 
     @Transactional
@@ -155,7 +223,8 @@ public class InventoryService {
         if (request.fromWarehouseId().equals(request.toWarehouseId()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouses must differ");
         String key = UUID.randomUUID().toString();
-        postTransaction(new PostTransaction(
+        // OUT posts first; applyCosting consumes layers and stamps unitCost on the txn.
+        InventoryTransaction out = postTransaction(new PostTransaction(
                 Type.STOCK_TRANSFER,
                 request.productId(),
                 request.fromWarehouseId(),
@@ -171,6 +240,7 @@ public class InventoryService {
                 null,
                 request.notes(),
                 LocalDate.now()));
+        BigDecimal unitCost = out.getUnitCost() != null ? out.getUnitCost() : BigDecimal.ZERO;
         postTransaction(new PostTransaction(
                 Type.STOCK_TRANSFER,
                 request.productId(),
@@ -184,9 +254,10 @@ public class InventoryService {
                 null,
                 null,
                 null,
-                null,
+                unitCost,
                 request.notes(),
                 LocalDate.now()));
+        // Transfer stays within inventory asset — no P&L voucher.
     }
 
     @Transactional
@@ -204,7 +275,7 @@ public class InventoryService {
                 null,
                 null,
                 null,
-                null,
+                request.unitCost(),
                 request.notes(),
                 LocalDate.now()));
     }

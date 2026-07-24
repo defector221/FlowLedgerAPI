@@ -92,6 +92,24 @@ public class AccountingController {
         return ApiResponse.of(fiscalYears.periods(id));
     }
 
+    @PostMapping("/fiscal-years/{id}/close")
+    @PreAuthorize("hasRole('ORGANIZATION_ADMIN')")
+    public ApiResponse<FiscalYearResponse> closeFiscalYear(@PathVariable UUID id) {
+        return ApiResponse.of(fiscalYears.closeFiscalYear(id));
+    }
+
+    @PostMapping("/periods/{id}/close")
+    @PreAuthorize("hasRole('ORGANIZATION_ADMIN')")
+    public ApiResponse<PeriodResponse> closePeriod(@PathVariable UUID id) {
+        return ApiResponse.of(fiscalYears.closePeriod(id));
+    }
+
+    @PostMapping("/periods/{id}/lock")
+    @PreAuthorize("hasRole('ORGANIZATION_ADMIN')")
+    public ApiResponse<PeriodResponse> lockPeriod(@PathVariable UUID id) {
+        return ApiResponse.of(fiscalYears.lockPeriod(id));
+    }
+
     @GetMapping("/journals")
     public ApiResponse<PageResponse<JournalResponse>> listJournals(
             @RequestParam(required = false) JournalStatus status,
@@ -184,6 +202,34 @@ public class AccountingController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ApiResponse.of(reports.generalLedger(from, to));
+    }
+
+    @GetMapping("/reports/day-book")
+    public ApiResponse<DayBookResponse> dayBook(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ApiResponse.of(reports.dayBook(from, to));
+    }
+
+    @GetMapping("/reports/cash-book")
+    public ApiResponse<CashBookResponse> cashBook(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ApiResponse.of(reports.cashBook(from, to));
+    }
+
+    @GetMapping("/reports/bank-book")
+    public ApiResponse<CashBookResponse> bankBook(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ApiResponse.of(reports.bankBook(from, to));
+    }
+
+    @GetMapping("/reports/cash-flow")
+    public ApiResponse<CashFlowResponse> cashFlow(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ApiResponse.of(reports.cashFlow(from, to));
     }
 
     @GetMapping("/reports/integrity-check")

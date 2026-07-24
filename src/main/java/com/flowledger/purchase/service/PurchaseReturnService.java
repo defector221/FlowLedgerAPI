@@ -1,8 +1,8 @@
 package com.flowledger.purchase.service;
 
-import com.flowledger.accounting.service.AccountingPostingService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
+import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
 import com.flowledger.inventory.service.InventoryService;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
@@ -33,19 +33,19 @@ public class PurchaseReturnService {
     private final DocumentNumberService numbers;
     private final OrganizationRepository organizations;
     private final InventoryService inventory;
-    private final AccountingPostingService accounting;
+    private final DocumentVoucherFacade documentPosting;
 
     public PurchaseReturnService(
             PurchaseInvoiceService invoices,
             DocumentNumberService numbers,
             OrganizationRepository organizations,
             InventoryService inventory,
-            AccountingPostingService accounting) {
+            DocumentVoucherFacade documentPosting) {
         this.invoices = invoices;
         this.numbers = numbers;
         this.organizations = organizations;
         this.inventory = inventory;
-        this.accounting = accounting;
+        this.documentPosting = documentPosting;
     }
 
     public PurchaseReturn create(ReturnRequest request) {
@@ -99,7 +99,7 @@ public class PurchaseReturnService {
             pr.setInventoryPosted(true);
         }
         pr.setStatus("CONFIRMED");
-        accounting.postPurchaseReturn(pr);
+        documentPosting.postPurchaseReturn(pr);
         return pr;
     }
 

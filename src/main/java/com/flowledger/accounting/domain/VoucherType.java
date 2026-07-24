@@ -8,5 +8,10 @@ public enum VoucherType {
     PAYMENT,
     CONTRA,
     CREDIT_NOTE,
-    DEBIT_NOTE
+    DEBIT_NOTE,
+    EXPENSE,
+    OPENING_BALANCE,
+    PAYROLL,
+    ASSET_PURCHASE,
+    DEPRECIATION
 }

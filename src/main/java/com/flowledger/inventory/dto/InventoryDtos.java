@@ -27,7 +27,15 @@ public final class InventoryDtos {
             LocalDate transactionDate) {}
 
     public record Adjustment(
-            @NotNull UUID productId, @NotNull UUID warehouseId, @NotNull BigDecimal quantity, String notes) {}
+            @NotNull UUID productId,
+            @NotNull UUID warehouseId,
+            @NotNull BigDecimal quantity,
+            String notes,
+            BigDecimal unitCost) {
+        public Adjustment(UUID productId, UUID warehouseId, BigDecimal quantity, String notes) {
+            this(productId, warehouseId, quantity, notes, null);
+        }
+    }
 
     public record Transfer(
             @NotNull UUID productId,

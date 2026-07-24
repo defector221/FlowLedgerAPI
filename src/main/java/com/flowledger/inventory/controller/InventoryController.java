@@ -3,6 +3,8 @@ package com.flowledger.inventory.controller;
 import com.flowledger.inventory.dto.InventoryDtos.*;
 import com.flowledger.inventory.entity.InventoryTransaction;
 import com.flowledger.inventory.service.InventoryService;
+import com.flowledger.report.dto.ReportFilter;
+import com.flowledger.report.service.ReportService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.*;
@@ -14,9 +16,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/inventory")
 public class InventoryController {
     private final InventoryService service;
+    private final ReportService reports;
 
-    public InventoryController(InventoryService s) {
-        service = s;
+    public InventoryController(InventoryService service, ReportService reports) {
+        this.service = service;
+        this.reports = reports;
     }
 
     @PostMapping("/transactions")
@@ -70,5 +74,11 @@ public class InventoryController {
     @GetMapping("/alerts/reorder")
     public List<Alert> reorder() {
         return service.lowStockAlerts(true);
+    }
+
+    @GetMapping("/reports/stock-aging")
+    public List<Map<String, Object>> stockAging(@RequestParam(required = false) LocalDate asOf) {
+        LocalDate to = asOf != null ? asOf : LocalDate.now();
+        return reports.report("stock-aging", new ReportFilter(null, to, null, null, null, null, null));
     }
 }

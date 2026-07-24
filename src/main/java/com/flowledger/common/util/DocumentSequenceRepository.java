@@ -17,6 +17,11 @@ public interface DocumentSequenceRepository extends JpaRepository<DocumentSequen
             where d.organizationId = :org
               and d.documentType = :type
               and d.financialYear = :fy
+              and ((:branchId is null and d.branchId is null) or d.branchId = :branchId)
             """)
-    Optional<DocumentSequence> findLocked(@Param("org") UUID org, @Param("type") String type, @Param("fy") String fy);
+    Optional<DocumentSequence> findLocked(
+            @Param("org") UUID org,
+            @Param("type") String type,
+            @Param("fy") String fy,
+            @Param("branchId") UUID branchId);
 }

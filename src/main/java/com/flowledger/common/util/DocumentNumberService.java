@@ -15,32 +15,42 @@ public class DocumentNumberService {
 
     @Transactional
     public String next(UUID org, String type, String prefix, String template, String fyStart, LocalDate date) {
+        return next(org, null, type, prefix, template, fyStart, date);
+    }
+
+    /** Branch-aware numbering; pass null branchId for organization-wide sequences. */
+    @Transactional
+    public String next(
+            UUID org, UUID branchId, String type, String prefix, String template, String fyStart, LocalDate date) {
         String fy = FinancialYearUtil.financialYear(date, fyStart);
-        DocumentSequence sequence = lockedOrCreate(org, type, fy, prefix);
+        DocumentSequence sequence = lockedOrCreate(org, branchId, type, fy, prefix);
         long nextValue = sequence.getNextValue();
         sequence.setNextValue(nextValue + 1);
         return format(sequence.getPrefix(), fy, template, nextValue);
     }
 
-    /**
-     * Bumps the sequence so the next allocated value is at least {@code minNextValue}.
-     * Used when seeded or manually inserted documents have advanced past the counter.
-     */
     @Transactional
     public void ensureNextAtLeast(
             UUID org, String type, String prefix, String fyStart, LocalDate date, long minNextValue) {
+        ensureNextAtLeast(org, null, type, prefix, fyStart, date, minNextValue);
+    }
+
+    @Transactional
+    public void ensureNextAtLeast(
+            UUID org, UUID branchId, String type, String prefix, String fyStart, LocalDate date, long minNextValue) {
         if (minNextValue < 1) return;
         String fy = FinancialYearUtil.financialYear(date, fyStart);
-        DocumentSequence sequence = lockedOrCreate(org, type, fy, prefix);
+        DocumentSequence sequence = lockedOrCreate(org, branchId, type, fy, prefix);
         if (sequence.getNextValue() < minNextValue) {
             sequence.setNextValue(minNextValue);
         }
     }
 
-    private DocumentSequence lockedOrCreate(UUID org, String type, String fy, String prefix) {
-        return repo.findLocked(org, type, fy).orElseGet(() -> {
+    private DocumentSequence lockedOrCreate(UUID org, UUID branchId, String type, String fy, String prefix) {
+        return repo.findLocked(org, type, fy, branchId).orElseGet(() -> {
             DocumentSequence created = new DocumentSequence();
             created.setOrganizationId(org);
+            created.setBranchId(branchId);
             created.setDocumentType(type);
             created.setFinancialYear(fy);
             created.setPrefix(prefix);

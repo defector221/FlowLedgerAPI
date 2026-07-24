@@ -51,6 +51,9 @@ springdoc:
     path: /swagger-ui.html
 
 flowledger:
+  finance:
+    # When false, document services fall back to AccountingPostingService (rollback path).
+    voucher-engine-enabled: ${FLOWLEDGER_VOUCHER_ENGINE_ENABLED:true}
   jwt:
     secret: ${JWT_SECRET:FlowLedgerDevSecretKeyMustBeAtLeast256BitsLongForHS256Security!!}
     access-token-expiry-minutes: 30

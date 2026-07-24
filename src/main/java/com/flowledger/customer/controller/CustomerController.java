@@ -57,6 +57,11 @@ public class CustomerController {
         return service.statement(id);
     }
 
+    @GetMapping("/{id}/aging")
+    public AgingReport aging(@PathVariable UUID id, @RequestParam(required = false) java.time.LocalDate asOf) {
+        return service.aging(id, asOf);
+    }
+
     @GetMapping("/{id}/outstanding")
     public BigDecimal outstanding(@PathVariable UUID id) {
         return service.outstanding(id);

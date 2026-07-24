@@ -51,6 +51,11 @@ public class Organization extends AuditableEntity {
     private String upiId;
     private String paymentTerms;
     private boolean allowNegativeStock;
+
+    /** Inventory costing method: FIFO or WAC (weighted average cost). */
+    @Column(name = "inventory_costing_method", nullable = false, length = 10)
+    private String inventoryCostingMethod = "WAC";
+
     private boolean active = true;
 
     @Column(nullable = false)

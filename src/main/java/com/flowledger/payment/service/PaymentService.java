@@ -1,14 +1,20 @@
 package com.flowledger.payment.service;
 
+import com.flowledger.accounting.domain.AccountSubType;
 import com.flowledger.accounting.domain.AccountingStatus;
 import com.flowledger.accounting.domain.JournalSource;
-import com.flowledger.accounting.service.AccountingPostingService;
+import com.flowledger.accounting.entity.Account;
+import com.flowledger.accounting.repository.AccountRepository;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.common.util.FinancialYearUtil;
+import com.flowledger.finance.voucher.adapter.ContraVoucherBuilder;
+import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
+import com.flowledger.finance.voucher.adapter.PaymentVoucherBuilder;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.payment.dto.PaymentDtos.Allocation;
+import com.flowledger.payment.dto.PaymentDtos.ContraRequest;
 import com.flowledger.payment.dto.PaymentDtos.PaymentRequest;
 import com.flowledger.payment.entity.Payment;
 import com.flowledger.payment.entity.PaymentAllocation;
@@ -35,16 +41,24 @@ public class PaymentService {
 
     private final DocumentNumberService numbers;
     private final OrganizationRepository organizations;
-    private final AccountingPostingService accounting;
+    private final DocumentVoucherFacade documentPosting;
+    private final AccountRepository accounts;
 
     public PaymentService(
-            DocumentNumberService numbers, OrganizationRepository organizations, AccountingPostingService accounting) {
+            DocumentNumberService numbers,
+            OrganizationRepository organizations,
+            DocumentVoucherFacade documentPosting,
+            AccountRepository accounts) {
         this.numbers = numbers;
         this.organizations = organizations;
-        this.accounting = accounting;
+        this.documentPosting = documentPosting;
+        this.accounts = accounts;
     }
 
     public Payment create(PaymentRequest request) {
+        if (request.paymentType() == Payment.Type.CONTRA) {
+            throw bad("Use POST /api/v1/payments/contra for CONTRA transfers");
+        }
         validate(request);
         BigDecimal allocated = request.allocations() == null
                 ? BigDecimal.ZERO
@@ -72,8 +86,50 @@ public class PaymentService {
                 allocate(payment, allocation);
             }
         }
-        accounting.postPayment(payment);
+        documentPosting.postPayment(payment);
         return payment;
+    }
+
+    public Payment createContra(ContraRequest request) {
+        UUID org = TenantContext.getOrganizationId();
+        if (request.fromAccountId().equals(request.toAccountId())) {
+            throw bad("fromAccountId and toAccountId must differ");
+        }
+        Account from = requireCashOrBank(org, request.fromAccountId(), "fromAccountId");
+        Account to = requireCashOrBank(org, request.toAccountId(), "toAccountId");
+        Payment payment = new Payment();
+        payment.setOrganizationId(org);
+        payment.setPaymentDate(request.date());
+        payment.setPaymentType(Payment.Type.CONTRA);
+        payment.setPartyType(Payment.Party.INTERNAL);
+        payment.setFromAccountId(from.getId());
+        payment.setToAccountId(to.getId());
+        payment.setAmount(request.amount());
+        payment.setPaymentMode("BANK_TRANSFER");
+        payment.setTransactionReference(request.transactionReference());
+        payment.setNotes(request.notes());
+        payment.setStatus("ACTIVE");
+        payment.setPaymentNumber(number(request.date()));
+        em.persist(payment);
+        documentPosting.postContra(payment);
+        return payment;
+    }
+
+    private Account requireCashOrBank(UUID org, UUID accountId, String field) {
+        Account account = accounts.findByIdAndOrganizationId(accountId, org)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, field + " not found"));
+        AccountSubType sub = account.getAccountSubType();
+        boolean cashOrBank = sub == AccountSubType.CASH
+                || sub == AccountSubType.BANK
+                || account.getSystemAccountKey() == com.flowledger.accounting.domain.SystemAccountKey.CASH
+                || account.getSystemAccountKey() == com.flowledger.accounting.domain.SystemAccountKey.BANK;
+        if (!cashOrBank) {
+            throw bad(field + " must be a cash or bank account");
+        }
+        if (!account.isActive()) {
+            throw bad(field + " is inactive");
+        }
+        return account;
     }
 
     public Payment allocate(UUID id, Allocation allocation) {
@@ -92,7 +148,7 @@ public class PaymentService {
             allocate(payment, allocation);
         }
         if (payment.getAccountingStatus() != AccountingStatus.POSTED) {
-            accounting.postPayment(payment);
+            documentPosting.postPayment(payment);
         }
         return payment;
     }
@@ -235,10 +291,19 @@ public class PaymentService {
         payment.getAllocations().clear();
         payment.setStatus("CANCELLED");
         if (payment.getAccountingStatus() == AccountingStatus.POSTED) {
-            JournalSource source = payment.getPaymentType() == Payment.Type.RECEIPT
-                    ? JournalSource.CUSTOMER_RECEIPT
-                    : JournalSource.SUPPLIER_PAYMENT;
-            accounting.reverseDocumentJournal(payment.getOrganizationId(), source, payment.getId());
+            JournalSource source;
+            String referenceType;
+            if (payment.getPaymentType() == Payment.Type.CONTRA) {
+                source = JournalSource.CONTRA;
+                referenceType = ContraVoucherBuilder.REFERENCE_TYPE;
+            } else if (payment.getPaymentType() == Payment.Type.RECEIPT) {
+                source = JournalSource.CUSTOMER_RECEIPT;
+                referenceType = PaymentVoucherBuilder.REFERENCE_TYPE_RECEIPT;
+            } else {
+                source = JournalSource.SUPPLIER_PAYMENT;
+                referenceType = PaymentVoucherBuilder.REFERENCE_TYPE_PAYMENT;
+            }
+            documentPosting.reverseDocument(payment.getOrganizationId(), referenceType, payment.getId(), source);
             payment.setAccountingStatus(AccountingStatus.REVERSED);
         }
         return payment;
@@ -261,6 +326,9 @@ public class PaymentService {
     }
 
     private void validate(PaymentRequest request) {
+        if (request.paymentType() == Payment.Type.CONTRA || request.partyType() == Payment.Party.INTERNAL) {
+            throw bad("Use POST /api/v1/payments/contra for CONTRA transfers");
+        }
         if (request.partyType() == Payment.Party.CUSTOMER
                 && (request.customerId() == null || request.supplierId() != null)) {
             throw bad("Customer receipt requires only customerId");

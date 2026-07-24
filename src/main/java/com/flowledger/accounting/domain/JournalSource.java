@@ -12,5 +12,9 @@ public enum JournalSource {
     INVENTORY,
     SYSTEM,
     CREDIT_NOTE,
-    DEBIT_NOTE
+    DEBIT_NOTE,
+    CONTRA,
+    OPENING_BALANCE,
+    STOCK_ADJUSTMENT,
+    VOUCHER
 }

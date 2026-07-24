@@ -21,12 +21,14 @@ import lombok.Setter;
 public class Payment extends AuditedEntity {
     public enum Type {
         RECEIPT,
-        PAYMENT
+        PAYMENT,
+        CONTRA
     }
 
     public enum Party {
         CUSTOMER,
-        SUPPLIER
+        SUPPLIER,
+        INTERNAL
     }
 
     @Column(name = "payment_number")
@@ -45,6 +47,15 @@ public class Payment extends AuditedEntity {
 
     private UUID customerId;
     private UUID supplierId;
+
+    /** Source cash/bank GL account for CONTRA transfers. */
+    @Column(name = "from_account_id")
+    private UUID fromAccountId;
+
+    /** Destination cash/bank GL account for CONTRA transfers. */
+    @Column(name = "to_account_id")
+    private UUID toAccountId;
+
     private BigDecimal amount;
     private String paymentMode;
     private String transactionReference;

@@ -6,9 +6,15 @@ import com.flowledger.customer.dto.CustomerDtos.*;
 import com.flowledger.customer.entity.Customer;
 import com.flowledger.customer.mapper.CustomerMapper;
 import com.flowledger.customer.repository.CustomerRepository;
+import com.flowledger.payment.entity.Payment;
+import com.flowledger.sales.entity.SalesInvoice;
 import com.flowledger.search.event.SearchIndexEventPublisher;
 import com.flowledger.search.model.SearchEntityType;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.math.*;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
@@ -23,6 +29,9 @@ public class CustomerService extends OrganizationScopedService {
     private final CustomerRepository repo;
     private final CustomerMapper mapper;
     private final SearchIndexEventPublisher searchEvents;
+
+    @PersistenceContext
+    private EntityManager em;
 
     public CustomerService(CustomerRepository repo, CustomerMapper mapper, SearchIndexEventPublisher searchEvents) {
         this.repo = repo;
@@ -129,12 +138,146 @@ public class CustomerService extends OrganizationScopedService {
     @Transactional(readOnly = true)
     public Statement statement(UUID id) {
         Customer customer = load(id);
-        return new Statement(customer.getOpeningBalance(), BigDecimal.ZERO, customer.getOpeningBalance());
+        UUID org = orgId();
+        BigDecimal opening = nz(customer.getOpeningBalance());
+
+        List<SalesInvoice> invoices = em.createQuery(
+                        """
+                        from SalesInvoice i
+                        where i.organizationId = :org and i.customerId = :cid
+                          and i.status not in :excluded
+                        order by i.invoiceDate asc, i.createdAt asc
+                        """,
+                        SalesInvoice.class)
+                .setParameter("org", org)
+                .setParameter("cid", id)
+                .setParameter("excluded", List.of(SalesInvoice.Status.DRAFT, SalesInvoice.Status.CANCELLED))
+                .getResultList();
+
+        List<Payment> receipts = em.createQuery(
+                        """
+                        from Payment p
+                        where p.organizationId = :org and p.customerId = :cid
+                          and p.paymentType = :ptype
+                          and p.status <> 'CANCELLED'
+                        order by p.paymentDate asc, p.createdAt asc
+                        """,
+                        Payment.class)
+                .setParameter("org", org)
+                .setParameter("cid", id)
+                .setParameter("ptype", Payment.Type.RECEIPT)
+                .getResultList();
+
+        record Timed(LocalDate date, String type, String number, UUID docId, BigDecimal debit, BigDecimal credit) {}
+        List<Timed> events = new ArrayList<>();
+        BigDecimal invoicesTotal = BigDecimal.ZERO;
+        BigDecimal outstanding = BigDecimal.ZERO;
+        for (SalesInvoice invoice : invoices) {
+            BigDecimal amount = nz(invoice.getGrandTotal());
+            invoicesTotal = invoicesTotal.add(amount);
+            outstanding = outstanding.add(nz(invoice.getOutstandingAmount()));
+            events.add(new Timed(
+                    invoice.getInvoiceDate(),
+                    "SALES_INVOICE",
+                    invoice.getInvoiceNumber(),
+                    invoice.getId(),
+                    amount,
+                    BigDecimal.ZERO));
+        }
+        BigDecimal receiptsTotal = BigDecimal.ZERO;
+        for (Payment receipt : receipts) {
+            BigDecimal amount = nz(receipt.getAmount());
+            receiptsTotal = receiptsTotal.add(amount);
+            events.add(new Timed(
+                    receipt.getPaymentDate(),
+                    "RECEIPT",
+                    receipt.getPaymentNumber(),
+                    receipt.getId(),
+                    BigDecimal.ZERO,
+                    amount));
+        }
+        events.sort(Comparator.comparing(Timed::date, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(Timed::type));
+
+        List<StatementEntry> entries = new ArrayList<>();
+        BigDecimal running = opening;
+        for (Timed event : events) {
+            running = running.add(event.debit()).subtract(event.credit());
+            entries.add(new StatementEntry(
+                    event.date(), event.type(), event.number(), event.docId(), event.debit(), event.credit(), running));
+        }
+        return new Statement(opening, outstanding, running, invoicesTotal, receiptsTotal, entries);
+    }
+
+    @Transactional(readOnly = true)
+    public AgingReport aging(UUID id, LocalDate asOfDate) {
+        Customer customer = load(id);
+        LocalDate asOf = asOfDate != null ? asOfDate : LocalDate.now();
+        List<SalesInvoice> unpaid = em.createQuery(
+                        """
+                        from SalesInvoice i
+                        where i.organizationId = :org and i.customerId = :cid
+                          and i.status not in :excluded
+                          and i.outstandingAmount > 0
+                        order by i.invoiceDate asc
+                        """,
+                        SalesInvoice.class)
+                .setParameter("org", orgId())
+                .setParameter("cid", id)
+                .setParameter("excluded", List.of(SalesInvoice.Status.DRAFT, SalesInvoice.Status.CANCELLED))
+                .getResultList();
+
+        BigDecimal current = BigDecimal.ZERO;
+        BigDecimal d30 = BigDecimal.ZERO;
+        BigDecimal d60 = BigDecimal.ZERO;
+        BigDecimal d90 = BigDecimal.ZERO;
+        BigDecimal over90 = BigDecimal.ZERO;
+        List<AgingLine> lines = new ArrayList<>();
+        for (SalesInvoice invoice : unpaid) {
+            LocalDate due = invoice.getDueDate() != null ? invoice.getDueDate() : invoice.getInvoiceDate();
+            int daysOverdue = (int) Math.max(0, ChronoUnit.DAYS.between(due, asOf));
+            String bucket = bucketName(daysOverdue);
+            BigDecimal amount = nz(invoice.getOutstandingAmount());
+            switch (bucket) {
+                case "CURRENT" -> current = current.add(amount);
+                case "1-30" -> d30 = d30.add(amount);
+                case "31-60" -> d60 = d60.add(amount);
+                case "61-90" -> d90 = d90.add(amount);
+                default -> over90 = over90.add(amount);
+            }
+            lines.add(new AgingLine(
+                    invoice.getId(),
+                    invoice.getInvoiceNumber(),
+                    invoice.getInvoiceDate(),
+                    due,
+                    amount,
+                    daysOverdue,
+                    bucket));
+        }
+        BigDecimal total = current.add(d30).add(d60).add(d90).add(over90);
+        return new AgingReport(
+                customer.getId(),
+                customer.getCustomerName(),
+                asOf,
+                new AgingBuckets(current, d30, d60, d90, over90, total),
+                lines);
     }
 
     @Transactional(readOnly = true)
     public BigDecimal outstanding(UUID id) {
-        return statement(id).balance();
+        return statement(id).invoicesOutstanding();
+    }
+
+    static String bucketName(int daysOverdue) {
+        if (daysOverdue <= 0) return "CURRENT";
+        if (daysOverdue <= 30) return "1-30";
+        if (daysOverdue <= 60) return "31-60";
+        if (daysOverdue <= 90) return "61-90";
+        return "90+";
+    }
+
+    private static BigDecimal nz(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     private Customer load(UUID id) {

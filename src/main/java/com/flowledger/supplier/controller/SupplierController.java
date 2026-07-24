@@ -3,6 +3,7 @@ package com.flowledger.supplier.controller;
 import com.flowledger.supplier.dto.SupplierDtos.*;
 import com.flowledger.supplier.service.SupplierService;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +31,11 @@ public class SupplierController {
     @GetMapping("/{id}")
     public Response get(@PathVariable UUID id) {
         return service.get(id);
+    }
+
+    @GetMapping("/{id}/aging")
+    public AgingReport aging(@PathVariable UUID id, @RequestParam(required = false) LocalDate asOf) {
+        return service.aging(id, asOf);
     }
 
     @PostMapping
