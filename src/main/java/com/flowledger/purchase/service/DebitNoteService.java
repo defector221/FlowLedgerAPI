@@ -85,6 +85,13 @@ public class DebitNoteService {
                 .getResultList();
     }
 
+    public DebitNote get(UUID id) {
+        DebitNote dn = em.find(DebitNote.class, id);
+        if (dn == null || !dn.getOrganizationId().equals(TenantContext.getOrganizationId()))
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Debit note not found");
+        return dn;
+    }
+
     private String number(LocalDate d) {
         Organization organization =
                 organizations.findById(TenantContext.getOrganizationId()).orElseThrow();

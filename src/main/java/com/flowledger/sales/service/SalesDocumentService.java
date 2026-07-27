@@ -722,8 +722,10 @@ public class SalesDocumentService {
 
     @Transactional(readOnly = true)
     public SalesReturn getReturn(UUID id) {
-        return returns.findByIdAndOrganizationId(id, orgId())
+        SalesReturn salesReturn = returns.findByIdAndOrganizationId(id, orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Sales return not found"));
+        salesReturn.getItems().size();
+        return salesReturn;
     }
 
     @Transactional(readOnly = true)

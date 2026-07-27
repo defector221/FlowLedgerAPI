@@ -176,6 +176,11 @@ public class PurchaseController {
         return returns.list(pageable);
     }
 
+    @GetMapping("/returns/{id}")
+    public PurchaseReturn getReturn(@PathVariable UUID id) {
+        return returns.get(id);
+    }
+
     @PostMapping("/returns/{id}/confirm")
     public PurchaseReturn confirmReturn(@PathVariable UUID id) {
         return returns.confirm(id);
@@ -190,5 +195,10 @@ public class PurchaseController {
     @GetMapping("/debit-notes")
     public List<DebitNote> debitNotes() {
         return debitNotes.list();
+    }
+
+    @GetMapping("/debit-notes/{id}")
+    public DebitNote getDebitNote(@PathVariable UUID id) {
+        return debitNotes.get(id);
     }
 }

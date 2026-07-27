@@ -38,7 +38,7 @@ UPDATE sales_invoices si
 SET branch_id = COALESCE(w.branch_id, b.id),
     store_id = w.store_id
 FROM warehouses w
-LEFT JOIN branches b ON b.organization_id = si.organization_id AND b.is_default = TRUE
+LEFT JOIN branches b ON b.organization_id = w.organization_id AND b.is_default = TRUE
 WHERE si.warehouse_id = w.id
   AND si.branch_id IS NULL;
 
