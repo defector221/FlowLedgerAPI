@@ -129,6 +129,9 @@ public class OrganizationService {
         if (request.inventoryDeductionEvent() != null) {
             settings.setInventoryDeductionEvent(request.inventoryDeductionEvent());
         }
+        if (request.allocationStrategy() != null) {
+            settings.setAllocationStrategy(request.allocationStrategy());
+        }
         if (request.taxInclusiveDefault() != null) {
             settings.setTaxInclusiveDefault(request.taxInclusiveDefault());
         }

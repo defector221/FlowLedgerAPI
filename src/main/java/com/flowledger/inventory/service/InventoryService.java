@@ -336,6 +336,22 @@ public class InventoryService {
             UUID referenceId,
             String referenceNumber,
             String idempotencyKey) {
+        return postPurchase(
+                warehouseId, productId, quantity, unitCost, date, referenceId, referenceNumber, idempotencyKey, null, null);
+    }
+
+    @Transactional
+    public boolean postPurchase(
+            UUID warehouseId,
+            UUID productId,
+            BigDecimal quantity,
+            BigDecimal unitCost,
+            LocalDate date,
+            UUID referenceId,
+            String referenceNumber,
+            String idempotencyKey,
+            String batchNumber,
+            LocalDate expiryDate) {
         InventoryTransaction existing = postTransaction(new PostTransaction(
                 Type.PURCHASE,
                 productId,
@@ -346,13 +362,69 @@ public class InventoryService {
                 referenceId,
                 referenceNumber,
                 idempotencyKey,
+                blank(batchNumber),
                 null,
-                null,
-                null,
+                expiryDate,
                 unitCost,
                 null,
                 date));
+        if (existing != null && batchNumber != null && !batchNumber.isBlank()) {
+            batches.findByOrganizationIdAndProductIdAndWarehouseIdAndBatchNumber(
+                            existing.getOrganizationId(),
+                            existing.getProductId(),
+                            existing.getWarehouseId(),
+                            batchNumber)
+                    .ifPresent(batch -> {
+                        if (batch.getReceivedDate() == null) {
+                            batch.setReceivedDate(date != null ? date : LocalDate.now());
+                        }
+                        batches.save(batch);
+                    });
+        }
         return existing != null;
+    }
+
+    @Transactional
+    public void postPosSale(
+            UUID warehouseId,
+            UUID productId,
+            BigDecimal quantity,
+            UUID batchId,
+            LocalDate date,
+            UUID referenceId,
+            String referenceNumber,
+            String idempotencyKey) {
+        String batchNumber = null;
+        LocalDate expiryDate = null;
+        if (batchId != null) {
+            InventoryBatch batch = batches.findByIdAndOrganizationId(batchId, TenantContext.getOrganizationId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Inventory batch not found"));
+            if (n(batch.getQuantity()).compareTo(quantity) < 0) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Insufficient batch quantity (available="
+                                + batch.getQuantity().stripTrailingZeros().toPlainString()
+                                + ")");
+            }
+            batchNumber = batch.getBatchNumber();
+            expiryDate = batch.getExpiryDate();
+        }
+        postTransaction(new PostTransaction(
+                Type.SALE,
+                productId,
+                warehouseId,
+                BigDecimal.ZERO,
+                quantity,
+                "SALES_INVOICE",
+                referenceId,
+                referenceNumber,
+                idempotencyKey,
+                batchNumber,
+                null,
+                expiryDate,
+                null,
+                null,
+                date));
     }
 
     @Transactional
@@ -400,6 +472,11 @@ public class InventoryService {
                 batch.setBatchNumber(transaction.getBatchNumber());
                 batch.setExpiryDate(transaction.getExpiryDate());
                 batch.setQuantity(BigDecimal.ZERO);
+                batch.setReceivedDate(
+                        transaction.getTransactionDate() != null
+                                ? transaction.getTransactionDate()
+                                : LocalDate.now());
+                batch.setQualityStatus("AVAILABLE");
             }
             batch.setQuantity(n(batch.getQuantity()).add(delta));
             batches.save(batch);

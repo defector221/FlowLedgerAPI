@@ -100,7 +100,7 @@ public class GoodsReceiptService {
                 }
             }
         }
-        for (GoodsReceiptItem item : goodsReceipt.getItems())
+        for (GoodsReceiptItem item : goodsReceipt.getItems()) {
             inventory.postPurchase(
                     goodsReceipt.getWarehouseId(),
                     item.getProductId(),
@@ -109,7 +109,10 @@ public class GoodsReceiptService {
                     goodsReceipt.getReceiptDate(),
                     goodsReceipt.getId(),
                     goodsReceipt.getGrnNumber(),
-                    "grn:" + goodsReceipt.getId() + ":" + item.getId());
+                    "grn:" + goodsReceipt.getId() + ":" + item.getId(),
+                    item.getBatchNumber(),
+                    item.getExpiryDate());
+        }
         goodsReceipt.setInventoryPosted(true);
         goodsReceipt.setStatus("CONFIRMED");
         return goodsReceipt;

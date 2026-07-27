@@ -89,6 +89,15 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.CONFLICT, ex.getMessage(), request, null);
     }
 
+    @ExceptionHandler(com.flowledger.retail.exception.PosCheckoutConflictException.class)
+    ProblemDetail posCheckoutConflict(
+            com.flowledger.retail.exception.PosCheckoutConflictException ex, HttpServletRequest request) {
+        ProblemDetail result = problem(HttpStatus.CONFLICT, ex.getMessage(), request, null);
+        result.setProperty("allocationChanged", ex.body().allocationChanged());
+        result.setProperty("lines", ex.body().lines());
+        return result;
+    }
+
     @ExceptionHandler(BusinessException.class)
     ProblemDetail business(BusinessException ex, HttpServletRequest request) {
         return problem(HttpStatus.BAD_REQUEST, ex.getMessage(), request, null);

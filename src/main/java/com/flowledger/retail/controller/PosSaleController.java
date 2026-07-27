@@ -4,6 +4,7 @@ import static com.flowledger.retail.dto.RetailDtos.*;
 
 import com.flowledger.retail.domain.RetailEnums.PosSaleStatus;
 import com.flowledger.retail.service.PosSaleService;
+import com.flowledger.retail.service.PosScanService;
 import com.flowledger.retail.service.RetailCatalogService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -18,10 +19,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class PosSaleController {
     private final PosSaleService sales;
     private final RetailCatalogService catalog;
+    private final PosScanService scanService;
 
-    public PosSaleController(PosSaleService sales, RetailCatalogService catalog) {
+    public PosSaleController(PosSaleService sales, RetailCatalogService catalog, PosScanService scanService) {
         this.sales = sales;
         this.catalog = catalog;
+        this.scanService = scanService;
     }
 
     @GetMapping("/sales")
@@ -90,6 +93,18 @@ public class PosSaleController {
     @PreAuthorize("hasAuthority('RETAIL_POS')")
     public PosSaleResponse checkout(@PathVariable UUID id, @Valid @RequestBody CheckoutRequest r) {
         return sales.checkout(id, r);
+    }
+
+    @PostMapping("/scan")
+    @PreAuthorize("hasAuthority('RETAIL_POS')")
+    public PosScanResponse scan(@Valid @RequestBody PosScanRequest r) {
+        return scanService.scan(r);
+    }
+
+    @PostMapping("/scan/confirm")
+    @PreAuthorize("hasAuthority('RETAIL_POS')")
+    public PosScanResponse confirmScan(@Valid @RequestBody PosScanConfirmRequest r) {
+        return scanService.confirm(r);
     }
 
     @GetMapping("/products")

@@ -23,6 +23,9 @@ public class OrganizationSettings {
     @Column(nullable = false)
     private String inventoryDeductionEvent = "INVOICE_CONFIRM";
 
+    @Column(name = "allocation_strategy", nullable = false)
+    private String allocationStrategy = "FIFO";
+
     @Column(nullable = false)
     private boolean taxInclusiveDefault;
 

@@ -47,4 +47,13 @@ public class PosSaleLine extends AuditedEntity {
 
     @Column(name = "line_order", nullable = false)
     private int lineOrder;
+
+    @Column(name = "inventory_batch_id")
+    private UUID inventoryBatchId;
+
+    @Column(name = "warehouse_id")
+    private UUID warehouseId;
+
+    @Column(name = "allocation_mode", length = 20)
+    private String allocationMode;
 }

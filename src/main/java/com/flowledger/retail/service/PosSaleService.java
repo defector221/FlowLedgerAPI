@@ -20,6 +20,14 @@ import com.flowledger.retail.repository.PosSaleLineRepository;
 import com.flowledger.retail.repository.PosSalePaymentRepository;
 import com.flowledger.retail.repository.PosSaleRepository;
 import com.flowledger.retail.repository.RetailStoreRepository;
+import com.flowledger.inventory.allocation.AllocationMode;
+import com.flowledger.inventory.allocation.AllocationStatus;
+import com.flowledger.inventory.allocation.CartLineAllocation;
+import com.flowledger.inventory.allocation.CheckoutLineIssue;
+import com.flowledger.inventory.allocation.CheckoutValidationResult;
+import com.flowledger.inventory.allocation.InventoryAllocationEngine;
+import com.flowledger.inventory.service.InventoryService;
+import com.flowledger.retail.exception.PosCheckoutConflictException;
 import com.flowledger.sales.dto.SalesDtos;
 import com.flowledger.sales.service.SalesInvoiceService;
 import java.math.BigDecimal;
@@ -51,6 +59,8 @@ public class PosSaleService {
     private final PaymentService paymentService;
     private final RetailLoyaltyService loyaltyService;
     private final RetailPricingService pricingService;
+    private final InventoryAllocationEngine allocationEngine;
+    private final InventoryService inventoryService;
 
     public PosSaleService(
             RetailModuleGuard guard,
@@ -63,7 +73,9 @@ public class PosSaleService {
             SalesInvoiceService salesInvoiceService,
             PaymentService paymentService,
             RetailLoyaltyService loyaltyService,
-            RetailPricingService pricingService) {
+            RetailPricingService pricingService,
+            InventoryAllocationEngine allocationEngine,
+            InventoryService inventoryService) {
         this.guard = guard;
         this.sales = sales;
         this.lines = lines;
@@ -75,6 +87,8 @@ public class PosSaleService {
         this.paymentService = paymentService;
         this.loyaltyService = loyaltyService;
         this.pricingService = pricingService;
+        this.allocationEngine = allocationEngine;
+        this.inventoryService = inventoryService;
     }
 
     @Transactional(readOnly = true)
@@ -115,6 +129,7 @@ public class PosSaleService {
         PosSaleLine mergeTarget = existing.stream()
                 .filter(line -> Objects.equals(line.getProductId(), r.productId())
                         && Objects.equals(line.getVariantId(), r.variantId())
+                        && Objects.equals(line.getInventoryBatchId(), r.inventoryBatchId())
                         && line.getRate().compareTo(r.rate()) == 0
                         && nz(line.getDiscountPercent()).compareTo(discountPercent) == 0
                         && nz(line.getTaxRate()).compareTo(taxRate) == 0)
@@ -129,6 +144,7 @@ public class PosSaleService {
             if (r.barcode() != null && !r.barcode().isBlank()) {
                 mergeTarget.setBarcode(r.barcode());
             }
+            applyAllocationFields(mergeTarget, r);
             mergeTarget.setLineTotal(lineTotal(mergeTarget));
             audit(mergeTarget, false);
             lines.save(mergeTarget);
@@ -148,6 +164,7 @@ public class PosSaleService {
         line.setDiscountPercent(discountPercent);
         line.setTaxRate(taxRate);
         line.setLineOrder(existing.size());
+        applyAllocationFields(line, r);
         line.setLineTotal(lineTotal(line));
         audit(line, true);
         lines.save(line);
@@ -287,12 +304,48 @@ public class PosSaleService {
         if (saleLines.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot checkout an empty cart");
         }
+        RetailStore store = stores.findByIdAndOrganizationIdAndDeletedFalse(sale.getStoreId(), org())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Store not found"));
+
+        if (r.confirmedAllocations() != null && !r.confirmedAllocations().isEmpty()) {
+            for (CheckoutLineConfirmation confirmation : r.confirmedAllocations()) {
+                PosSaleLine line = saleLines.stream()
+                        .filter(l -> l.getId().equals(confirmation.lineId()))
+                        .findFirst()
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Line not found"));
+                line.setInventoryBatchId(confirmation.inventoryBatchId());
+                line.setAllocationMode(confirmation.allocationMode());
+                if (line.getWarehouseId() == null) {
+                    line.setWarehouseId(store.getWarehouseId());
+                }
+                audit(line, false);
+                lines.save(line);
+            }
+            saleLines = lines.findByOrganizationIdAndPosSaleIdOrderByLineOrderAsc(org(), saleId);
+        }
+
+        ensureLineWarehouses(saleLines, store.getWarehouseId());
+        CheckoutValidationResult validation = allocationEngine.revalidateForCheckout(saleLines.stream()
+                .map(line -> new CartLineAllocation(
+                        org(),
+                        line.getId(),
+                        line.getProductId(),
+                        line.getWarehouseId(),
+                        line.getQuantity(),
+                        line.getInventoryBatchId(),
+                        parseAllocationMode(line.getAllocationMode())))
+                .toList());
+        if (!validation.isOk()) {
+            throw new PosCheckoutConflictException(new PosCheckoutConflictResponse(
+                    validation.issues().stream().anyMatch(CheckoutLineIssue::allocationChanged),
+                    "Inventory allocation changed — confirm new batch or remove item",
+                    validation.issues().stream().map(this::mapConflictLine).toList()));
+        }
+
         recompute(sale);
 
         UUID customerId = resolveCustomer(r.customerId(), sale.getCustomerId());
         sale.setCustomerId(customerId);
-        RetailStore store = stores.findByIdAndOrganizationIdAndDeletedFalse(sale.getStoreId(), org())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Store not found"));
 
         BigDecimal loyaltyRedeem = nz(sale.getLoyaltyPointsRedeemed());
         if (loyaltyRedeem.signum() > 0) {
@@ -355,8 +408,21 @@ public class PosSaleService {
                 null,
                 items);
         SalesDtos.InvoiceDetail draft = salesInvoiceService.createDraft(invoice);
-        // POS checkout is already authorized at the counter — skip AI sales-invoice approval gate.
-        SalesDtos.InvoiceDetail confirmed = salesInvoiceService.confirmConverted(draft.id());
+        // POS posts batch-aware inventory after confirm.
+        SalesDtos.InvoiceDetail confirmed = salesInvoiceService.confirmConvertedForPos(draft.id());
+
+        for (PosSaleLine line : saleLines) {
+            inventoryService.postPosSale(
+                    line.getWarehouseId() != null ? line.getWarehouseId() : store.getWarehouseId(),
+                    line.getProductId(),
+                    line.getQuantity(),
+                    line.getInventoryBatchId(),
+                    LocalDate.now(),
+                    confirmed.id(),
+                    confirmed.invoiceNumber(),
+                    "pos:" + saleId + ":" + line.getId());
+        }
+        salesInvoiceService.markInventoryPosted(confirmed.id());
 
         sale.setSalesInvoiceId(confirmed.id());
         if (confirmed.invoiceNumber() != null && !confirmed.invoiceNumber().isBlank()) {
@@ -561,7 +627,10 @@ public class PosSaleService {
                                 l.getDiscountPercent(),
                                 l.getTaxRate(),
                                 l.getLineTotal(),
-                                l.getLineOrder()))
+                                l.getLineOrder(),
+                                l.getWarehouseId(),
+                                l.getInventoryBatchId(),
+                                l.getAllocationMode()))
                         .toList();
         List<PosPaymentResponse> paymentResponses = payments.findByOrganizationIdAndPosSaleId(org(), e.getId()).stream()
                 .map(p -> new PosPaymentResponse(
@@ -597,6 +666,67 @@ public class PosSaleService {
 
     private BigDecimal nz(BigDecimal v) {
         return v == null ? BigDecimal.ZERO : v;
+    }
+
+    private void applyAllocationFields(PosSaleLine line, PosLineRequest r) {
+        if (r.warehouseId() != null) {
+            line.setWarehouseId(r.warehouseId());
+        }
+        if (r.inventoryBatchId() != null) {
+            line.setInventoryBatchId(r.inventoryBatchId());
+        }
+        if (r.allocationMode() != null && !r.allocationMode().isBlank()) {
+            line.setAllocationMode(r.allocationMode());
+        }
+    }
+
+    private void ensureLineWarehouses(List<PosSaleLine> saleLines, UUID storeWarehouseId) {
+        for (PosSaleLine line : saleLines) {
+            if (line.getWarehouseId() == null) {
+                line.setWarehouseId(storeWarehouseId);
+                lines.save(line);
+            }
+            if (line.getAllocationMode() == null || line.getAllocationMode().isBlank()) {
+                line.setAllocationMode(
+                        line.getInventoryBatchId() != null
+                                ? AllocationMode.BATCH_AUTO.name()
+                                : AllocationMode.WAREHOUSE_POOL.name());
+                lines.save(line);
+            }
+        }
+    }
+
+    private AllocationMode parseAllocationMode(String mode) {
+        if (mode == null || mode.isBlank()) {
+            return AllocationMode.WAREHOUSE_POOL;
+        }
+        try {
+            return AllocationMode.valueOf(mode);
+        } catch (IllegalArgumentException ex) {
+            return AllocationMode.WAREHOUSE_POOL;
+        }
+    }
+
+    private CheckoutConflictLineResponse mapConflictLine(CheckoutLineIssue issue) {
+        return new CheckoutConflictLineResponse(
+                issue.lineId(),
+                issue.productId(),
+                issue.status().name(),
+                issue.allocationChanged(),
+                issue.message(),
+                issue.candidates().stream()
+                        .map(c -> new AllocationCandidateResponse(
+                                c.batchId(),
+                                c.warehouseId(),
+                                c.warehouseName(),
+                                c.batchNumber(),
+                                c.availableQty(),
+                                c.expiryDate(),
+                                c.receivedDate(),
+                                c.lotNumber(),
+                                c.qualityStatus(),
+                                c.reservedQty()))
+                        .toList());
     }
 
     private UUID org() {

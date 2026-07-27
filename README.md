@@ -202,6 +202,7 @@ flowchart LR
 - **Append-only** `inventory_transactions` with idempotency keys.
 - Stock is derived from movements; draft invoices may **reserve** quantity without reducing on-hand until confirm.
 - Events: `OPENING_STOCK`, `PURCHASE`, `SALE`, `ADJUSTMENT`, `TRANSFER`.
+- **Allocation engine (Phase 1 — POS):** org-configurable batch strategies (FIFO, FEFO, LIFO, etc.) for batch-tracked products; warehouse pool for non-batch. Integrated with POS scan + checkout re-validation. See [docs/inventory-allocation.md](docs/inventory-allocation.md).
 
 ### 6. Document numbering
 

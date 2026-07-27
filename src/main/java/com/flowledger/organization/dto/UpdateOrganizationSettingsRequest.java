@@ -4,6 +4,7 @@ import java.util.UUID;
 
 public record UpdateOrganizationSettingsRequest(
         String inventoryDeductionEvent,
+        String allocationStrategy,
         Boolean taxInclusiveDefault,
         Boolean roundOffEnabled,
         UUID defaultWarehouseId,

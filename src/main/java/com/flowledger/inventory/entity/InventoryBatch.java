@@ -27,6 +27,17 @@ public class InventoryBatch extends AuditedEntity {
 
     private LocalDate expiryDate;
 
+    private LocalDate receivedDate;
+
+    private String lotNumber;
+
+    @Column(name = "quality_status", nullable = false)
+    private String qualityStatus = "AVAILABLE";
+
     @Column(nullable = false)
     private BigDecimal quantity = BigDecimal.ZERO;
+
+    @Version
+    @Column(nullable = false)
+    private Long version = 0L;
 }

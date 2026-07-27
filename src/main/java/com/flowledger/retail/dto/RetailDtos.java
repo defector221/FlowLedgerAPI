@@ -118,7 +118,65 @@ public final class RetailDtos {
             @NotNull @Positive BigDecimal quantity,
             @NotNull BigDecimal rate,
             BigDecimal discountPercent,
-            BigDecimal taxRate) {}
+            BigDecimal taxRate,
+            UUID warehouseId,
+            UUID inventoryBatchId,
+            String allocationMode) {}
+
+    public record PosScanRequest(
+            @NotBlank String barcode,
+            @NotNull @Positive BigDecimal quantity,
+            UUID warehouseId,
+            UUID posSaleId) {}
+
+    public record PosScanConfirmRequest(
+            @NotBlank String barcode,
+            @NotNull @Positive BigDecimal quantity,
+            @NotNull UUID warehouseId,
+            @NotNull UUID batchId,
+            UUID posSaleId) {}
+
+    public record AllocationCandidateResponse(
+            UUID batchId,
+            UUID warehouseId,
+            String warehouseName,
+            String batchNumber,
+            BigDecimal availableQty,
+            LocalDate expiryDate,
+            LocalDate receivedDate,
+            String lotNumber,
+            String qualityStatus,
+            BigDecimal reservedQty) {}
+
+    public record AllocatedInventoryResponse(
+            UUID batchId,
+            UUID warehouseId,
+            String warehouseName,
+            String batchNumber,
+            BigDecimal quantity,
+            LocalDate expiryDate,
+            LocalDate receivedDate,
+            String lotNumber,
+            String allocationMode) {}
+
+    public record PosScanResponse(
+            String status,
+            ProductLookupResponse product,
+            AllocatedInventoryResponse allocated,
+            List<AllocationCandidateResponse> candidates,
+            String reason) {}
+
+    public record CheckoutLineConfirmation(UUID lineId, UUID inventoryBatchId, String allocationMode) {}
+
+    public record CheckoutConflictLineResponse(
+            UUID lineId,
+            UUID productId,
+            String status,
+            boolean allocationChanged,
+            String message,
+            List<AllocationCandidateResponse> candidates) {}
+
+    public record PosCheckoutConflictResponse(boolean allocationChanged, String message, List<CheckoutConflictLineResponse> lines) {}
 
     public record PosLineUpdateRequest(
             @Positive BigDecimal quantity, BigDecimal discountPercent, BigDecimal rate, BigDecimal taxRate) {}
@@ -135,7 +193,11 @@ public final class RetailDtos {
 
     public record PaymentInput(@NotNull PaymentMode paymentMode, @NotNull BigDecimal amount, String reference) {}
 
-    public record CheckoutRequest(UUID customerId, String receiptType, @NotNull List<@Valid PaymentInput> payments) {}
+    public record CheckoutRequest(
+            UUID customerId,
+            String receiptType,
+            @NotNull List<@Valid PaymentInput> payments,
+            List<CheckoutLineConfirmation> confirmedAllocations) {}
 
     public record PosLineResponse(
             UUID id,
@@ -148,7 +210,10 @@ public final class RetailDtos {
             BigDecimal discountPercent,
             BigDecimal taxRate,
             BigDecimal lineTotal,
-            int lineOrder) {}
+            int lineOrder,
+            UUID warehouseId,
+            UUID inventoryBatchId,
+            String allocationMode) {}
 
     public record PosPaymentResponse(
             UUID id, PaymentMode paymentMode, BigDecimal amount, UUID paymentId, String reference) {}

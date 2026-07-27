@@ -142,10 +142,27 @@ public class SalesInvoiceService {
      */
     @Transactional
     public InvoiceDetail confirmConverted(UUID id) {
-        return confirm(id, false);
+        return confirm(id, false, false);
+    }
+
+    /** POS checkout posts batch-aware inventory separately after confirm. */
+    @Transactional
+    public InvoiceDetail confirmConvertedForPos(UUID id) {
+        return confirm(id, false, true);
+    }
+
+    @Transactional
+    public void markInventoryPosted(UUID id) {
+        SalesInvoice invoice = load(id);
+        invoice.setInventoryPosted(true);
+        repo.save(invoice);
     }
 
     private InvoiceDetail confirm(UUID id, boolean requireWorkflowApproval) {
+        return confirm(id, requireWorkflowApproval, false);
+    }
+
+    private InvoiceDetail confirm(UUID id, boolean requireWorkflowApproval, boolean skipInventoryPosting) {
         SalesInvoice invoice = load(id);
         if (invoice.getStatus() == SalesInvoice.Status.CANCELLED)
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled invoice cannot be confirmed");
@@ -171,7 +188,7 @@ public class SalesInvoiceService {
             invoice.setDueDate(resolveDueDate(invoice.getCustomerId(), invoiceDate));
         }
         recalculate(invoice, organization);
-        if (!invoice.isInventoryPosted()) {
+        if (!invoice.isInventoryPosted() && !skipInventoryPosting) {
             List<SalesInvoiceItem> stockableLines = stockableLines(invoice.getItems());
             if (!stockableLines.isEmpty()) {
                 ensureWarehouseForStockedItems(invoice);

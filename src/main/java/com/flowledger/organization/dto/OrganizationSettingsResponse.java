@@ -6,6 +6,7 @@ public record OrganizationSettingsResponse(
         UUID id,
         UUID organizationId,
         String inventoryDeductionEvent,
+        String allocationStrategy,
         boolean taxInclusiveDefault,
         boolean roundOffEnabled,
         UUID defaultWarehouseId,
