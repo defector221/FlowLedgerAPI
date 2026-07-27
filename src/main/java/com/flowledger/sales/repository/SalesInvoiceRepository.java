@@ -32,6 +32,14 @@ public interface SalesInvoiceRepository
 
     Page<SalesInvoice> findByOrganizationId(UUID org, Pageable pageable);
 
+    @Query(
+            """
+            select count(i) from SalesInvoice i
+            where i.organizationId = :org and lower(i.invoiceNumber) = lower(:invoiceNumber)
+            """)
+    long countByOrganizationIdAndInvoiceNumberIgnoreCase(
+            @Param("org") UUID org, @Param("invoiceNumber") String invoiceNumber);
+
     long countByOrganizationIdAndInvoiceDateBetween(UUID organizationId, LocalDate start, LocalDate end);
 
     @Query(

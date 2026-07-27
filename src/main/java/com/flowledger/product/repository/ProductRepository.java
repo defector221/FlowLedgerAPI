@@ -11,6 +11,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
 
     boolean existsByOrganizationIdAndSku(UUID org, String sku);
 
+    Optional<Product> findByOrganizationIdAndSku(UUID org, String sku);
+
     List<Product> findByOrganizationId(UUID organizationId);
 
     List<Product> findByOrganizationIdAndActiveTrue(UUID organizationId);

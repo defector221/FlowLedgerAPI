@@ -360,6 +360,11 @@ public class PurchaseInvoiceService {
                 .getResultList();
     }
 
+    /** Standalone purchase invoice for migration imports (no PO/GRN required). */
+    public PurchaseInvoice createStandalone(UUID supplierId, UUID warehouseId, InvoiceRequest request) {
+        return create(supplierId, null, null, warehouseId, request, request.items());
+    }
+
     private PurchaseInvoice create(
             UUID supplier, UUID po, UUID grn, UUID wh, InvoiceRequest request, List<Line> lines) {
         if (lines == null || lines.isEmpty())
@@ -373,6 +378,9 @@ public class PurchaseInvoiceService {
         invoice.setBranchId(hierarchy.resolveBranchId(null, wh));
         invoice.setInvoiceNumber(number(request.invoiceDate(), invoice.getBranchId()));
         applyRequest(invoice, request, lines);
+        if (request.supplierInvoiceNumber() != null && !request.supplierInvoiceNumber().isBlank()) {
+            invoice.setSupplierInvoiceNumber(request.supplierInvoiceNumber());
+        }
         em.persist(invoice);
         searchEvents.upsert(invoice.getOrganizationId(), SearchEntityType.PURCHASE_INVOICE, invoice.getId());
         return invoice;

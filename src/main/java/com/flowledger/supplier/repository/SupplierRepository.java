@@ -11,6 +11,10 @@ public interface SupplierRepository extends JpaRepository<Supplier, UUID>, JpaSp
 
     boolean existsByOrganizationIdAndSupplierCode(UUID organizationId, String supplierCode);
 
+    Optional<Supplier> findByOrganizationIdAndSupplierCode(UUID organizationId, String supplierCode);
+
+    Optional<Supplier> findFirstByOrganizationIdAndSupplierNameIgnoreCase(UUID organizationId, String supplierName);
+
     List<Supplier> findByOrganizationId(UUID organizationId);
 
     Page<Supplier> findByOrganizationId(UUID organizationId, Pageable pageable);

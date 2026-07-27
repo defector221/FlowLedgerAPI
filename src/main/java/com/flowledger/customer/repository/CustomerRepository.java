@@ -11,6 +11,10 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID>, JpaSp
 
     boolean existsByOrganizationIdAndCustomerCode(UUID organizationId, String customerCode);
 
+    Optional<Customer> findByOrganizationIdAndCustomerCode(UUID organizationId, String customerCode);
+
+    Optional<Customer> findFirstByOrganizationIdAndCustomerNameIgnoreCase(UUID organizationId, String customerName);
+
     List<Customer> findByOrganizationId(UUID organizationId);
 
     Page<Customer> findByOrganizationId(UUID organizationId, Pageable pageable);

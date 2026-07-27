@@ -1,67 +1,88 @@
 package com.flowledger.product.service;
 
 import com.flowledger.common.service.OrganizationScopedService;
-import com.flowledger.common.tenant.TenantContext;
+import com.flowledger.migration.domain.ExportFormat;
+import com.flowledger.migration.domain.ImportModule;
+import com.flowledger.migration.dto.MigrationDtos.ExportRequest;
+import com.flowledger.migration.export.ExportEngine;
+import com.flowledger.migration.job.ImportJobService;
 import com.flowledger.product.dto.ProductIdentificationDtos.ExportBarcodesRequest;
 import com.flowledger.product.dto.ProductIdentificationDtos.ImportCommitRequest;
 import com.flowledger.product.dto.ProductIdentificationDtos.ImportJobResponse;
 import com.flowledger.product.dto.ProductIdentificationDtos.ImportPreviewResponse;
-import com.flowledger.product.entity.ProductImportJob;
-import com.flowledger.product.repository.ProductImportJobRepository;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * Thin alias over the Migration Center pipeline for legacy {@code /products/import/*} endpoints.
+ * Prefer {@code /api/v1/migration/*} for new clients.
+ */
 @Service
 @Transactional
 public class ProductImportExportService extends OrganizationScopedService {
-    private final ProductImportJobRepository jobs;
+    private final ImportJobService imports;
+    private final ExportEngine exports;
 
-    public ProductImportExportService(ProductImportJobRepository jobs) {
-        this.jobs = jobs;
+    public ProductImportExportService(ImportJobService imports, ExportEngine exports) {
+        this.imports = imports;
+        this.exports = exports;
     }
 
     public ImportPreviewResponse preview(MultipartFile file) {
-        ProductImportJob job = new ProductImportJob();
-        job.setOrganizationId(orgId());
-        job.setStatus("PREVIEW");
-        job.setFileName(file == null ? null : file.getOriginalFilename());
-        job.setPreviewJson(List.of(Map.of("message", "Import preview stub — validation not implemented")));
-        TenantContext.userId().ifPresent(job::setCreatedBy);
-        ProductImportJob saved = jobs.save(job);
-        return new ImportPreviewResponse(saved.getId(), saved.getStatus(), saved.getPreviewJson());
+        var job = imports.upload(ImportModule.BARCODE, file);
+        job = imports.detect(job.id());
+        return new ImportPreviewResponse(
+                job.id(),
+                job.status(),
+                List.of(Map.of(
+                        "message",
+                        "Delegated to Migration Center (BARCODE). Open Data Migration to map, validate, and commit.",
+                        "jobId",
+                        job.id().toString(),
+                        "totalRows",
+                        String.valueOf(job.totalRows()))));
     }
 
     public ImportJobResponse commit(ImportCommitRequest request) {
-        ProductImportJob job = load(request.jobId());
-        job.setStatus("COMMITTED");
-        job.setResultJson(Map.of("imported", 0, "skipped", 0, "message", "Import commit stub"));
-        job.setCompletedAt(OffsetDateTime.now());
-        return toResponse(jobs.save(job));
+        var job = imports.get(request.jobId());
+        if ("DETECTED".equals(job.status()) || "MAPPED".equals(job.status())) {
+            job = imports.validate(request.jobId());
+        }
+        if ("VALIDATED".equals(job.status()) || "COMPLETED_WITH_ERRORS".equals(job.status())) {
+            job = imports.commit(request.jobId());
+        }
+        return new ImportJobResponse(
+                job.id(),
+                job.status(),
+                job.fileName(),
+                Map.of(
+                        "imported", job.successRows(),
+                        "skipped", job.skippedRows(),
+                        "errors", job.errorRows(),
+                        "message", "Delegated to migration pipeline"),
+                job.errorSummary());
     }
 
     @Transactional(readOnly = true)
     public ImportJobResponse getJob(UUID jobId) {
-        return toResponse(load(jobId));
+        var job = imports.get(jobId);
+        return new ImportJobResponse(
+                job.id(),
+                job.status(),
+                job.fileName(),
+                Map.of(
+                        "imported", job.successRows(),
+                        "skipped", job.skippedRows(),
+                        "errors", job.errorRows()),
+                job.errorSummary());
     }
 
     public byte[] exportBarcodes(ExportBarcodesRequest request) {
-        String header = "product_id,barcode,status\n";
-        return header.getBytes();
-    }
-
-    private ProductImportJob load(UUID jobId) {
-        return required(jobs.findByIdAndOrganizationId(jobId, orgId()), "Import job");
-    }
-
-    private ImportJobResponse toResponse(ProductImportJob job) {
-        return new ImportJobResponse(
-                job.getId(), job.getStatus(), job.getFileName(), job.getResultJson(), job.getErrorMessage());
+        var exported = exports.export(new ExportRequest(ImportModule.BARCODE, ExportFormat.CSV));
+        return exports.download(exported.id());
     }
 }
