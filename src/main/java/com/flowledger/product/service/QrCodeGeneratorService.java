@@ -15,7 +15,6 @@ import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 import java.io.ByteArrayOutputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -29,12 +28,17 @@ public class QrCodeGeneratorService extends OrganizationScopedService {
     private final ProductRepository products;
     private final ProductQrCodeRepository qrCodes;
     private final StorageService storage;
+    private final PublicProductService publicProducts;
 
     public QrCodeGeneratorService(
-            ProductRepository products, ProductQrCodeRepository qrCodes, StorageService storage) {
+            ProductRepository products,
+            ProductQrCodeRepository qrCodes,
+            StorageService storage,
+            PublicProductService publicProducts) {
         this.products = products;
         this.qrCodes = qrCodes;
         this.storage = storage;
+        this.publicProducts = publicProducts;
     }
 
     @Transactional(readOnly = true)
@@ -69,17 +73,19 @@ public class QrCodeGeneratorService extends OrganizationScopedService {
     }
 
     private String resolveTemplate(String template, Product product) {
+        String productUrl = publicProducts.publishedProductUrl(product.getId());
+        String warrantyUrl = productUrl + "/warranty";
         return template
                 .replace("{{sku}}", product.getSku() == null ? "" : product.getSku())
                 .replace("{{productName}}", product.getName() == null ? "" : product.getName())
                 .replace("{{barcode}}", product.getBarcode() == null ? "" : product.getBarcode())
-                .replace("{{productUrl}}", "/products/" + product.getId())
-                .replace("{{warrantyUrl}}", "/products/" + product.getId() + "/warranty");
+                .replace("{{productUrl}}", productUrl)
+                .replace("{{warrantyUrl}}", warrantyUrl);
     }
 
     private byte[] encodePng(String payload) {
         try {
-            BitMatrix matrix = new QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 256, 256);
+            BitMatrix matrix = new QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 512, 512);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             MatrixToImageWriter.writeToStream(matrix, "PNG", out);
             return out.toByteArray();

@@ -1,5 +1,6 @@
 package com.flowledger.purchase.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -17,6 +18,7 @@ public class PurchaseReturnItem {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @JsonIgnore
     @ManyToOne
     @JoinColumn(name = "purchase_return_id")
     private PurchaseReturn purchaseReturn;

@@ -109,6 +109,7 @@ public class PurchaseReturnService {
         PurchaseReturn pr = em.find(PurchaseReturn.class, id);
         if (pr == null || !pr.getOrganizationId().equals(TenantContext.getOrganizationId()))
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Purchase return not found");
+        pr.getItems().size();
         return pr;
     }
 
