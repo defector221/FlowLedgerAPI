@@ -233,7 +233,10 @@ public final class AccountingDtos {
             List<DayBookEntry> entries,
             BigDecimal totalDebit,
             BigDecimal totalCredit,
-            long entryCount) {}
+            long entryCount,
+            int page,
+            int size,
+            int totalPages) {}
 
     public record CashBookLine(
             UUID journalEntryId,
@@ -255,7 +258,11 @@ public final class AccountingDtos {
             List<CashBookLine> lines,
             BigDecimal totalDebit,
             BigDecimal totalCredit,
-            BigDecimal closingBalance) {}
+            BigDecimal closingBalance,
+            long lineCount,
+            int page,
+            int size,
+            int totalPages) {}
 
     public record CashFlowSection(String name, List<NamedAmount> items, BigDecimal total) {}
 

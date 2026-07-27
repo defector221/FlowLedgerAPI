@@ -15,6 +15,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     JwtProperties.class,
     NotificationProperties.class,
     com.flowledger.storage.MinioStorageProperties.class,
+    com.flowledger.storage.LocalStorageProperties.class,
     com.flowledger.search.config.SearchProperties.class,
     com.flowledger.subscription.config.BillingProperties.class,
     com.flowledger.subscription.config.RazorpayProperties.class,

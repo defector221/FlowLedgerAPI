@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @Setter
 @ConfigurationProperties(prefix = "flowledger.storage.minio")
 public class MinioStorageProperties {
+    private boolean enabled = true;
     private String endpoint;
     private String accessKey;
     private String secretKey;

@@ -7,11 +7,16 @@ import jakarta.annotation.PostConstruct;
 import java.io.*;
 import java.time.Duration;
 import lombok.SneakyThrows;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
+@ConditionalOnProperty(name = "flowledger.storage.minio.enabled", havingValue = "true", matchIfMissing = true)
 public class MinioStorageService implements StorageService {
+    private static final Logger log = LoggerFactory.getLogger(MinioStorageService.class);
     private final MinioClient client;
     private final MinioStorageProperties properties;
 
@@ -23,10 +28,19 @@ public class MinioStorageService implements StorageService {
     @PostConstruct
     @SneakyThrows
     public void ensureBucket() {
-        if (!client.bucketExists(
-                BucketExistsArgs.builder().bucket(properties.getBucket()).build()))
-            client.makeBucket(
-                    MakeBucketArgs.builder().bucket(properties.getBucket()).build());
+        try {
+            if (!client.bucketExists(
+                    BucketExistsArgs.builder().bucket(properties.getBucket()).build()))
+                client.makeBucket(
+                        MakeBucketArgs.builder().bucket(properties.getBucket()).build());
+            log.info("MinIO bucket ready: {} at {}", properties.getBucket(), properties.getEndpoint());
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "MinIO is not reachable at "
+                            + properties.getEndpoint()
+                            + ". Start it with `docker compose up -d minio` or set MINIO_ENABLED=false for local filesystem storage.",
+                    e);
+        }
     }
 
     @SneakyThrows

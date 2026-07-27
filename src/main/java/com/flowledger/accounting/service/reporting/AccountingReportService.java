@@ -313,7 +313,7 @@ public class AccountingReportService {
     }
 
     @Transactional(readOnly = true)
-    public DayBookResponse dayBook(LocalDate from, LocalDate to) {
+    public DayBookResponse dayBook(LocalDate from, LocalDate to, Pageable pageable) {
         UUID org = TenantContext.getOrganizationId();
         LocalDate fromDate = from != null ? from : LocalDate.of(1970, 1, 1);
         LocalDate toDate = to != null ? to : LocalDate.of(2999, 12, 31);
@@ -341,7 +341,7 @@ public class AccountingReportService {
                 totalDebit = totalDebit.add(debit);
                 totalCredit = totalCredit.add(credit);
             }
-            return new DayBookResponse(from, to, "VOUCHER", entries, totalDebit, totalCredit, entries.size());
+            return pagedDayBook(from, to, "VOUCHER", entries, totalDebit, totalCredit, pageable);
         }
 
         List<JournalEntry> entries =
@@ -366,17 +366,17 @@ public class AccountingReportService {
             totalDebit = totalDebit.add(debit);
             totalCredit = totalCredit.add(credit);
         }
-        return new DayBookResponse(from, to, "JOURNAL", rows, totalDebit, totalCredit, rows.size());
+        return pagedDayBook(from, to, "JOURNAL", rows, totalDebit, totalCredit, pageable);
     }
 
     @Transactional(readOnly = true)
-    public CashBookResponse cashBook(LocalDate from, LocalDate to) {
-        return moneyBook(from, to, "CASH", SystemAccountKey.CASH, AccountSubType.CASH, "CASH");
+    public CashBookResponse cashBook(LocalDate from, LocalDate to, Pageable pageable) {
+        return moneyBook(from, to, "CASH", SystemAccountKey.CASH, AccountSubType.CASH, "CASH", pageable);
     }
 
     @Transactional(readOnly = true)
-    public CashBookResponse bankBook(LocalDate from, LocalDate to) {
-        return moneyBook(from, to, "BANK", SystemAccountKey.BANK, AccountSubType.BANK, "BANK");
+    public CashBookResponse bankBook(LocalDate from, LocalDate to, Pageable pageable) {
+        return moneyBook(from, to, "BANK", SystemAccountKey.BANK, AccountSubType.BANK, "BANK", pageable);
     }
 
     @Transactional(readOnly = true)
@@ -449,7 +449,8 @@ public class AccountingReportService {
             String bookType,
             SystemAccountKey systemKey,
             AccountSubType subType,
-            String nameToken) {
+            String nameToken,
+            Pageable pageable) {
         UUID org = TenantContext.getOrganizationId();
         LocalDate fromDate = from != null ? from : LocalDate.of(1970, 1, 1);
         LocalDate toDate = to != null ? to : LocalDate.of(2999, 12, 31);
@@ -497,7 +498,42 @@ public class AccountingReportService {
                         running));
             }
         }
-        return new CashBookResponse(from, to, bookType, opening, bookLines, totalDebit, totalCredit, running);
+        PageResponse<CashBookLine> page = PageResponse.slice(bookLines, pageable);
+        return new CashBookResponse(
+                from,
+                to,
+                bookType,
+                opening,
+                page.content(),
+                totalDebit,
+                totalCredit,
+                running,
+                page.totalElements(),
+                page.page(),
+                page.size(),
+                page.totalPages());
+    }
+
+    private static DayBookResponse pagedDayBook(
+            LocalDate from,
+            LocalDate to,
+            String sourceType,
+            List<DayBookEntry> entries,
+            BigDecimal totalDebit,
+            BigDecimal totalCredit,
+            Pageable pageable) {
+        PageResponse<DayBookEntry> page = PageResponse.slice(entries, pageable);
+        return new DayBookResponse(
+                from,
+                to,
+                sourceType,
+                page.content(),
+                totalDebit,
+                totalCredit,
+                page.totalElements(),
+                page.page(),
+                page.size(),
+                page.totalPages());
     }
 
     private Set<UUID> resolveMoneyAccountIds(

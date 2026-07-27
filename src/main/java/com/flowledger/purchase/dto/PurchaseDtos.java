@@ -35,7 +35,7 @@ public final class PurchaseDtos {
             @NotEmpty List<@Valid Line> items) {}
 
     public record GrnRequest(
-            @NotNull UUID warehouseId, @NotNull LocalDate receiptDate, String notes, List<@Valid Line> items) {}
+            @NotNull UUID warehouseId, LocalDate receiptDate, String notes, List<@Valid Line> items) {}
 
     public record InvoiceRequest(
             String supplierInvoiceNumber,

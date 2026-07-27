@@ -48,7 +48,7 @@ public class PurchaseOrderService {
         po.setOrganizationId(TenantContext.getOrganizationId());
         po.setSupplierId(request.supplierId());
         po.setOrderDate(request.orderDate());
-        po.setExpectedDeliveryDate(request.expectedDeliveryDate());
+        po.setExpectedDeliveryDate(resolveExpectedDelivery(request));
         po.setNotes(request.notes());
         po.setTermsAndConditions(request.termsAndConditions());
         po.setPoNumber(number("PURCHASE_ORDER", "PO", request.orderDate()));
@@ -60,7 +60,9 @@ public class PurchaseOrderService {
     public PurchaseOrder get(UUID id) {
         PurchaseOrder found = em.find(PurchaseOrder.class, id);
         if (found == null) throw missing("Purchase order");
-        return owned(found);
+        PurchaseOrder owned = owned(found);
+        owned.getItems().size(); // initialize for JSON (open-in-view=false)
+        return owned;
     }
 
     public PageResponse<PurchaseOrder> list(Pageable pageable) {
@@ -83,7 +85,7 @@ public class PurchaseOrderService {
         if (!"DRAFT".equals(po.getStatus())) throw conflict("Only draft orders can be changed");
         po.setSupplierId(request.supplierId());
         po.setOrderDate(request.orderDate());
-        po.setExpectedDeliveryDate(request.expectedDeliveryDate());
+        po.setExpectedDeliveryDate(resolveExpectedDelivery(request));
         po.setNotes(request.notes());
         po.setTermsAndConditions(request.termsAndConditions());
         po.getItems().clear();
@@ -121,6 +123,28 @@ public class PurchaseOrderService {
         if (invoiced > 0) throw conflict("Order already invoiced and cannot be cancelled");
         po.setStatus("CANCELLED");
         return po;
+    }
+
+    private LocalDate resolveExpectedDelivery(OrderRequest request) {
+        if (request.expectedDeliveryDate() != null) return request.expectedDeliveryDate();
+        if (request.orderDate() == null || request.items() == null || request.items().isEmpty()) return null;
+        int maxLead = 0;
+        boolean any = false;
+        UUID org = TenantContext.getOrganizationId();
+        for (Line line : request.items()) {
+            try {
+                Integer lead = supplierCatalog
+                        .requireActiveCatalogItem(org, request.supplierId(), line.productId())
+                        .getLeadTimeDays();
+                if (lead != null && lead >= 0) {
+                    maxLead = Math.max(maxLead, lead);
+                    any = true;
+                }
+            } catch (ResponseStatusException ignored) {
+                // skip products without an active catalog row
+            }
+        }
+        return any ? request.orderDate().plusDays(maxLead) : null;
     }
 
     private void applyOrderLines(PurchaseOrder po, List<Line> lines) {

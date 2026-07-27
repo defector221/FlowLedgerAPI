@@ -61,7 +61,10 @@ flowledger:
   cors:
     allowed-origins: http://localhost:5173,http://localhost:3000,https://flowledger.valiantxgroup.com,https://apiflowledger.valiantxgroup.com
   storage:
+    local:
+      base-path: ${FLOWLEDGER_LOCAL_STORAGE_PATH:${user.home}/.flowledger/storage}
     minio:
+      enabled: ${MINIO_ENABLED:true}
       endpoint: ${MINIO_ENDPOINT:http://localhost:19000}
       access-key: ${MINIO_ACCESS_KEY:admin}
       secret-key: ${MINIO_SECRET_KEY:Vayupa@2024@wan}

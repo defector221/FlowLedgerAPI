@@ -5,6 +5,7 @@ import com.flowledger.accounting.domain.JournalSource;
 import com.flowledger.common.dto.PageResponse;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
+import com.flowledger.common.util.PaymentTermsDates;
 import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
 import com.flowledger.finance.voucher.adapter.PurchaseVoucherBuilder;
 import com.flowledger.organization.entity.Organization;
@@ -21,6 +22,7 @@ import com.flowledger.purchase.entity.PurchaseOrder;
 import com.flowledger.purchase.entity.PurchaseOrderItem;
 import com.flowledger.search.event.SearchIndexEventPublisher;
 import com.flowledger.search.model.SearchEntityType;
+import com.flowledger.supplier.repository.SupplierRepository;
 import com.flowledger.tax.TaxSplitDefaults;
 import com.flowledger.tax.dto.GstCalculationDtos;
 import com.flowledger.tax.service.GstCalculationService;
@@ -51,6 +53,7 @@ public class PurchaseInvoiceService {
     private final PurchaseOrderService orders;
     private final DocumentNumberService numbers;
     private final OrganizationRepository organizations;
+    private final SupplierRepository suppliers;
     private final GstCalculationService gst;
     private final SearchIndexEventPublisher searchEvents;
     private final DocumentVoucherFacade documentPosting;
@@ -60,6 +63,7 @@ public class PurchaseInvoiceService {
             PurchaseOrderService purchaseOrderService,
             DocumentNumberService documentNumberService,
             OrganizationRepository organizationRepository,
+            SupplierRepository suppliers,
             GstCalculationService tax,
             SearchIndexEventPublisher searchEvents,
             DocumentVoucherFacade documentPosting) {
@@ -67,6 +71,7 @@ public class PurchaseInvoiceService {
         orders = purchaseOrderService;
         numbers = documentNumberService;
         organizations = organizationRepository;
+        this.suppliers = suppliers;
         gst = tax;
         this.searchEvents = searchEvents;
         this.documentPosting = documentPosting;
@@ -269,6 +274,9 @@ public class PurchaseInvoiceService {
         if ("CANCELLED".equals(invoice.getStatus()))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled invoice cannot be confirmed");
         if (!"DRAFT".equals(invoice.getStatus())) return invoice;
+        if (invoice.getDueDate() == null) {
+            invoice.setDueDate(resolveDueDate(invoice.getSupplierId(), invoice.getInvoiceDate()));
+        }
         invoice.setStatus(invoice.getOutstandingAmount().signum() == 0 ? "PAID" : "CONFIRMED");
         documentPosting.postPurchaseInvoice(invoice);
         searchEvents.upsert(invoice.getOrganizationId(), SearchEntityType.PURCHASE_INVOICE, invoice.getId());
@@ -297,6 +305,7 @@ public class PurchaseInvoiceService {
         PurchaseInvoice invoice = em.find(PurchaseInvoice.class, id);
         if (invoice == null || !invoice.getOrganizationId().equals(TenantContext.getOrganizationId()))
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Purchase invoice not found");
+        invoice.getItems().size(); // initialize for JSON (open-in-view=false)
         return invoice;
     }
 
@@ -368,7 +377,10 @@ public class PurchaseInvoiceService {
         if (lines == null || lines.isEmpty())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invoice requires items");
         invoice.setInvoiceDate(request.invoiceDate());
-        invoice.setDueDate(request.dueDate());
+        invoice.setDueDate(
+                request.dueDate() != null
+                        ? request.dueDate()
+                        : resolveDueDate(invoice.getSupplierId(), request.invoiceDate()));
         invoice.setSupplierInvoiceNumber(request.supplierInvoiceNumber());
         invoice.setPlaceOfSupply(request.placeOfSupply());
         invoice.setTaxInclusive(Boolean.TRUE.equals(request.taxInclusive()));
@@ -446,6 +458,17 @@ public class PurchaseInvoiceService {
                 .map(PurchaseInvoiceItem::getLineTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
         invoice.setOutstandingAmount(invoice.getGrandTotal());
+    }
+
+    private LocalDate resolveDueDate(UUID supplierId, LocalDate invoiceDate) {
+        String terms = null;
+        if (supplierId != null) {
+            terms = suppliers
+                    .findByIdAndOrganizationId(supplierId, TenantContext.getOrganizationId())
+                    .map(supplier -> supplier.getPaymentTerms())
+                    .orElse(null);
+        }
+        return PaymentTermsDates.dueDate(invoiceDate, terms);
     }
 
     private Organization organization() {

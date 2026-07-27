@@ -6,6 +6,7 @@ import com.flowledger.ai.workflow.AiWorkflowGateService;
 import com.flowledger.common.dto.PageResponse;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
+import com.flowledger.common.util.PaymentTermsDates;
 import com.flowledger.customer.repository.CustomerRepository;
 import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
 import com.flowledger.finance.voucher.adapter.SalesVoucherBuilder;
@@ -34,8 +35,6 @@ import jakarta.persistence.criteria.Predicate;
 import java.math.*;
 import java.time.*;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Pageable;
@@ -47,8 +46,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class SalesInvoiceService {
-    private static final Pattern PAYMENT_TERMS_DAYS = Pattern.compile("(\\d{1,3})");
-
     private final SalesInvoiceRepository repo;
     private final InventoryService inventory;
     private final ProductRepository products;
@@ -349,28 +346,14 @@ public class SalesInvoiceService {
     }
 
     private LocalDate resolveDueDate(UUID customerId, LocalDate invoiceDate) {
-        int days = 30;
+        String terms = null;
         if (customerId != null) {
-            days = customers
+            terms = customers
                     .findByIdAndOrganizationId(customerId, TenantContext.getOrganizationId())
-                    .map(customer -> parsePaymentTermsDays(customer.getPaymentTerms()))
-                    .orElse(30);
+                    .map(customer -> customer.getPaymentTerms())
+                    .orElse(null);
         }
-        return invoiceDate.plusDays(days);
-    }
-
-    private static int parsePaymentTermsDays(String paymentTerms) {
-        if (paymentTerms == null || paymentTerms.isBlank()) return 30;
-        Matcher matcher = PAYMENT_TERMS_DAYS.matcher(paymentTerms.trim());
-        if (matcher.find()) {
-            try {
-                int days = Integer.parseInt(matcher.group(1));
-                if (days >= 0 && days <= 365) return days;
-            } catch (NumberFormatException ignored) {
-                // fall through
-            }
-        }
-        return 30;
+        return PaymentTermsDates.dueDate(invoiceDate, terms);
     }
 
     private void ensureWarehouseForStockedItems(SalesInvoice invoice) {

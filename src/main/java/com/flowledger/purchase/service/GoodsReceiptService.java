@@ -58,9 +58,10 @@ public class GoodsReceiptService {
         goodsReceipt.setPurchaseOrderId(poId);
         goodsReceipt.setSupplierId(po.getSupplierId());
         goodsReceipt.setWarehouseId(request.warehouseId());
-        goodsReceipt.setReceiptDate(request.receiptDate());
+        LocalDate receiptDate = resolveReceiptDate(po, request.receiptDate());
+        goodsReceipt.setReceiptDate(receiptDate);
         goodsReceipt.setNotes(request.notes());
-        goodsReceipt.setGrnNumber(number(request.receiptDate()));
+        goodsReceipt.setGrnNumber(number(receiptDate));
         applyLines(goodsReceipt, source);
         em.persist(goodsReceipt);
         return goodsReceipt;
@@ -78,7 +79,7 @@ public class GoodsReceiptService {
         Map<UUID, BigDecimal> receivable = receivableByProduct(po.getId(), goodsReceipt.getId());
         List<Line> source = resolveGrnLines(po, request.items(), receivable);
         goodsReceipt.setWarehouseId(request.warehouseId());
-        goodsReceipt.setReceiptDate(request.receiptDate());
+        goodsReceipt.setReceiptDate(resolveReceiptDate(po, request.receiptDate()));
         goodsReceipt.setNotes(request.notes());
         goodsReceipt.getItems().clear();
         applyLines(goodsReceipt, source);
@@ -138,6 +139,7 @@ public class GoodsReceiptService {
         GoodsReceipt goodsReceipt = em.find(GoodsReceipt.class, id);
         if (goodsReceipt == null || !goodsReceipt.getOrganizationId().equals(TenantContext.getOrganizationId()))
             throw missing("GRN");
+        goodsReceipt.getItems().size(); // initialize for JSON (open-in-view=false)
         return goodsReceipt;
     }
 
@@ -261,6 +263,12 @@ public class GoodsReceiptService {
             throw conflict("Purchase order must be confirmed before creating a GRN");
         }
         return po;
+    }
+
+    private static LocalDate resolveReceiptDate(PurchaseOrder po, LocalDate requested) {
+        if (requested != null) return requested;
+        if (po.getExpectedDeliveryDate() != null) return po.getExpectedDeliveryDate();
+        return LocalDate.now();
     }
 
     private String number(LocalDate date) {

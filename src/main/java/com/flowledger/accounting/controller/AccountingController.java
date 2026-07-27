@@ -211,22 +211,25 @@ public class AccountingController {
     @GetMapping("/reports/day-book")
     public ApiResponse<DayBookResponse> dayBook(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ApiResponse.of(reports.dayBook(from, to));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @PageableDefault(size = 50) Pageable pageable) {
+        return ApiResponse.of(reports.dayBook(from, to, pageable));
     }
 
     @GetMapping("/reports/cash-book")
     public ApiResponse<CashBookResponse> cashBook(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ApiResponse.of(reports.cashBook(from, to));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @PageableDefault(size = 50) Pageable pageable) {
+        return ApiResponse.of(reports.cashBook(from, to, pageable));
     }
 
     @GetMapping("/reports/bank-book")
     public ApiResponse<CashBookResponse> bankBook(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ApiResponse.of(reports.bankBook(from, to));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @PageableDefault(size = 50) Pageable pageable) {
+        return ApiResponse.of(reports.bankBook(from, to, pageable));
     }
 
     @GetMapping("/reports/cash-flow")
