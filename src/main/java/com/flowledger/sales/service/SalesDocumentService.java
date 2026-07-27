@@ -7,6 +7,9 @@ import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.customer.entity.Customer;
 import com.flowledger.customer.repository.CustomerRepository;
 import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
+import com.flowledger.inventory.allocation.AllocationMode;
+import com.flowledger.inventory.allocation.InventoryDeductionCoordinator;
+import com.flowledger.inventory.allocation.ReservationResult;
 import com.flowledger.inventory.dto.InventoryDtos.PostTransaction;
 import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.service.InventoryService;
@@ -14,6 +17,10 @@ import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.product.entity.Product;
 import com.flowledger.product.repository.ProductRepository;
+import com.flowledger.sales.dto.SalesAllocationDtos.ConfirmLineAllocationRequest;
+import com.flowledger.sales.dto.SalesAllocationDtos.ConfirmOrderRequest;
+import com.flowledger.sales.dto.SalesAllocationDtos.ConvertToChallanLineRequest;
+import com.flowledger.sales.dto.SalesAllocationDtos.ConvertToChallanRequest;
 import com.flowledger.sales.dto.SalesDtos.*;
 import com.flowledger.sales.entity.*;
 import com.flowledger.sales.repository.*;
@@ -26,7 +33,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Pageable;
@@ -56,6 +65,7 @@ public class SalesDocumentService {
     private final DocumentVoucherFacade documentPosting;
     private final ObjectProvider<AiWorkflowGateService> workflowGate;
     private final ShipmentRepository shipments;
+    private final InventoryDeductionCoordinator inventoryCoordinator;
 
     private static final EnumSet<ShipmentStatus> DISPATCHED_OR_LATER = EnumSet.of(
             ShipmentStatus.PARTIALLY_DISPATCHED,
@@ -80,7 +90,8 @@ public class SalesDocumentService {
             InventoryService inventory,
             DocumentVoucherFacade documentPosting,
             ObjectProvider<AiWorkflowGateService> workflowGate,
-            ShipmentRepository shipments) {
+            ShipmentRepository shipments,
+            InventoryDeductionCoordinator inventoryCoordinator) {
         this.quotations = quotations;
         this.orders = orders;
         this.challans = challans;
@@ -97,6 +108,7 @@ public class SalesDocumentService {
         this.documentPosting = documentPosting;
         this.workflowGate = workflowGate;
         this.shipments = shipments;
+        this.inventoryCoordinator = inventoryCoordinator;
     }
 
     private void gate(String documentType, UUID entityId, BigDecimal amount, String action) {
@@ -245,6 +257,12 @@ public class SalesDocumentService {
         quotation.setConvertedToOrderId(saved.getId());
         quotation.setStatus(Quotation.Status.CONVERTED);
         quotations.save(quotation);
+        if (inventoryCoordinator.shouldReserveOnSalesOrderConfirm(orgId())) {
+            UUID warehouseId = inventoryCoordinator.resolveWarehouseId(orgId(), saved.getWarehouseId());
+            saved.setWarehouseId(warehouseId);
+            reserveOrderLines(saved, warehouseId, null);
+            saved = orders.save(saved);
+        }
         return saved;
     }
 
@@ -304,21 +322,117 @@ public class SalesDocumentService {
         if (order.getStatus() == SalesOrder.Status.FULFILLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Fulfilled order cannot be cancelled");
         }
+        inventoryCoordinator.releaseSalesOrder(orgId(), id);
         order.setStatus(SalesOrder.Status.CANCELLED);
         return orders.save(order);
     }
 
     @Transactional
-    public DeliveryChallan convertOrderToChallan(UUID orderId, UUID warehouseId) {
+    public SalesOrder confirmOrder(UUID id, ConfirmOrderRequest request) {
+        SalesOrder order = getOrder(id);
+        if (order.getStatus() != SalesOrder.Status.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only draft orders can be confirmed");
+        }
+        UUID warehouseId = inventoryCoordinator.resolveWarehouseId(orgId(), request == null ? null : request.warehouseId());
+        order.setWarehouseId(warehouseId);
+        if (inventoryCoordinator.shouldReserveOnSalesOrderConfirm(orgId())) {
+            reserveOrderLines(order, warehouseId, null);
+        }
+        order.setStatus(SalesOrder.Status.CONFIRMED);
+        return orders.save(order);
+    }
+
+    @Transactional
+    public SalesOrder confirmOrderLineAllocation(UUID orderId, UUID lineId, ConfirmLineAllocationRequest request) {
+        SalesOrder order = getOrder(orderId);
+        if (order.getStatus() != SalesOrder.Status.DRAFT && order.getStatus() != SalesOrder.Status.CONFIRMED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order cannot be updated");
+        }
+        SalesOrderItem line = order.getItems().stream()
+                .filter(i -> i.getId().equals(lineId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Line not found"));
+        UUID warehouseId = order.getWarehouseId() != null
+                ? order.getWarehouseId()
+                : inventoryCoordinator.resolveWarehouseId(orgId(), null);
+        order.setWarehouseId(warehouseId);
+        AllocationMode mode = parseAllocationMode(request.allocationMode());
+        ReservationResult result = inventoryCoordinator.reserveSalesOrderLine(
+                orgId(),
+                line.getProductId(),
+                warehouseId,
+                line.getQuantity(),
+                request.batchId(),
+                mode != null ? mode : AllocationMode.BATCH_MANUAL,
+                orderId,
+                lineId);
+        applyReservationToLine(line, warehouseId, result);
+        if (order.getStatus() == SalesOrder.Status.DRAFT) {
+            order.setStatus(SalesOrder.Status.CONFIRMED);
+        }
+        return orders.save(order);
+    }
+
+    private void reserveOrderLines(SalesOrder order, UUID warehouseId, UUID onlyLineId) {
+        for (SalesOrderItem line : order.getItems()) {
+            if (onlyLineId != null && !onlyLineId.equals(line.getId())) {
+                continue;
+            }
+            ReservationResult result = inventoryCoordinator.reserveSalesOrderLine(
+                    orgId(),
+                    line.getProductId(),
+                    warehouseId,
+                    line.getQuantity(),
+                    line.getInventoryBatchId(),
+                    parseAllocationMode(line.getAllocationMode()),
+                    order.getId(),
+                    line.getId());
+            applyReservationToLine(line, warehouseId, result);
+        }
+    }
+
+    private void applyReservationToLine(SalesOrderItem line, UUID warehouseId, ReservationResult result) {
+        if (result.reservationId() == null && result.allocated() == null) {
+            return;
+        }
+        line.setWarehouseId(warehouseId);
+        line.setStockReservationId(result.reservationId());
+        if (result.allocated() != null) {
+            line.setInventoryBatchId(result.allocated().batchId());
+            line.setAllocationMode(result.allocated().allocationMode().name());
+        }
+    }
+
+    private AllocationMode parseAllocationMode(String mode) {
+        if (mode == null || mode.isBlank()) {
+            return null;
+        }
+        try {
+            return AllocationMode.valueOf(mode);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    @Transactional
+    public DeliveryChallan convertOrderToChallan(UUID orderId, ConvertToChallanRequest request) {
         SalesOrder order = getOrder(orderId);
         if (order.getStatus() == SalesOrder.Status.CANCELLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled order cannot be converted");
         }
         gate("SALES_ORDER", order.getId(), order.getGrandTotal(), "convert to delivery challan");
-        challans.findByOrganizationIdAndSalesOrderId(orgId(), orderId).ifPresent(existing -> {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Challan already exists for order");
-        });
         Organization org = organization();
+        UUID warehouseId = inventoryCoordinator.resolveWarehouseId(
+                orgId(), request == null ? null : request.warehouseId());
+        if (order.getWarehouseId() == null) {
+            order.setWarehouseId(warehouseId);
+        } else if (request != null && request.warehouseId() != null) {
+            warehouseId = request.warehouseId();
+        } else {
+            warehouseId = order.getWarehouseId();
+        }
+
+        Map<UUID, BigDecimal> requestedByLine = buildChallanQtyMap(order, request);
         DeliveryChallan challan = new DeliveryChallan();
         challan.setOrganizationId(orgId());
         challan.setCustomerId(order.getCustomerId());
@@ -333,18 +447,64 @@ public class SalesDocumentService {
                 NUMBER_FORMAT,
                 org.getFinancialYearStart(),
                 challan.getChallanDate()));
+
         int i = 0;
         for (SalesOrderItem orderItem : order.getItems()) {
+            BigDecimal qty = requestedByLine.get(orderItem.getId());
+            if (qty == null || qty.signum() <= 0) {
+                continue;
+            }
+            BigDecimal delivered = challans.sumDeliveredQtyForOrderLine(orgId(), orderId, orderItem.getId());
+            BigDecimal remaining = orderItem.getQuantity().subtract(delivered);
+            if (qty.compareTo(remaining) > 0) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Challan quantity exceeds remaining order quantity for line "
+                                + orderItem.getId());
+            }
             DeliveryChallanItem item = new DeliveryChallanItem();
             item.setDeliveryChallan(challan);
+            item.setSalesOrderItemId(orderItem.getId());
             item.setProductId(orderItem.getProductId());
             item.setDescription(resolveLineDescription(orderItem.getProductId(), orderItem.getDescription()));
-            item.setQuantity(orderItem.getQuantity());
+            item.setQuantity(qty);
             item.setUnitId(orderItem.getUnitId());
             item.setLineOrder(i++);
             challan.getItems().add(item);
         }
-        return challans.save(challan);
+        if (challan.getItems().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No challan lines to deliver");
+        }
+
+        DeliveryChallan saved = challans.save(challan);
+        for (DeliveryChallanItem item : saved.getItems()) {
+            SalesOrderItem orderItem = order.getItems().stream()
+                    .filter(line -> line.getId().equals(item.getSalesOrderItemId()))
+                    .findFirst()
+                    .orElseThrow();
+            inventoryCoordinator.transferOrderLineToChallan(
+                    orgId(), orderItem, item, saved.getId(), item.getId(), item.getQuantity());
+        }
+        orders.save(order);
+        return challans.save(saved);
+    }
+
+    private Map<UUID, BigDecimal> buildChallanQtyMap(SalesOrder order, ConvertToChallanRequest request) {
+        Map<UUID, BigDecimal> map = new HashMap<>();
+        if (request != null && request.lines() != null && !request.lines().isEmpty()) {
+            for (ConvertToChallanLineRequest line : request.lines()) {
+                map.put(line.orderLineId(), line.quantity());
+            }
+            return map;
+        }
+        for (SalesOrderItem orderItem : order.getItems()) {
+            BigDecimal delivered = challans.sumDeliveredQtyForOrderLine(orgId(), order.getId(), orderItem.getId());
+            BigDecimal remaining = orderItem.getQuantity().subtract(delivered);
+            if (remaining.signum() > 0) {
+                map.put(orderItem.getId(), remaining);
+            }
+        }
+        return map;
     }
 
     @Transactional
@@ -622,20 +782,29 @@ public class SalesDocumentService {
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private SalesInvoice createInvoiceFromOrder(SalesOrder order, UUID warehouseId, UUID challanId) {
-        var requestItems = order.getItems().stream()
-                .map(orderLine -> new Item(
-                        orderLine.getProductId(),
-                        orderLine.getDescription(),
-                        orderLine.getHsnSacCode(),
-                        orderLine.getQuantity(),
-                        orderLine.getUnitId(),
-                        orderLine.getRate(),
-                        orderLine.getDiscountPercent(),
-                        orderLine.getTaxRate(),
-                        orderLine.getTaxType(),
-                        orderLine.getSplitStrategy(),
-                        orderLine.getCgstSharePercent(),
-                        orderLine.getSgstSharePercent()))
+        DeliveryChallan challan = challanId == null
+                ? null
+                : challans.findDetailedByIdAndOrganizationId(challanId, orgId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Challan not found"));
+        var requestItems = (challan != null ? challan.getItems() : order.getItems()).stream()
+                .map(sourceLine -> {
+                    SalesOrderItem orderLine = resolveOrderLineForInvoice(order, challan, sourceLine);
+                    return new Item(
+                            orderLine.getProductId(),
+                            orderLine.getDescription(),
+                            orderLine.getHsnSacCode(),
+                            sourceLine instanceof DeliveryChallanItem dcLine
+                                    ? dcLine.getQuantity()
+                                    : orderLine.getQuantity(),
+                            orderLine.getUnitId(),
+                            orderLine.getRate(),
+                            orderLine.getDiscountPercent(),
+                            orderLine.getTaxRate(),
+                            orderLine.getTaxType(),
+                            orderLine.getSplitStrategy(),
+                            orderLine.getCgstSharePercent(),
+                            orderLine.getSgstSharePercent());
+                })
                 .toList();
         var request = new Invoice(
                 order.getCustomerId(),
@@ -656,9 +825,32 @@ public class SalesDocumentService {
                 null,
                 requestItems);
         InvoiceDetail draft = invoiceService.createDraft(request);
+        invoiceService.applyAllocationSnapshots(
+                draft.id(),
+                challan != null ? challan.getItems() : null,
+                order.getItems());
         invoiceService.confirmConverted(draft.id());
         return invoices.findDetailedByIdAndOrganizationId(draft.id(), orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
+    }
+
+    private SalesOrderItem resolveOrderLineForInvoice(
+            SalesOrder order, DeliveryChallan challan, Object sourceLine) {
+        if (sourceLine instanceof DeliveryChallanItem dcLine) {
+            if (dcLine.getSalesOrderItemId() != null) {
+                return order.getItems().stream()
+                        .filter(item -> item.getId().equals(dcLine.getSalesOrderItemId()))
+                        .findFirst()
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.CONFLICT, "Sales order line missing for challan item"));
+            }
+            return order.getItems().stream()
+                    .filter(item -> item.getProductId().equals(dcLine.getProductId()))
+                    .findFirst()
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.CONFLICT, "Sales order line missing for challan item"));
+        }
+        return (SalesOrderItem) sourceLine;
     }
 
     private void applyQuotation(Quotation quotation, QuotationRequest request, Organization org) {

@@ -3,7 +3,6 @@ package com.flowledger.inventory.allocation;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
-import com.flowledger.inventory.repository.InventoryTransactionRepository;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -15,7 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class WarehousePoolAllocatorTest {
     @Mock
-    InventoryTransactionRepository transactions;
+    ReservationAvailabilityService availability;
 
     @InjectMocks
     WarehousePoolAllocator allocator;
@@ -25,7 +24,7 @@ class WarehousePoolAllocatorTest {
         UUID org = UUID.randomUUID();
         UUID product = UUID.randomUUID();
         UUID warehouse = UUID.randomUUID();
-        when(transactions.stockBalance(org, product, warehouse)).thenReturn(new BigDecimal("10"));
+        when(availability.warehouseAvailable(org, product, warehouse, null)).thenReturn(new BigDecimal("10"));
 
         AllocationResult result = allocator.allocate(
                 new AllocationRequest(org, product, warehouse, new BigDecimal("3"), null));
@@ -39,7 +38,20 @@ class WarehousePoolAllocatorTest {
         UUID org = UUID.randomUUID();
         UUID product = UUID.randomUUID();
         UUID warehouse = UUID.randomUUID();
-        when(transactions.stockBalance(org, product, warehouse)).thenReturn(new BigDecimal("1"));
+        when(availability.warehouseAvailable(org, product, warehouse, null)).thenReturn(new BigDecimal("1"));
+
+        AllocationResult result = allocator.allocate(
+                new AllocationRequest(org, product, warehouse, new BigDecimal("3"), null));
+
+        assertEquals(AllocationStatus.OUT_OF_STOCK, result.status());
+    }
+
+    @Test
+    void subtractsReservedFromAvailable() {
+        UUID org = UUID.randomUUID();
+        UUID product = UUID.randomUUID();
+        UUID warehouse = UUID.randomUUID();
+        when(availability.warehouseAvailable(org, product, warehouse, null)).thenReturn(new BigDecimal("2"));
 
         AllocationResult result = allocator.allocate(
                 new AllocationRequest(org, product, warehouse, new BigDecimal("3"), null));

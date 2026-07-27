@@ -50,11 +50,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 try {
                     UUID userId = jwt.userId(token);
                     UUID organizationId = jwt.organizationId(token);
-                    UserPrincipal principal = users.load(userId, organizationId);
+                    UUID branchId = jwt.branchId(token);
+                    UUID storeId = jwt.storeId(token);
+                    UUID warehouseId = jwt.warehouseId(token);
+                    UserPrincipal principal = users.load(userId, organizationId, branchId, storeId, warehouseId);
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                     TenantContext.set(principal.getOrgId(), principal.getId());
+                    TenantContext.setLocation(branchId, storeId, warehouseId);
                 } catch (Exception ex) {
                     log.debug("JWT principal load failed: {}", ex.getMessage());
                     writeUnauthorized(response, "Access token expired or invalid");

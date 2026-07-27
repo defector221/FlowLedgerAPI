@@ -4,6 +4,7 @@ import com.flowledger.common.entity.AuditedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,4 +30,13 @@ public class RetailProductBarcode extends AuditedEntity {
 
     @Column(name = "is_primary", nullable = false)
     private boolean primary;
+
+    @Column(nullable = false, length = 20)
+    private String status = "ACTIVE";
+
+    @Column(name = "is_generated", nullable = false)
+    private boolean generated;
+
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
 }

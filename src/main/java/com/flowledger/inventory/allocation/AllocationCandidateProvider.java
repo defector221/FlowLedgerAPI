@@ -2,6 +2,7 @@ package com.flowledger.inventory.allocation;
 
 import com.flowledger.inventory.entity.InventoryBatch;
 import com.flowledger.inventory.repository.InventoryBatchRepository;
+import com.flowledger.inventory.repository.StockReservationRepository;
 import com.flowledger.warehouse.entity.Warehouse;
 import com.flowledger.warehouse.repository.WarehouseRepository;
 import java.math.BigDecimal;
@@ -17,13 +18,19 @@ import org.springframework.stereotype.Component;
 public class AllocationCandidateProvider {
     private final InventoryBatchRepository batches;
     private final WarehouseRepository warehouses;
+    private final StockReservationRepository reservations;
 
-    public AllocationCandidateProvider(InventoryBatchRepository batches, WarehouseRepository warehouses) {
+    public AllocationCandidateProvider(
+            InventoryBatchRepository batches,
+            WarehouseRepository warehouses,
+            StockReservationRepository reservations) {
         this.batches = batches;
         this.warehouses = warehouses;
+        this.reservations = reservations;
     }
 
-    public List<AllocationCandidate> eligibleBatches(UUID orgId, UUID productId, UUID warehouseId, BigDecimal qty) {
+    public List<AllocationCandidate> eligibleBatches(
+            UUID orgId, UUID productId, UUID warehouseId, BigDecimal qty, UUID excludeReservationId) {
         LocalDate today = LocalDate.now();
         List<InventoryBatch> rows =
                 batches.findByOrganizationIdAndProductIdAndWarehouseIdAndQualityStatusOrderByReceivedDateAscExpiryDateAsc(
@@ -36,7 +43,9 @@ public class AllocationCandidateProvider {
             if (batch.getExpiryDate() != null && batch.getExpiryDate().isBefore(today)) {
                 continue;
             }
-            BigDecimal available = n(batch.getQuantity());
+            BigDecimal reserved =
+                    reservations.activeReservedQtyByBatch(orgId, batch.getId(), excludeReservationId);
+            BigDecimal available = n(batch.getQuantity()).subtract(reserved).max(BigDecimal.ZERO);
             if (available.compareTo(qty) < 0) {
                 continue;
             }
@@ -50,27 +59,33 @@ public class AllocationCandidateProvider {
                     batch.getReceivedDate(),
                     batch.getLotNumber(),
                     batch.getQualityStatus(),
-                    BigDecimal.ZERO));
+                    reserved));
         }
         return eligible;
     }
 
-    public AllocationCandidate toCandidate(InventoryBatch batch) {
+    public AllocationCandidate toCandidate(InventoryBatch batch, UUID orgId, UUID excludeReservationId) {
         String warehouseName = warehouses
                 .findByIdAndOrganizationId(batch.getWarehouseId(), batch.getOrganizationId())
                 .map(Warehouse::getWarehouseName)
                 .orElse(null);
+        BigDecimal reserved = reservations.activeReservedQtyByBatch(orgId, batch.getId(), excludeReservationId);
+        BigDecimal available = n(batch.getQuantity()).subtract(reserved).max(BigDecimal.ZERO);
         return new AllocationCandidate(
                 batch.getId(),
                 batch.getWarehouseId(),
                 warehouseName,
                 batch.getBatchNumber(),
-                n(batch.getQuantity()),
+                available,
                 batch.getExpiryDate(),
                 batch.getReceivedDate(),
                 batch.getLotNumber(),
                 batch.getQualityStatus(),
-                BigDecimal.ZERO);
+                reserved);
+    }
+
+    public AllocationCandidate toCandidate(InventoryBatch batch) {
+        return toCandidate(batch, batch.getOrganizationId(), null);
     }
 
     private static BigDecimal n(BigDecimal v) {

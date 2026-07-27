@@ -10,6 +10,9 @@ import com.flowledger.common.util.PaymentTermsDates;
 import com.flowledger.customer.repository.CustomerRepository;
 import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
 import com.flowledger.finance.voucher.adapter.SalesVoucherBuilder;
+import com.flowledger.inventory.allocation.InventoryDeductionCoordinator;
+import com.flowledger.location.service.LocationStampingSupport;
+import com.flowledger.location.service.LocationScopeService;
 import com.flowledger.inventory.dto.InventoryDtos.PostTransaction;
 import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.service.InventoryService;
@@ -60,6 +63,9 @@ public class SalesInvoiceService {
     private final DocumentVoucherFacade documentPosting;
     private final SubscriptionService subscriptions;
     private final ObjectProvider<AiWorkflowGateService> workflowGate;
+    private final InventoryDeductionCoordinator inventoryCoordinator;
+    private final LocationStampingSupport locationStamping;
+    private final LocationScopeService locationScope;
 
     public SalesInvoiceService(
             SalesInvoiceRepository salesInvoiceRepository,
@@ -75,7 +81,10 @@ public class SalesInvoiceService {
             SearchIndexEventPublisher searchEvents,
             DocumentVoucherFacade documentPosting,
             SubscriptionService subscriptions,
-            ObjectProvider<AiWorkflowGateService> workflowGate) {
+            ObjectProvider<AiWorkflowGateService> workflowGate,
+            InventoryDeductionCoordinator inventoryCoordinator,
+            LocationStampingSupport locationStamping,
+            LocationScopeService locationScope) {
         repo = salesInvoiceRepository;
         inventory = inventoryService;
         this.products = products;
@@ -90,6 +99,39 @@ public class SalesInvoiceService {
         this.documentPosting = documentPosting;
         this.subscriptions = subscriptions;
         this.workflowGate = workflowGate;
+        this.inventoryCoordinator = inventoryCoordinator;
+        this.locationStamping = locationStamping;
+        this.locationScope = locationScope;
+    }
+
+    @Transactional
+    public void applyAllocationSnapshots(
+            UUID invoiceId, List<DeliveryChallanItem> challanItems, List<SalesOrderItem> orderItems) {
+        SalesInvoice invoice = load(invoiceId);
+        List<SalesInvoiceItem> invoiceItems = invoice.getItems();
+        for (int i = 0; i < invoiceItems.size(); i++) {
+            SalesInvoiceItem invoiceItem = invoiceItems.get(i);
+            if (challanItems != null && i < challanItems.size()) {
+                DeliveryChallanItem source = challanItems.get(i);
+                invoiceItem.setInventoryBatchId(source.getInventoryBatchId());
+                invoiceItem.setWarehouseId(source.getWarehouseId());
+                invoiceItem.setAllocationMode(source.getAllocationMode());
+                invoiceItem.setStockReservationId(source.getStockReservationId());
+                continue;
+            }
+            SalesOrderItem source = orderItems.stream()
+                    .filter(line -> line.getProductId().equals(invoiceItem.getProductId()))
+                    .findFirst()
+                    .orElse(null);
+            if (source == null) {
+                continue;
+            }
+            invoiceItem.setInventoryBatchId(source.getInventoryBatchId());
+            invoiceItem.setWarehouseId(source.getWarehouseId());
+            invoiceItem.setAllocationMode(source.getAllocationMode());
+            invoiceItem.setStockReservationId(source.getStockReservationId());
+        }
+        repo.save(invoice);
     }
 
     @Transactional
@@ -101,9 +143,12 @@ public class SalesInvoiceService {
         invoice.setOrganizationId(organization.getId());
         apply(invoice, d);
         ensureWarehouseForStockedItems(invoice);
+        locationStamping.stampSalesInvoice(invoice, invoice.getWarehouseId(), invoice.getStoreId());
         if (invoice.getInvoiceNumber() == null || invoice.getInvoiceNumber().isBlank()) {
             invoice.setInvoiceNumber(numbers.next(
                     organization.getId(),
+                    invoice.getBranchId(),
+                    invoice.getStoreId(),
                     "SALES_INVOICE",
                     organization.getInvoicePrefix(),
                     organization.getInvoiceNumberFormat(),
@@ -178,6 +223,8 @@ public class SalesInvoiceService {
         if (invoice.getInvoiceNumber() == null || invoice.getInvoiceNumber().isBlank())
             invoice.setInvoiceNumber(numbers.next(
                     organization.getId(),
+                    invoice.getBranchId(),
+                    invoice.getStoreId(),
                     "SALES_INVOICE",
                     organization.getInvoicePrefix(),
                     organization.getInvoiceNumberFormat(),
@@ -189,49 +236,40 @@ public class SalesInvoiceService {
         }
         recalculate(invoice, organization);
         if (!invoice.isInventoryPosted() && !skipInventoryPosting) {
-            List<SalesInvoiceItem> stockableLines = stockableLines(invoice.getItems());
-            if (!stockableLines.isEmpty()) {
+            List<SalesInvoiceItem> stocked = stockableLines(invoice.getItems());
+            if (!stocked.isEmpty()) {
                 ensureWarehouseForStockedItems(invoice);
-                if (invoice.getWarehouseId() == null)
+                if (invoice.getWarehouseId() == null) {
                     throw new ResponseStatusException(
                             HttpStatus.BAD_REQUEST, "Warehouse is required when confirming stocked products");
-                for (var line : stockableLines) {
-                    BigDecimal available = inventory
-                            .getStock(line.getProductId(), invoice.getWarehouseId())
-                            .available();
-                    if (!organization.isAllowNegativeStock() && available.compareTo(line.getQuantity()) < 0) {
-                        String productLabel = products.findById(line.getProductId())
-                                .map(Product::getName)
-                                .filter(name -> name != null && !name.isBlank())
-                                .orElse(line.getProductId().toString());
-                        throw new ResponseStatusException(
-                                HttpStatus.CONFLICT,
-                                "Insufficient stock for \""
-                                        + productLabel
-                                        + "\". Available: "
-                                        + available.stripTrailingZeros().toPlainString()
-                                        + ", required: "
-                                        + line.getQuantity()
-                                                .stripTrailingZeros()
-                                                .toPlainString());
-                    }
-                    inventory.postTransaction(new PostTransaction(
-                            Type.SALE,
-                            line.getProductId(),
-                            invoice.getWarehouseId(),
-                            BigDecimal.ZERO,
-                            line.getQuantity(),
-                            "SALES_INVOICE",
-                            invoice.getId(),
-                            invoice.getInvoiceNumber(),
-                            "invoice:" + invoice.getId() + ":" + line.getId(),
-                            null,
-                            null,
-                            null,
-                            null,
-                            invoice.getNotes(),
-                            invoice.getInvoiceDate()));
                 }
+                if (!organization.isAllowNegativeStock()) {
+                    for (var line : stocked) {
+                        UUID warehouseId = line.getWarehouseId() != null
+                                ? line.getWarehouseId()
+                                : invoice.getWarehouseId();
+                        BigDecimal available = inventory
+                                .getStock(line.getProductId(), warehouseId)
+                                .available();
+                        if (available.compareTo(line.getQuantity()) < 0) {
+                            String productLabel = products.findById(line.getProductId())
+                                    .map(Product::getName)
+                                    .filter(name -> name != null && !name.isBlank())
+                                    .orElse(line.getProductId().toString());
+                            throw new ResponseStatusException(
+                                    HttpStatus.CONFLICT,
+                                    "Insufficient stock for \""
+                                            + productLabel
+                                            + "\". Available: "
+                                            + available.stripTrailingZeros().toPlainString()
+                                            + ", required: "
+                                            + line.getQuantity()
+                                                    .stripTrailingZeros()
+                                                    .toPlainString());
+                        }
+                    }
+                }
+                inventoryCoordinator.deductOnInvoiceConfirm(invoice, organization, stocked);
             }
             invoice.setInventoryPosted(true);
         }
@@ -310,6 +348,16 @@ public class SalesInvoiceService {
             if (customerId != null) {
                 predicates.add(cb.equal(root.get("customerId"), customerId));
             }
+            if (!locationScope.isOrgWideAdmin()) {
+                var branchIds = locationScope.accessibleBranchIds();
+                if (!branchIds.isEmpty()) {
+                    predicates.add(root.get("branchId").in(branchIds));
+                }
+                var storeIds = locationScope.accessibleStoreIds();
+                if (!storeIds.isEmpty()) {
+                    predicates.add(cb.or(root.get("storeId").isNull(), root.get("storeId").in(storeIds)));
+                }
+            }
             return cb.and(predicates.toArray(Predicate[]::new));
         };
         return PageResponse.from(repo.findAll(spec, pageable));
@@ -338,6 +386,7 @@ public class SalesInvoiceService {
         invoice.setNotes(d.notes());
         invoice.setTermsAndConditions(d.termsAndConditions());
         invoice.setTemplateId(d.templateId());
+        locationStamping.stampSalesInvoice(invoice, d.warehouseId(), null);
         invoice.getItems().clear();
         int n = 0;
         for (Item dline : d.items()) {

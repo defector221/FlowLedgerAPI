@@ -35,6 +35,12 @@ public class InventoryTransaction extends AuditedEntity {
     @Column(name = "warehouse_id", nullable = false)
     private UUID warehouseId;
 
+    @Column(name = "branch_id")
+    private UUID branchId;
+
+    @Column(name = "store_id")
+    private UUID storeId;
+
     @Column(name = "transaction_date", nullable = false)
     private LocalDate transactionDate;
 

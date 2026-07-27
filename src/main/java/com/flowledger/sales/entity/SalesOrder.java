@@ -48,6 +48,9 @@ public class SalesOrder extends AuditedEntity {
     @Version
     private Long version;
 
+    @Column(name = "warehouse_id")
+    private UUID warehouseId;
+
     @OneToMany(mappedBy = "salesOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("lineOrder")
     private List<SalesOrderItem> items = new ArrayList<>();

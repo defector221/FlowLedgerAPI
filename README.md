@@ -200,9 +200,12 @@ flowchart LR
 ### 5. Inventory model
 
 - **Append-only** `inventory_transactions` with idempotency keys.
-- Stock is derived from movements; draft invoices may **reserve** quantity without reducing on-hand until confirm.
+- Stock is derived from movements; **batch-aware reservations** (Phase 2A) hold qty without ledger deduct until consume.
 - Events: `OPENING_STOCK`, `PURCHASE`, `SALE`, `ADJUSTMENT`, `TRANSFER`.
-- **Allocation engine (Phase 1 — POS):** org-configurable batch strategies (FIFO, FEFO, LIFO, etc.) for batch-tracked products; warehouse pool for non-batch. Integrated with POS scan + checkout re-validation. See [docs/inventory-allocation.md](docs/inventory-allocation.md).
+- **Allocation engine:**
+  - **Phase 1 (POS):** org-configurable batch strategies (FIFO, FEFO, LIFO, etc.) for batch-tracked products; warehouse pool for non-batch. See [docs/inventory-allocation.md](docs/inventory-allocation.md).
+  - **Phase 2A + 2B (sales chain):** reservations on SO confirm, split on partial delivery challan, consume + batch deduct on invoice confirm. See [docs/inventory-allocation-phase2.md](docs/inventory-allocation-phase2.md).
+  - **Database schema (ERD):** [docs/inventory-allocation-schema.md](docs/inventory-allocation-schema.md).
 
 ### 6. Document numbering
 
@@ -239,6 +242,11 @@ JPA: `ddl-auto: validate` (schema owned by Flyway)
 | V26 | YRV COA demo enrichment |
 | V27–V31 | Later incremental features (see migration files) |
 | V32 | Subscription billing extension (org subscriptions, payment transactions, webhooks) |
+| V53 | Inventory costing + `stock_reservations` base |
+| V55–V57 | Allocation strategy, batch fields, POS line allocation (Phase 1) |
+| V58–V61 | Batch-aware reservations, SO / DC / invoice allocation (Phase 2A + 2B) |
+
+See [docs/inventory-allocation-schema.md](docs/inventory-allocation-schema.md) for the allocation ERD.
 
 ### Flyway policy
 
@@ -399,7 +407,10 @@ mvn test
 
 Unit tests under `src/test/java/com/flowledger/` — Mockito-based; focus on accounting, GST, search, PDF, utilities, and AI (chat, recommendations, event bridge).
 
-Docs: `docs/ai/` (ROADMAP, ARCHITECTURE, SEQUENCE, OPENAPI, FLOWS).
+Docs: `docs/ai/` (ROADMAP, ARCHITECTURE, SEQUENCE, OPENAPI, FLOWS).  
+Inventory allocation: [inventory-allocation.md](docs/inventory-allocation.md), [inventory-allocation-phase2.md](docs/inventory-allocation-phase2.md), [inventory-allocation-schema.md](docs/inventory-allocation-schema.md) (ERD).
+
+Barcode & product identification: [barcode-module.md](docs/barcode-module.md), [barcode-scanner.md](docs/barcode-scanner.md).
 
 ---
 

@@ -19,6 +19,9 @@ public class DocumentSequence {
     @Column(name = "branch_id")
     private UUID branchId;
 
+    @Column(name = "store_id")
+    private UUID storeId;
+
     private String documentType;
     private String financialYear;
     private String prefix;

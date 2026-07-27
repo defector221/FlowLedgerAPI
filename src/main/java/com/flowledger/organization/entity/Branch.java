@@ -39,4 +39,16 @@ public class Branch extends AuditedEntity {
 
     @Column(name = "is_default", nullable = false)
     private boolean defaultBranch = false;
+
+    @Column(name = "gst_number", length = 20)
+    private String gstNumber;
+
+    @Column(length = 20)
+    private String pan;
+
+    private String phone;
+    private String email;
+
+    @Column(name = "is_head_office", nullable = false)
+    private boolean headOffice = false;
 }

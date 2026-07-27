@@ -9,4 +9,10 @@ public record AllocationRequest(
         UUID productId,
         UUID warehouseId,
         BigDecimal quantity,
-        UUID preferredBatchId) {}
+        UUID preferredBatchId,
+        UUID excludeReservationId) {
+
+    public AllocationRequest(UUID organizationId, UUID productId, UUID warehouseId, BigDecimal quantity, UUID preferredBatchId) {
+        this(organizationId, productId, warehouseId, quantity, preferredBatchId, null);
+    }
+}

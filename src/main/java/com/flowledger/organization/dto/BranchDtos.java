@@ -14,8 +14,13 @@ public final class BranchDtos {
             String state,
             String postalCode,
             String country,
+            String gstNumber,
+            String pan,
+            String phone,
+            String email,
             Boolean active,
-            Boolean defaultBranch) {}
+            Boolean defaultBranch,
+            Boolean headOffice) {}
 
     public record BranchResponse(
             UUID id,
@@ -26,6 +31,11 @@ public final class BranchDtos {
             String state,
             String postalCode,
             String country,
+            String gstNumber,
+            String pan,
+            String phone,
+            String email,
             boolean active,
-            boolean defaultBranch) {}
+            boolean defaultBranch,
+            boolean headOffice) {}
 }

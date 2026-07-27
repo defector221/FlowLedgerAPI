@@ -22,6 +22,9 @@ public class PosSale extends RetailAuditedEntity {
     @Column(name = "store_id", nullable = false)
     private UUID storeId;
 
+    @Column(name = "branch_id")
+    private UUID branchId;
+
     @Column(name = "counter_id")
     private UUID counterId;
 

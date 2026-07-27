@@ -1,6 +1,9 @@
 package com.flowledger.sales.controller;
 
 import com.flowledger.common.dto.PageResponse;
+import com.flowledger.sales.dto.SalesAllocationDtos.ConfirmLineAllocationRequest;
+import com.flowledger.sales.dto.SalesAllocationDtos.ConfirmOrderRequest;
+import com.flowledger.sales.dto.SalesAllocationDtos.ConvertToChallanRequest;
 import com.flowledger.sales.dto.SalesDtos.*;
 import com.flowledger.sales.entity.*;
 import com.flowledger.sales.service.SalesDocumentService;
@@ -78,14 +81,29 @@ public class SalesDocumentController {
         return service.updateOrder(id, request);
     }
 
+    @PostMapping("/orders/{id}/confirm")
+    public SalesOrder confirmOrder(
+            @PathVariable UUID id, @RequestBody(required = false) ConfirmOrderRequest request) {
+        return service.confirmOrder(id, request);
+    }
+
+    @PostMapping("/orders/{id}/lines/{lineId}/allocate/confirm")
+    public SalesOrder confirmOrderLineAllocation(
+            @PathVariable UUID id,
+            @PathVariable UUID lineId,
+            @Valid @RequestBody ConfirmLineAllocationRequest request) {
+        return service.confirmOrderLineAllocation(id, lineId, request);
+    }
+
     @PostMapping("/orders/{id}/cancel")
     public SalesOrder cancelOrder(@PathVariable UUID id) {
         return service.cancelOrder(id);
     }
 
     @PostMapping("/orders/{id}/convert-to-challan")
-    public DeliveryChallan convertToChallan(@PathVariable UUID id, @RequestBody Map<String, UUID> body) {
-        return service.convertOrderToChallan(id, body.get("warehouseId"));
+    public DeliveryChallan convertToChallan(
+            @PathVariable UUID id, @RequestBody(required = false) ConvertToChallanRequest request) {
+        return service.convertOrderToChallan(id, request);
     }
 
     @PostMapping("/orders/{id}/convert-to-invoice")

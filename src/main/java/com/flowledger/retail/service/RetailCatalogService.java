@@ -2,6 +2,7 @@ package com.flowledger.retail.service;
 
 import static com.flowledger.retail.dto.RetailDtos.*;
 
+import com.flowledger.barcode.service.BarcodeResolveService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.product.entity.Product;
 import com.flowledger.product.repository.ProductRepository;
@@ -34,6 +35,7 @@ public class RetailCatalogService {
     private final RetailProductVariantRepository variants;
     private final RetailProductBarcodeRepository barcodes;
     private final ProductRepository products;
+    private final BarcodeResolveService barcodeResolve;
 
     public RetailCatalogService(
             RetailModuleGuard guard,
@@ -42,7 +44,8 @@ public class RetailCatalogService {
             RetailCollectionRepository collections,
             RetailProductVariantRepository variants,
             RetailProductBarcodeRepository barcodes,
-            ProductRepository products) {
+            ProductRepository products,
+            BarcodeResolveService barcodeResolve) {
         this.guard = guard;
         this.brands = brands;
         this.departments = departments;
@@ -50,6 +53,7 @@ public class RetailCatalogService {
         this.variants = variants;
         this.barcodes = barcodes;
         this.products = products;
+        this.barcodeResolve = barcodeResolve;
     }
 
     // ------------------------------------------------------------------ Brands
@@ -239,13 +243,13 @@ public class RetailCatalogService {
     // ---------------------------------------------------------------- Barcodes
     @Transactional(readOnly = true)
     public List<BarcodeResponse> listBarcodes(UUID productId) {
-        return barcodes.findByOrganizationIdAndProductId(org(), productId).stream()
+        return barcodes.findByOrganizationIdAndProductIdAndDeletedAtIsNullOrderByPrimaryDescCreatedAtAsc(org(), productId).stream()
                 .map(this::map)
                 .toList();
     }
 
     public BarcodeResponse createBarcode(BarcodeRequest r) {
-        barcodes.findByOrganizationIdAndBarcode(org(), r.barcode()).ifPresent(b -> conflict("Barcode already exists"));
+        barcodes.findActiveByOrganizationIdAndBarcode(org(), r.barcode()).ifPresent(b -> conflict("Barcode already exists"));
         RetailProductBarcode e = new RetailProductBarcode();
         e.setOrganizationId(org());
         e.setProductId(r.productId());
@@ -272,86 +276,8 @@ public class RetailCatalogService {
     // ------------------------------------------------------------ Barcode lookup
     @Transactional(readOnly = true)
     public ProductLookupResponse lookupByBarcode(String barcode) {
-        UUID org = org();
-
-        // 1. Explicit retail barcode mapping.
-        Optional<RetailProductBarcode> mapping = barcodes.findByOrganizationIdAndBarcode(org, barcode);
-        if (mapping.isPresent()) {
-            RetailProductBarcode m = mapping.get();
-            if (m.getVariantId() != null) {
-                Optional<RetailProductVariant> v =
-                        variants.findByIdAndOrganizationIdAndDeletedFalse(m.getVariantId(), org);
-                if (v.isPresent()) {
-                    return fromVariant(v.get(), barcode);
-                }
-            }
-            if (m.getProductId() != null) {
-                return products.findByIdAndOrganizationId(m.getProductId(), org)
-                        .map(p -> fromProduct(p, barcode))
-                        .orElseThrow(() -> notFound("Product not found for barcode"));
-            }
-        }
-
-        // 2. Variant-level barcode.
-        Optional<RetailProductVariant> variant =
-                variants.findFirstByOrganizationIdAndBarcodeAndDeletedFalse(org, barcode);
-        if (variant.isPresent()) {
-            return fromVariant(variant.get(), barcode);
-        }
-
-        // 3. Core product barcode.
-        Optional<Product> byBarcode = products.findFirstByOrganizationIdAndBarcode(org, barcode);
-        if (byBarcode.isPresent()) {
-            return fromProduct(byBarcode.get(), barcode);
-        }
-
-        // 4. Name / SKU fallback for typed POS search.
-        String needle = barcode.trim().toLowerCase(Locale.ROOT);
-        List<Product> active = products.findByOrganizationIdAndActiveTrue(org);
-        Optional<Product> exact = active.stream()
-                .filter(p -> (p.getName() != null && p.getName().equalsIgnoreCase(barcode.trim()))
-                        || (p.getSku() != null && p.getSku().equalsIgnoreCase(barcode.trim())))
-                .findFirst();
-        if (exact.isPresent()) {
-            Product p = exact.get();
-            return fromProduct(p, p.getBarcode() != null ? p.getBarcode() : barcode);
-        }
-        Optional<Product> partial = active.stream()
-                .filter(p -> (p.getName() != null
-                                && p.getName().toLowerCase(Locale.ROOT).contains(needle))
-                        || (p.getSku() != null
-                                && p.getSku().toLowerCase(Locale.ROOT).contains(needle)))
-                .findFirst();
-        return partial.map(p -> fromProduct(p, p.getBarcode() != null ? p.getBarcode() : barcode))
-                .orElseThrow(() -> notFound("No product found for \"" + barcode + "\""));
-    }
-
-    private ProductLookupResponse fromProduct(Product p, String barcode) {
-        return new ProductLookupResponse(
-                p.getId(),
-                null,
-                p.getName(),
-                barcode,
-                p.getSellingPrice(),
-                p.getMrp(),
-                p.getHsnSacCode(),
-                p.getUnitId(),
-                p.getTaxRateId());
-    }
-
-    private ProductLookupResponse fromVariant(RetailProductVariant v, String barcode) {
-        Product parent = products.findByIdAndOrganizationId(v.getParentProductId(), org())
-                .orElse(null);
-        return new ProductLookupResponse(
-                v.getParentProductId(),
-                v.getId(),
-                parent == null ? null : parent.getName(),
-                barcode,
-                v.getSellingPrice() != null ? v.getSellingPrice() : (parent == null ? null : parent.getSellingPrice()),
-                v.getMrp() != null ? v.getMrp() : (parent == null ? null : parent.getMrp()),
-                parent == null ? null : parent.getHsnSacCode(),
-                parent == null ? null : parent.getUnitId(),
-                parent == null ? null : parent.getTaxRateId());
+        org();
+        return barcodeResolve.lookupByBarcode(barcode);
     }
 
     // ----------------------------------------------------------------- Helpers

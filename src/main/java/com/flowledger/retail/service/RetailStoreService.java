@@ -3,11 +3,15 @@ package com.flowledger.retail.service;
 import static com.flowledger.retail.dto.RetailDtos.*;
 
 import com.flowledger.common.tenant.TenantContext;
+import com.flowledger.location.service.LocationHierarchyService;
+import com.flowledger.location.service.LocationScopeService;
+import com.flowledger.organization.repository.BranchRepository;
 import com.flowledger.retail.entity.RetailCashCounter;
 import com.flowledger.retail.entity.RetailCashier;
 import com.flowledger.retail.entity.RetailStore;
 import com.flowledger.retail.entity.RetailStoreType;
 import com.flowledger.retail.entity.RetailTerminal;
+import com.flowledger.retail.domain.StoreType;
 import com.flowledger.retail.repository.RetailCashCounterRepository;
 import com.flowledger.retail.repository.RetailCashierRepository;
 import com.flowledger.retail.repository.RetailStoreRepository;
@@ -30,6 +34,9 @@ public class RetailStoreService {
     private final RetailCashCounterRepository counters;
     private final RetailTerminalRepository terminals;
     private final RetailCashierRepository cashiers;
+    private final BranchRepository branches;
+    private final LocationHierarchyService hierarchy;
+    private final LocationScopeService scope;
 
     public RetailStoreService(
             RetailModuleGuard guard,
@@ -37,13 +44,19 @@ public class RetailStoreService {
             RetailStoreRepository stores,
             RetailCashCounterRepository counters,
             RetailTerminalRepository terminals,
-            RetailCashierRepository cashiers) {
+            RetailCashierRepository cashiers,
+            BranchRepository branches,
+            LocationHierarchyService hierarchy,
+            LocationScopeService scope) {
         this.guard = guard;
         this.storeTypes = storeTypes;
         this.stores = stores;
         this.counters = counters;
         this.terminals = terminals;
         this.cashiers = cashiers;
+        this.branches = branches;
+        this.hierarchy = hierarchy;
+        this.scope = scope;
     }
 
     // ------------------------------------------------------------- Store types
@@ -87,9 +100,21 @@ public class RetailStoreService {
     // ------------------------------------------------------------------ Stores
     @Transactional(readOnly = true)
     public List<StoreResponse> listStores() {
-        return stores.findByOrganizationIdAndDeletedFalseOrderByNameAsc(org()).stream()
-                .map(this::map)
-                .toList();
+        return listStores(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<StoreResponse> listStores(UUID branchId) {
+        List<RetailStore> rows = branchId != null
+                ? stores.findByOrganizationIdAndBranchIdAndDeletedFalseOrderByNameAsc(org(), branchId)
+                : stores.findByOrganizationIdAndDeletedFalseOrderByNameAsc(org());
+        if (!scope.isOrgWideAdmin()) {
+            var allowed = scope.accessibleStoreIds();
+            if (!allowed.isEmpty()) {
+                rows = rows.stream().filter(s -> allowed.contains(s.getId())).toList();
+            }
+        }
+        return rows.stream().map(this::map).toList();
     }
 
     @Transactional(readOnly = true)
@@ -102,6 +127,7 @@ public class RetailStoreService {
         if (stores.existsByOrganizationIdAndCodeIgnoreCaseAndDeletedFalse(org(), code)) {
             conflict("Store code already exists");
         }
+        validateBranch(r.branchId());
         RetailStore e = new RetailStore();
         e.setOrganizationId(org());
         e.setCode(code);
@@ -126,13 +152,37 @@ public class RetailStoreService {
 
     private void applyStore(RetailStore e, StoreRequest r) {
         e.setName(r.name());
+        e.setBranchId(r.branchId() != null ? r.branchId() : hierarchy.defaultBranchId());
         e.setStoreTypeId(r.storeTypeId());
+        if (r.storeType() != null) {
+            e.setStoreType(r.storeType());
+        }
         e.setWarehouseId(r.warehouseId());
+        e.setManagerId(r.managerId());
         e.setAddress(r.address());
         e.setCity(r.city());
         e.setState(r.state());
+        e.setPostalCode(r.postalCode());
+        e.setCountry(r.country() == null || r.country().isBlank() ? "IN" : r.country());
         e.setPhone(r.phone());
+        e.setEmail(r.email());
+        e.setDefaultCurrency(r.defaultCurrency());
+        e.setTimezone(r.timezone());
+        if (r.allowNegativeStock() != null) e.setAllowNegativeStock(r.allowNegativeStock());
+        if (r.allowOfflinePos() != null) e.setAllowOfflinePos(r.allowOfflinePos());
+        if (r.enableClickAndCollect() != null) e.setEnableClickAndCollect(r.enableClickAndCollect());
+        if (r.enableLoyalty() != null) e.setEnableLoyalty(r.enableLoyalty());
+        if (r.enableGiftCard() != null) e.setEnableGiftCard(r.enableGiftCard());
         e.setStatus(r.status() == null ? "ACTIVE" : r.status());
+    }
+
+    private void validateBranch(UUID branchId) {
+        UUID effective = branchId != null ? branchId : hierarchy.defaultBranchId();
+        if (effective == null) {
+            conflict("Branch is required");
+        }
+        branches.findByIdAndOrganizationId(effective, org())
+                .orElseThrow(() -> notFound("Branch not found"));
     }
 
     private RetailStore loadStore(UUID id) {
@@ -189,6 +239,24 @@ public class RetailStoreService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<TerminalResponse> listAllTerminals(UUID storeId) {
+        if (storeId != null) {
+            return listTerminals(storeId);
+        }
+        return stores.findByOrganizationIdAndDeletedFalseOrderByNameAsc(org()).stream()
+                .flatMap(s -> listTerminals(s.getId()).stream())
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TerminalResponse getTerminal(UUID id) {
+        RetailTerminal e = terminals
+                .findByIdAndOrganizationIdAndDeletedFalse(id, org())
+                .orElseThrow(() -> notFound("Terminal not found"));
+        return map(e);
+    }
+
     public TerminalResponse createTerminal(TerminalRequest r) {
         String code = code(r.code());
         if (terminals.existsByOrganizationIdAndStoreIdAndCodeIgnoreCaseAndDeletedFalse(org(), r.storeId(), code)) {
@@ -200,6 +268,7 @@ public class RetailStoreService {
         e.setCounterId(r.counterId());
         e.setCode(code);
         e.setName(r.name());
+        e.setDeviceId(r.deviceId());
         e.setStatus(r.status() == null ? "ACTIVE" : r.status());
         audit(e, true);
         return map(terminals.save(e));
@@ -211,6 +280,9 @@ public class RetailStoreService {
                 .orElseThrow(() -> notFound("Terminal not found"));
         e.setCounterId(r.counterId());
         e.setName(r.name());
+        if (r.deviceId() != null) {
+            e.setDeviceId(r.deviceId());
+        }
         if (r.status() != null) {
             e.setStatus(r.status());
         }
@@ -278,13 +350,26 @@ public class RetailStoreService {
                 e.getId(),
                 e.getCode(),
                 e.getName(),
+                e.getBranchId(),
                 e.getStoreTypeId(),
+                e.getStoreType(),
                 e.getWarehouseId(),
+                e.getManagerId(),
                 e.getAddress(),
                 e.getCity(),
                 e.getState(),
+                e.getPostalCode(),
+                e.getCountry(),
                 e.getPhone(),
+                e.getEmail(),
                 e.getStatus(),
+                e.getDefaultCurrency(),
+                e.getTimezone(),
+                e.isAllowNegativeStock(),
+                e.isAllowOfflinePos(),
+                e.isEnableClickAndCollect(),
+                e.isEnableLoyalty(),
+                e.isEnableGiftCard(),
                 e.getVersion());
     }
 
@@ -294,7 +379,14 @@ public class RetailStoreService {
 
     private TerminalResponse map(RetailTerminal e) {
         return new TerminalResponse(
-                e.getId(), e.getStoreId(), e.getCounterId(), e.getCode(), e.getName(), e.getStatus(), e.getVersion());
+                e.getId(),
+                e.getStoreId(),
+                e.getCounterId(),
+                e.getCode(),
+                e.getName(),
+                e.getDeviceId(),
+                e.getStatus(),
+                e.getVersion());
     }
 
     private CashierResponse map(RetailCashier e) {

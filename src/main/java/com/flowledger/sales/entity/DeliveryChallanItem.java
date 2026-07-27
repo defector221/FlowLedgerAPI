@@ -39,4 +39,19 @@ public class DeliveryChallanItem {
 
     private UUID unitId;
     private int lineOrder;
+
+    @Column(name = "sales_order_item_id")
+    private UUID salesOrderItemId;
+
+    @Column(name = "inventory_batch_id")
+    private UUID inventoryBatchId;
+
+    @Column(name = "warehouse_id")
+    private UUID warehouseId;
+
+    @Column(name = "allocation_mode", length = 20)
+    private String allocationMode;
+
+    @Column(name = "stock_reservation_id")
+    private UUID stockReservationId;
 }

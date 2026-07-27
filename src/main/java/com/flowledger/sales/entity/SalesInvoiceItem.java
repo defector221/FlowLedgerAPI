@@ -55,4 +55,16 @@ public class SalesInvoiceItem {
     private BigDecimal sgstSharePercent = new BigDecimal("50");
 
     private int lineOrder;
+
+    @Column(name = "inventory_batch_id")
+    private UUID inventoryBatchId;
+
+    @Column(name = "warehouse_id")
+    private UUID warehouseId;
+
+    @Column(name = "allocation_mode", length = 20)
+    private String allocationMode;
+
+    @Column(name = "stock_reservation_id")
+    private UUID stockReservationId;
 }

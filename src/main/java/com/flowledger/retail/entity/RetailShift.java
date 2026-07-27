@@ -55,4 +55,7 @@ public class RetailShift extends RetailAuditedEntity {
 
     @Column(columnDefinition = "text")
     private String notes;
+
+    @Column(name = "drawer_id")
+    private UUID drawerId;
 }

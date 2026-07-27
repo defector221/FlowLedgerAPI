@@ -26,16 +26,27 @@ public class JwtService {
         return create(p, Duration.ofDays(properties.getRefreshTokenExpiryDays()), "refresh");
     }
 
+    public String createAccessToken(UserPrincipal p, UUID branchId, UUID storeId, UUID warehouseId) {
+        return createWithLocation(p, Duration.ofMinutes(properties.getAccessTokenExpiryMinutes()), "access", branchId, storeId, warehouseId);
+    }
+
     private String create(UserPrincipal p, Duration duration, String type) {
+        return createWithLocation(p, duration, type, p.getBranchId(), p.getStoreId(), p.getWarehouseId());
+    }
+
+    private String createWithLocation(
+            UserPrincipal p, Duration duration, String type, UUID branchId, UUID storeId, UUID warehouseId) {
         Instant now = Instant.now();
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(p.getId().toString())
                 .claim("orgId", p.getOrgId())
                 .claim("type", type)
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(duration)))
-                .signWith(key)
-                .compact();
+                .expiration(Date.from(now.plus(duration)));
+        if (branchId != null) builder.claim("branchId", branchId.toString());
+        if (storeId != null) builder.claim("storeId", storeId.toString());
+        if (warehouseId != null) builder.claim("warehouseId", warehouseId.toString());
+        return builder.signWith(key).compact();
     }
 
     public Claims parse(String token) {
@@ -56,6 +67,22 @@ public class JwtService {
 
     public UUID organizationId(String token) {
         Object value = parse(token).get("orgId");
+        return value == null ? null : UUID.fromString(value.toString());
+    }
+
+    public UUID branchId(String token) {
+        return uuidClaim(parse(token).get("branchId"));
+    }
+
+    public UUID storeId(String token) {
+        return uuidClaim(parse(token).get("storeId"));
+    }
+
+    public UUID warehouseId(String token) {
+        return uuidClaim(parse(token).get("warehouseId"));
+    }
+
+    private static UUID uuidClaim(Object value) {
         return value == null ? null : UUID.fromString(value.toString());
     }
 

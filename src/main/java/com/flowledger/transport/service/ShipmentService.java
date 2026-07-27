@@ -5,6 +5,7 @@ import static com.flowledger.transport.dto.TransportDtos.*;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.customer.repository.CustomerRepository;
+import com.flowledger.inventory.allocation.InventoryDeductionCoordinator;
 import com.flowledger.inventory.dto.InventoryDtos.PostTransaction;
 import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.service.InventoryService;
@@ -55,6 +56,7 @@ public class ShipmentService {
     private final TransportCompanyRepository companies;
     private final WarehouseRepository warehouses;
     private final TransportActivityNotificationService activityNotifications;
+    private final InventoryDeductionCoordinator inventoryCoordinator;
 
     public ShipmentService(
             ShipmentRepository shipments,
@@ -72,7 +74,8 @@ public class ShipmentService {
             CustomerRepository customers,
             TransportCompanyRepository companies,
             WarehouseRepository warehouses,
-            TransportActivityNotificationService activityNotifications) {
+            TransportActivityNotificationService activityNotifications,
+            InventoryDeductionCoordinator inventoryCoordinator) {
         this.shipments = shipments;
         this.legs = legs;
         this.lines = lines;
@@ -89,6 +92,7 @@ public class ShipmentService {
         this.companies = companies;
         this.warehouses = warehouses;
         this.activityNotifications = activityNotifications;
+        this.inventoryCoordinator = inventoryCoordinator;
     }
 
     @Transactional(readOnly = true)
@@ -613,28 +617,33 @@ public class ShipmentService {
     }
 
     public void maybePostInventoryOnDispatch(Shipment shipment) {
-        String event = settings.findByOrganizationId(org())
-                .map(OrganizationSettings::getInventoryDeductionEvent)
-                .orElse("");
-        if (!Set.of("DELIVERY_CHALLAN", "CHALLAN_DISPATCH").contains(event.toUpperCase(Locale.ROOT))) return;
+        UUID org = org();
+        if (!inventoryCoordinator.deductsOnShipmentDispatch(org)) {
+            return;
+        }
         if (shipment.getFromWarehouseId() == null) conflict("Warehouse is required for inventory deduction");
+        DeliveryChallan challan = null;
+        if ("DELIVERY_CHALLAN".equalsIgnoreCase(String.valueOf(shipment.getSourceDocumentType()))) {
+            challan = challans
+                    .findDetailedByIdAndOrganizationId(shipment.getSourceDocumentId(), org)
+                    .orElse(null);
+        }
+        Map<UUID, DeliveryChallanItem> challanItemsById = new HashMap<>();
+        if (challan != null) {
+            challan.getItems().forEach(item -> challanItemsById.put(item.getId(), item));
+        }
         for (ShipmentLine line : lines.findByShipmentIdOrderByLineOrder(shipment.getId())) {
-            inventory.postTransaction(new PostTransaction(
-                    Type.SALE,
-                    line.getProductId(),
-                    shipment.getFromWarehouseId(),
-                    BigDecimal.ZERO,
-                    line.getQuantity(),
-                    "SHIPMENT",
+            DeliveryChallanItem challanItem =
+                    line.getSourceLineId() != null ? challanItemsById.get(line.getSourceLineId()) : null;
+            inventoryCoordinator.deductOnShipmentDispatch(
+                    org,
                     shipment.getId(),
                     shipment.getShipmentNumber(),
-                    "shipment:" + shipment.getId() + ":" + line.getId(),
-                    line.getBatchNumber(),
-                    line.getSerialNumber(),
-                    null,
-                    BigDecimal.ZERO,
-                    shipment.getRemarks(),
-                    LocalDate.now()));
+                    shipment.getFromWarehouseId(),
+                    line.getProductId(),
+                    line.getQuantity(),
+                    line.getSourceLineId(),
+                    challanItem);
         }
     }
 

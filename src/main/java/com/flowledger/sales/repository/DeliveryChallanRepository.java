@@ -21,5 +21,20 @@ public interface DeliveryChallanRepository extends JpaRepository<DeliveryChallan
 
     Optional<DeliveryChallan> findByOrganizationIdAndSalesOrderId(UUID org, UUID orderId);
 
+    List<DeliveryChallan> findByOrganizationIdAndSalesOrderIdAndStatusNot(
+            UUID org, UUID orderId, DeliveryChallan.Status status);
+
+    @Query(
+            """
+            SELECT COALESCE(SUM(i.quantity), 0) FROM DeliveryChallanItem i
+            JOIN i.deliveryChallan c
+            WHERE c.organizationId = :org
+              AND c.salesOrderId = :orderId
+              AND c.status <> com.flowledger.sales.entity.DeliveryChallan.Status.CANCELLED
+              AND i.salesOrderItemId = :orderLineId
+            """)
+    java.math.BigDecimal sumDeliveredQtyForOrderLine(
+            @Param("org") UUID org, @Param("orderId") UUID orderId, @Param("orderLineId") UUID orderLineId);
+
     Page<DeliveryChallan> findByOrganizationIdOrderByChallanDateDesc(UUID org, Pageable pageable);
 }

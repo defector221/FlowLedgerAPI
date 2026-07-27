@@ -15,42 +15,71 @@ public class DocumentNumberService {
 
     @Transactional
     public String next(UUID org, String type, String prefix, String template, String fyStart, LocalDate date) {
-        return next(org, null, type, prefix, template, fyStart, date);
+        return next(org, null, null, type, prefix, template, fyStart, date);
     }
 
     /** Branch-aware numbering; pass null branchId for organization-wide sequences. */
     @Transactional
     public String next(
             UUID org, UUID branchId, String type, String prefix, String template, String fyStart, LocalDate date) {
+        return next(org, branchId, null, type, prefix, template, fyStart, date);
+    }
+
+    /** Branch and store aware numbering. */
+    @Transactional
+    public String next(
+            UUID org,
+            UUID branchId,
+            UUID storeId,
+            String type,
+            String prefix,
+            String template,
+            String fyStart,
+            LocalDate date) {
         String fy = FinancialYearUtil.financialYear(date, fyStart);
-        DocumentSequence sequence = lockedOrCreate(org, branchId, type, fy, prefix);
+        DocumentSequence sequence = lockedOrCreate(org, branchId, storeId, type, fy, prefix);
         long nextValue = sequence.getNextValue();
         sequence.setNextValue(nextValue + 1);
-        return format(sequence.getPrefix(), fy, template, nextValue);
+        return format(sequence.getPrefix(), fy, template, nextValue, branchId, storeId);
     }
 
     @Transactional
     public void ensureNextAtLeast(
             UUID org, String type, String prefix, String fyStart, LocalDate date, long minNextValue) {
-        ensureNextAtLeast(org, null, type, prefix, fyStart, date, minNextValue);
+        ensureNextAtLeast(org, null, null, type, prefix, fyStart, date, minNextValue);
     }
 
     @Transactional
     public void ensureNextAtLeast(
             UUID org, UUID branchId, String type, String prefix, String fyStart, LocalDate date, long minNextValue) {
+        ensureNextAtLeast(org, branchId, null, type, prefix, fyStart, date, minNextValue);
+    }
+
+    @Transactional
+    public void ensureNextAtLeast(
+            UUID org,
+            UUID branchId,
+            UUID storeId,
+            String type,
+            String prefix,
+            String fyStart,
+            LocalDate date,
+            long minNextValue) {
         if (minNextValue < 1) return;
         String fy = FinancialYearUtil.financialYear(date, fyStart);
-        DocumentSequence sequence = lockedOrCreate(org, branchId, type, fy, prefix);
+        DocumentSequence sequence = lockedOrCreate(org, branchId, storeId, type, fy, prefix);
         if (sequence.getNextValue() < minNextValue) {
             sequence.setNextValue(minNextValue);
         }
     }
 
-    private DocumentSequence lockedOrCreate(UUID org, UUID branchId, String type, String fy, String prefix) {
-        return repo.findLocked(org, type, fy, branchId).orElseGet(() -> {
+    private DocumentSequence lockedOrCreate(
+            UUID org, UUID branchId, UUID storeId, String type, String fy, String prefix) {
+        return repo.findLocked(org, type, fy, branchId, storeId).orElseGet(() -> {
             DocumentSequence created = new DocumentSequence();
             created.setOrganizationId(org);
             created.setBranchId(branchId);
+            created.setStoreId(storeId);
             created.setDocumentType(type);
             created.setFinancialYear(fy);
             created.setPrefix(prefix);
@@ -58,11 +87,17 @@ public class DocumentNumberService {
         });
     }
 
-    private static String format(String prefix, String fy, String template, long nextValue) {
-        return template.replace("{PREFIX}", prefix)
-                .replace("{FY}", fy)
-                .replaceAll(
-                        "\\{SEQ:(\\d+)}",
-                        String.format("%0" + template.replaceAll(".*\\{SEQ:(\\d+)}.*", "$1") + "d", nextValue));
+    private static String format(
+            String prefix, String fy, String template, long nextValue, UUID branchId, UUID storeId) {
+        String result = template.replace("{PREFIX}", prefix).replace("{FY}", fy);
+        if (branchId != null) {
+            result = result.replace("{BRANCH_ID}", branchId.toString().substring(0, 8).toUpperCase());
+        }
+        if (storeId != null) {
+            result = result.replace("{STORE_ID}", storeId.toString().substring(0, 8).toUpperCase());
+        }
+        return result.replaceAll(
+                "\\{SEQ:(\\d+)}",
+                String.format("%0" + template.replaceAll(".*\\{SEQ:(\\d+)}.*", "$1") + "d", nextValue));
     }
 }

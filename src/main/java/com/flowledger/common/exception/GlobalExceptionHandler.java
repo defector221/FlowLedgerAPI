@@ -84,6 +84,34 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.UNAUTHORIZED, ex.getMessage(), request, null);
     }
 
+    @ExceptionHandler(com.flowledger.sales.exception.SalesAllocationConflictException.class)
+    ProblemDetail salesAllocationConflict(
+            com.flowledger.sales.exception.SalesAllocationConflictException ex, HttpServletRequest request) {
+        ProblemDetail result = problem(HttpStatus.CONFLICT, ex.getMessage(), request, null);
+        result.setProperty("status", ex.status().name());
+        if (ex.lineId() != null) {
+            result.setProperty("lineId", ex.lineId());
+        }
+        if (ex.productId() != null) {
+            result.setProperty("productId", ex.productId());
+        }
+        if (ex.result().candidates() != null && !ex.result().candidates().isEmpty()) {
+            result.setProperty(
+                    "candidates",
+                    ex.result().candidates().stream()
+                            .map(c -> java.util.Map.of(
+                                    "batchId", c.batchId(),
+                                    "warehouseId", c.warehouseId(),
+                                    "batchNumber", c.batchNumber() != null ? c.batchNumber() : "",
+                                    "availableQty", c.availableQty(),
+                                    "expiryDate", c.expiryDate() != null ? c.expiryDate().toString() : "",
+                                    "receivedDate", c.receivedDate() != null ? c.receivedDate().toString() : "",
+                                    "lotNumber", c.lotNumber() != null ? c.lotNumber() : ""))
+                            .toList());
+        }
+        return result;
+    }
+
     @ExceptionHandler(ConflictException.class)
     ProblemDetail conflict(ConflictException ex, HttpServletRequest request) {
         return problem(HttpStatus.CONFLICT, ex.getMessage(), request, null);

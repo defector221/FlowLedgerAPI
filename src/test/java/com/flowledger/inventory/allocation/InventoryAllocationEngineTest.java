@@ -3,13 +3,14 @@ package com.flowledger.inventory.allocation;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.flowledger.inventory.allocation.strategy.FifoAllocationStrategy;
 import com.flowledger.inventory.entity.InventoryBatch;
 import com.flowledger.inventory.repository.InventoryBatchRepository;
 import com.flowledger.inventory.repository.InventoryTransactionRepository;
+import com.flowledger.inventory.repository.StockReservationRepository;
+import com.flowledger.inventory.service.StockReservationService;
 import com.flowledger.organization.entity.OrganizationSettings;
 import com.flowledger.organization.repository.OrganizationSettingsRepository;
 import com.flowledger.product.entity.Product;
@@ -43,14 +44,23 @@ class InventoryAllocationEngineTest {
     @Mock
     InventoryTransactionRepository transactions;
 
+    @Mock
+    StockReservationRepository reservations;
+
+    @Mock
+    StockReservationService reservationService;
+
     private InventoryAllocationEngine engine;
 
     @BeforeEach
     void setUp() {
-        AllocationCandidateProvider provider = new AllocationCandidateProvider(batches, warehouses);
+        ReservationAvailabilityService availability =
+                new ReservationAvailabilityService(transactions, reservations, batches);
+        AllocationCandidateProvider provider = new AllocationCandidateProvider(batches, warehouses, reservations);
         BatchAllocationEngine batchEngine = new BatchAllocationEngine(
                 provider,
                 batches,
+                availability,
                 new FifoAllocationStrategy(),
                 new com.flowledger.inventory.allocation.strategy.FefoAllocationStrategy(),
                 new com.flowledger.inventory.allocation.strategy.LifoAllocationStrategy(),
@@ -60,8 +70,9 @@ class InventoryAllocationEngineTest {
                 products,
                 orgSettings,
                 warehouses,
-                new WarehousePoolAllocator(transactions),
-                batchEngine);
+                new WarehousePoolAllocator(availability),
+                batchEngine,
+                reservationService);
     }
 
     @Test
@@ -73,6 +84,7 @@ class InventoryAllocationEngineTest {
         product.setBatchTracking(false);
         when(products.findByIdAndOrganizationId(productId, org)).thenReturn(Optional.of(product));
         when(transactions.stockBalance(org, productId, warehouse)).thenReturn(new BigDecimal("5"));
+        when(reservations.activeReservedQty(org, productId, warehouse, null)).thenReturn(BigDecimal.ZERO);
 
         AllocationResult result = engine.allocate(new AllocationRequest(org, productId, warehouse, BigDecimal.ONE, null));
 
@@ -104,6 +116,8 @@ class InventoryAllocationEngineTest {
         when(batches.findByOrganizationIdAndProductIdAndWarehouseIdAndQualityStatusOrderByReceivedDateAscExpiryDateAsc(
                         org, productId, warehouse, "AVAILABLE"))
                 .thenReturn(List.of(newer, older));
+        when(reservations.activeReservedQtyByBatch(org, batchA, null)).thenReturn(BigDecimal.ZERO);
+        when(reservations.activeReservedQtyByBatch(org, batchB, null)).thenReturn(BigDecimal.ZERO);
 
         CheckoutValidationResult validation = engine.revalidateForCheckout(List.of(new CartLineAllocation(
                 org, lineId, productId, warehouse, BigDecimal.ONE, batchB, AllocationMode.BATCH_AUTO)));

@@ -8,6 +8,7 @@ import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.common.util.PaymentTermsDates;
 import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
 import com.flowledger.finance.voucher.adapter.PurchaseVoucherBuilder;
+import com.flowledger.location.service.LocationHierarchyService;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.purchase.dto.PurchaseDtos.InvoiceRequest;
@@ -57,6 +58,7 @@ public class PurchaseInvoiceService {
     private final GstCalculationService gst;
     private final SearchIndexEventPublisher searchEvents;
     private final DocumentVoucherFacade documentPosting;
+    private final LocationHierarchyService hierarchy;
 
     public PurchaseInvoiceService(
             GoodsReceiptService goodsReceiptService,
@@ -66,7 +68,8 @@ public class PurchaseInvoiceService {
             SupplierRepository suppliers,
             GstCalculationService tax,
             SearchIndexEventPublisher searchEvents,
-            DocumentVoucherFacade documentPosting) {
+            DocumentVoucherFacade documentPosting,
+            LocationHierarchyService hierarchy) {
         grns = goodsReceiptService;
         orders = purchaseOrderService;
         numbers = documentNumberService;
@@ -75,6 +78,7 @@ public class PurchaseInvoiceService {
         gst = tax;
         this.searchEvents = searchEvents;
         this.documentPosting = documentPosting;
+        this.hierarchy = hierarchy;
     }
 
     public PurchaseInvoice fromGrn(UUID grnId, InvoiceRequest request) {
@@ -366,7 +370,8 @@ public class PurchaseInvoiceService {
         invoice.setPurchaseOrderId(po);
         invoice.setGoodsReceiptId(grn);
         invoice.setWarehouseId(wh);
-        invoice.setInvoiceNumber(number(request.invoiceDate()));
+        invoice.setBranchId(hierarchy.resolveBranchId(null, wh));
+        invoice.setInvoiceNumber(number(request.invoiceDate(), invoice.getBranchId()));
         applyRequest(invoice, request, lines);
         em.persist(invoice);
         searchEvents.upsert(invoice.getOrganizationId(), SearchEntityType.PURCHASE_INVOICE, invoice.getId());
@@ -475,10 +480,12 @@ public class PurchaseInvoiceService {
         return organizations.findById(TenantContext.getOrganizationId()).orElseThrow();
     }
 
-    private String number(LocalDate date) {
+    private String number(LocalDate date, UUID branchId) {
         Organization organization = organization();
         return numbers.next(
                 organization.getId(),
+                branchId,
+                null,
                 "PURCHASE_INVOICE",
                 organization.getPurchaseInvoicePrefix(),
                 "{PREFIX}/{FY}/{SEQ:6}",

@@ -86,9 +86,9 @@ sequenceDiagram
 Organization setting `allocation_strategy` on `organization_settings` (default `FIFO`).  
 Manage via **Settings → Operations → Batch Allocation Strategy**.
 
-## Phase 2 (planned)
+## Phase 2 (2A + 2B implemented)
 
-See **[inventory-allocation-phase2.md](inventory-allocation-phase2.md)** for the full breakdown. Summary:
+See **[inventory-allocation-phase2.md](inventory-allocation-phase2.md)** for the full breakdown. **Database schema (ERD):** [inventory-allocation-schema.md](inventory-allocation-schema.md).
 
 | Sub-phase | Scope |
 |-----------|--------|

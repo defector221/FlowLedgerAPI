@@ -22,6 +22,9 @@ public class SupplierCatalogItem extends AuditedEntity {
     @Column(name = "supplier_sku")
     private String supplierSku;
 
+    @Column(name = "supplier_barcode", length = 150)
+    private String supplierBarcode;
+
     @Column(name = "supplier_product_name")
     private String supplierProductName;
 

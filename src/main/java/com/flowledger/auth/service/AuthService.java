@@ -286,8 +286,19 @@ public class AuthService {
     }
 
     private LoginResponse tokens(User user, UUID organizationId) {
-        UserPrincipal principal = details.load(user.getId(), organizationId);
-        String access = jwt.createAccessToken(principal);
+        return tokens(user, organizationId, null, null, null);
+    }
+
+    public LoginResponse issueTokensWithLocation(
+            UUID userId, UUID organizationId, UUID branchId, UUID storeId, UUID warehouseId) {
+        User user = users.findByIdAndActiveTrue(userId).orElseThrow(() -> new UnauthorizedException("User unavailable"));
+        membershipService.requireActiveMembership(userId, organizationId);
+        return tokens(user, organizationId, branchId, storeId, warehouseId);
+    }
+
+    private LoginResponse tokens(User user, UUID organizationId, UUID branchId, UUID storeId, UUID warehouseId) {
+        UserPrincipal principal = details.load(user.getId(), organizationId, branchId, storeId, warehouseId);
+        String access = jwt.createAccessToken(principal, branchId, storeId, warehouseId);
         String refresh = jwt.createRefreshToken(principal);
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUserId(user.getId());

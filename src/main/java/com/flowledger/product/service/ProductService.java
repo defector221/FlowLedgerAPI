@@ -111,6 +111,7 @@ public class ProductService extends OrganizationScopedService {
                                 saved.getId(),
                                 price.supplierId(),
                                 price.supplierSku(),
+                                null,
                                 saved.getName(),
                                 price.purchasePrice(),
                                 "INR",

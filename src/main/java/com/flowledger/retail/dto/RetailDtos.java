@@ -11,6 +11,7 @@ import com.flowledger.retail.domain.RetailEnums.RefundMode;
 import com.flowledger.retail.domain.RetailEnums.ReturnReason;
 import com.flowledger.retail.domain.RetailEnums.ShiftStatus;
 import com.flowledger.retail.domain.RetailEnums.SyncStatus;
+import com.flowledger.retail.domain.StoreType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -32,25 +33,51 @@ public final class RetailDtos {
     public record StoreRequest(
             @NotBlank String code,
             @NotBlank String name,
+            UUID branchId,
             UUID storeTypeId,
+            StoreType storeType,
             @NotNull UUID warehouseId,
+            UUID managerId,
             String address,
             String city,
             String state,
+            String postalCode,
+            String country,
             String phone,
-            String status) {}
+            String email,
+            String status,
+            String defaultCurrency,
+            String timezone,
+            Boolean allowNegativeStock,
+            Boolean allowOfflinePos,
+            Boolean enableClickAndCollect,
+            Boolean enableLoyalty,
+            Boolean enableGiftCard) {}
 
     public record StoreResponse(
             UUID id,
             String code,
             String name,
+            UUID branchId,
             UUID storeTypeId,
+            StoreType storeType,
             UUID warehouseId,
+            UUID managerId,
             String address,
             String city,
             String state,
+            String postalCode,
+            String country,
             String phone,
+            String email,
             String status,
+            String defaultCurrency,
+            String timezone,
+            boolean allowNegativeStock,
+            boolean allowOfflinePos,
+            boolean enableClickAndCollect,
+            boolean enableLoyalty,
+            boolean enableGiftCard,
             Long version) {}
 
     public record CounterRequest(@NotNull UUID storeId, @NotBlank String code, @NotBlank String name, String status) {}
@@ -58,10 +85,22 @@ public final class RetailDtos {
     public record CounterResponse(UUID id, UUID storeId, String code, String name, String status, Long version) {}
 
     public record TerminalRequest(
-            @NotNull UUID storeId, UUID counterId, @NotBlank String code, @NotBlank String name, String status) {}
+            @NotNull UUID storeId,
+            UUID counterId,
+            @NotBlank String code,
+            @NotBlank String name,
+            String deviceId,
+            String status) {}
 
     public record TerminalResponse(
-            UUID id, UUID storeId, UUID counterId, String code, String name, String status, Long version) {}
+            UUID id,
+            UUID storeId,
+            UUID counterId,
+            String code,
+            String name,
+            String deviceId,
+            String status,
+            Long version) {}
 
     public record CashierRequest(
             @NotNull UUID storeId,

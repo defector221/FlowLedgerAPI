@@ -1,5 +1,6 @@
 package com.flowledger.warehouse.dto;
 
+import com.flowledger.warehouse.domain.WarehouseType;
 import jakarta.validation.constraints.*;
 import java.util.*;
 
@@ -12,10 +13,20 @@ public final class WarehouseDtos {
             String address,
             String contactPerson,
             String phone,
-            Boolean defaultWarehouse) {}
+            Boolean defaultWarehouse,
+            WarehouseType warehouseType,
+            UUID branchId,
+            UUID storeId) {}
 
     public record Update(
-            @NotBlank String warehouseName, String address, String contactPerson, String phone, Boolean active) {}
+            @NotBlank String warehouseName,
+            String address,
+            String contactPerson,
+            String phone,
+            Boolean active,
+            WarehouseType warehouseType,
+            UUID branchId,
+            UUID storeId) {}
 
     public record Response(
             UUID id,
@@ -25,5 +36,8 @@ public final class WarehouseDtos {
             String contactPerson,
             String phone,
             boolean defaultWarehouse,
-            boolean active) {}
+            boolean active,
+            WarehouseType warehouseType,
+            UUID branchId,
+            UUID storeId) {}
 }

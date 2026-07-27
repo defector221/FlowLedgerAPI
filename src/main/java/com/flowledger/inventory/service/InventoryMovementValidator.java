@@ -1,8 +1,8 @@
 package com.flowledger.inventory.service;
 
 import com.flowledger.common.exception.BusinessException;
-import com.flowledger.inventory.repository.InventoryTransactionRepository;
-import com.flowledger.inventory.repository.StockReservationRepository;
+import com.flowledger.inventory.allocation.ReservationAvailabilityService;
+import com.flowledger.inventory.allocation.ReservationAvailabilityService;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import java.math.BigDecimal;
@@ -13,16 +13,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class InventoryMovementValidator {
     private final OrganizationRepository organizations;
-    private final InventoryTransactionRepository transactions;
-    private final StockReservationRepository reservations;
+    private final ReservationAvailabilityService availability;
 
     public InventoryMovementValidator(
-            OrganizationRepository organizations,
-            InventoryTransactionRepository transactions,
-            StockReservationRepository reservations) {
+            OrganizationRepository organizations, ReservationAvailabilityService availability) {
         this.organizations = organizations;
-        this.transactions = transactions;
-        this.reservations = reservations;
+        this.availability = availability;
     }
 
     public void validateOutbound(UUID orgId, UUID productId, UUID warehouseId, BigDecimal qty) {
@@ -33,16 +29,10 @@ public class InventoryMovementValidator {
         if (org.isAllowNegativeStock()) {
             return;
         }
-        BigDecimal onHand = n(transactions.stockBalance(orgId, productId, warehouseId));
-        BigDecimal reserved = n(reservations.activeReservedQty(orgId, productId, warehouseId));
-        BigDecimal available = onHand.subtract(reserved);
+        BigDecimal available = availability.warehouseAvailable(orgId, productId, warehouseId, null);
         if (available.compareTo(qty) < 0) {
             throw new BusinessException("Insufficient stock for product " + productId + " in warehouse " + warehouseId
                     + " (available=" + available + ", requested=" + qty + ")");
         }
-    }
-
-    private static BigDecimal n(BigDecimal v) {
-        return v == null ? BigDecimal.ZERO : v;
     }
 }

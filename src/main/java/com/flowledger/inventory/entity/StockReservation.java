@@ -43,4 +43,13 @@ public class StockReservation extends AuditedEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Status status = Status.ACTIVE;
+
+    @Column(name = "inventory_batch_id")
+    private UUID inventoryBatchId;
+
+    @Column(name = "allocation_mode", length = 20)
+    private String allocationMode;
+
+    @Column(name = "line_reference_id")
+    private UUID lineReferenceId;
 }

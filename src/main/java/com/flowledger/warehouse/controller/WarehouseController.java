@@ -1,5 +1,6 @@
 package com.flowledger.warehouse.controller;
 
+import com.flowledger.warehouse.domain.WarehouseType;
 import com.flowledger.warehouse.dto.WarehouseDtos.*;
 import com.flowledger.warehouse.service.WarehouseService;
 import jakarta.validation.Valid;
@@ -19,8 +20,11 @@ public class WarehouseController {
     }
 
     @GetMapping
-    public List<Response> list() {
-        return service.list();
+    @PreAuthorize("hasAuthority('WAREHOUSE_READ') or hasAuthority('WAREHOUSE_MANAGE') or hasAnyRole('ORGANIZATION_ADMIN', 'INVENTORY_MANAGER')")
+    public List<Response> list(
+            @RequestParam(required = false) WarehouseType type,
+            @RequestParam(required = false) UUID branchId) {
+        return service.list(type, branchId);
     }
 
     @GetMapping("/{id}")
@@ -30,13 +34,13 @@ public class WarehouseController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ORGANIZATION_ADMIN', 'INVENTORY_MANAGER')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MANAGE') or hasAnyRole('ORGANIZATION_ADMIN', 'INVENTORY_MANAGER')")
     public Response create(@Valid @RequestBody Create dto) {
         return service.create(dto);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ORGANIZATION_ADMIN', 'INVENTORY_MANAGER')")
+    @PreAuthorize("hasAuthority('WAREHOUSE_MANAGE') or hasAnyRole('ORGANIZATION_ADMIN', 'INVENTORY_MANAGER')")
     public Response update(@PathVariable UUID id, @Valid @RequestBody Update dto) {
         return service.update(id, dto);
     }

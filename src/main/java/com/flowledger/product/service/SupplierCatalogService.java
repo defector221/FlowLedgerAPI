@@ -105,6 +105,9 @@ public class SupplierCatalogService extends OrganizationScopedService {
                 item.setSupplierSku(dto.supplierSku().trim().toUpperCase(Locale.ROOT));
             }
         }
+        if (dto.supplierBarcode() != null) {
+            item.setSupplierBarcode(dto.supplierBarcode().isBlank() ? null : dto.supplierBarcode().trim());
+        }
         if (dto.supplierProductName() != null) item.setSupplierProductName(dto.supplierProductName());
         if (dto.purchasePrice() != null) item.setPurchasePrice(dto.purchasePrice());
         if (dto.currency() != null) item.setCurrency(normalizeCurrency(dto.currency()));
@@ -127,6 +130,16 @@ public class SupplierCatalogService extends OrganizationScopedService {
         item.setPreferred(false);
         TenantContext.userId().ifPresent(item::setUpdatedBy);
         repository.save(item);
+    }
+
+    public Response updateForProduct(UUID productId, UUID catalogItemId, Update dto) {
+        SupplierCatalogItem item = loadForProduct(productId, catalogItemId);
+        return update(item.getSupplierId(), catalogItemId, dto);
+    }
+
+    public void softDeleteForProduct(UUID productId, UUID catalogItemId) {
+        SupplierCatalogItem item = loadForProduct(productId, catalogItemId);
+        softDelete(item.getSupplierId(), catalogItemId);
     }
 
     @Transactional(readOnly = true)
@@ -164,6 +177,9 @@ public class SupplierCatalogService extends OrganizationScopedService {
         Product product = products.findByIdAndOrganizationId(productId, org).orElseThrow();
         Supplier supplier = suppliers.findByIdAndOrganizationId(supplierId, org).orElseThrow();
         item.setSupplierSku(resolveSupplierSku(org, dto.supplierSku(), product.getSku(), supplier.getSupplierCode()));
+        if (dto.supplierBarcode() != null && !dto.supplierBarcode().isBlank()) {
+            item.setSupplierBarcode(dto.supplierBarcode().trim());
+        }
         item.setSupplierProductName(
                 dto.supplierProductName() == null || dto.supplierProductName().isBlank()
                         ? product.getName()
@@ -212,6 +228,12 @@ public class SupplierCatalogService extends OrganizationScopedService {
         repository.saveAllAndFlush(others);
     }
 
+    private SupplierCatalogItem loadForProduct(UUID productId, UUID id) {
+        return required(
+                repository.findByIdAndOrganizationIdAndProductIdAndDeletedFalse(id, orgId(), productId),
+                "Supplier catalog item");
+    }
+
     private SupplierCatalogItem load(UUID supplierId, UUID id) {
         return required(
                 repository.findByIdAndOrganizationIdAndSupplierIdAndDeletedFalse(id, orgId(), supplierId),
@@ -256,6 +278,7 @@ public class SupplierCatalogService extends OrganizationScopedService {
                 item.getSupplierId(),
                 supplier == null ? null : supplier.getSupplierName(),
                 item.getSupplierSku(),
+                item.getSupplierBarcode(),
                 item.getSupplierProductName(),
                 item.getPurchasePrice(),
                 item.getCurrency(),

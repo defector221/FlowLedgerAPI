@@ -13,6 +13,7 @@ public final class SupplierCatalogDtos {
             UUID productId,
             UUID supplierId,
             @Size(max = 255) String supplierSku,
+            @Size(max = 150) String supplierBarcode,
             @Size(max = 255) String supplierProductName,
             @NotNull @DecimalMin("0.0") BigDecimal purchasePrice,
             @Size(min = 3, max = 3) String currency,
@@ -26,6 +27,7 @@ public final class SupplierCatalogDtos {
 
     public record Update(
             @Size(max = 255) String supplierSku,
+            @Size(max = 150) String supplierBarcode,
             @Size(max = 255) String supplierProductName,
             @DecimalMin("0.0") BigDecimal purchasePrice,
             @Size(min = 3, max = 3) String currency,
@@ -47,6 +49,7 @@ public final class SupplierCatalogDtos {
             UUID supplierId,
             String supplierName,
             String supplierSku,
+            String supplierBarcode,
             String supplierProductName,
             BigDecimal purchasePrice,
             String currency,

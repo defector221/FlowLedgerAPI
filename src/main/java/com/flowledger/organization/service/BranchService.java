@@ -1,5 +1,6 @@
 package com.flowledger.organization.service;
 
+import com.flowledger.common.dto.PageResponse;
 import com.flowledger.common.exception.ConflictException;
 import com.flowledger.common.exception.ResourceNotFoundException;
 import com.flowledger.common.tenant.TenantContext;
@@ -7,9 +8,13 @@ import com.flowledger.organization.dto.BranchDtos.BranchRequest;
 import com.flowledger.organization.dto.BranchDtos.BranchResponse;
 import com.flowledger.organization.entity.Branch;
 import com.flowledger.organization.repository.BranchRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +34,28 @@ public class BranchService {
     }
 
     @Transactional(readOnly = true)
+    public PageResponse<BranchResponse> search(String search, Boolean active, Pageable pageable) {
+        UUID org = TenantContext.getOrganizationId();
+        Specification<Branch> spec = (root, query, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("organizationId"), org));
+            if (active != null) {
+                predicates.add(cb.equal(root.get("active"), active));
+            }
+            if (search != null && !search.isBlank()) {
+                String pattern = "%" + search.trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("code")), pattern),
+                        cb.like(cb.lower(root.get("name")), pattern),
+                        cb.like(cb.lower(root.get("city")), pattern)));
+            }
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+        Page<Branch> page = branches.findAll(spec, pageable);
+        return PageResponse.from(page.map(BranchService::toResponse));
+    }
+
+    @Transactional(readOnly = true)
     public BranchResponse get(UUID id) {
         return toResponse(load(id));
     }
@@ -40,8 +67,9 @@ public class BranchService {
         if (branches.existsByOrganizationIdAndCode(org, code)) {
             throw new ConflictException("Branch code already exists");
         }
-        if (Boolean.TRUE.equals(request.defaultBranch())) {
+        if (Boolean.TRUE.equals(request.defaultBranch()) || Boolean.TRUE.equals(request.headOffice())) {
             branches.clearDefault(org);
+            branches.clearHeadOffice(org);
         }
         Branch branch = new Branch();
         branch.setOrganizationId(org);
@@ -57,11 +85,27 @@ public class BranchService {
                 && branches.existsByOrganizationIdAndCode(branch.getOrganizationId(), code)) {
             throw new ConflictException("Branch code already exists");
         }
-        if (Boolean.TRUE.equals(request.defaultBranch())) {
+        if (Boolean.TRUE.equals(request.defaultBranch()) || Boolean.TRUE.equals(request.headOffice())) {
             branches.clearDefault(branch.getOrganizationId());
+            branches.clearHeadOffice(branch.getOrganizationId());
         }
         apply(branch, request, code);
         return toResponse(branches.save(branch));
+    }
+
+    @Transactional
+    public void deactivate(UUID id) {
+        Branch branch = load(id);
+        if (branch.isDefaultBranch()) {
+            throw new ConflictException("Cannot deactivate the default branch");
+        }
+        branch.setActive(false);
+        branches.save(branch);
+    }
+
+    @Transactional(readOnly = true)
+    public Branch loadEntity(UUID id) {
+        return load(id);
     }
 
     private Branch load(UUID id) {
@@ -77,11 +121,21 @@ public class BranchService {
         branch.setState(request.state());
         branch.setPostalCode(request.postalCode());
         branch.setCountry(request.country() == null || request.country().isBlank() ? "IN" : request.country());
+        branch.setGstNumber(request.gstNumber());
+        branch.setPan(request.pan());
+        branch.setPhone(request.phone());
+        branch.setEmail(request.email());
         if (request.active() != null) {
             branch.setActive(request.active());
         }
         if (request.defaultBranch() != null) {
             branch.setDefaultBranch(request.defaultBranch());
+        }
+        if (request.headOffice() != null) {
+            branch.setHeadOffice(request.headOffice());
+            if (request.headOffice()) {
+                branch.setDefaultBranch(true);
+            }
         }
     }
 
@@ -95,7 +149,12 @@ public class BranchService {
                 branch.getState(),
                 branch.getPostalCode(),
                 branch.getCountry(),
+                branch.getGstNumber(),
+                branch.getPan(),
+                branch.getPhone(),
+                branch.getEmail(),
                 branch.isActive(),
-                branch.isDefaultBranch());
+                branch.isDefaultBranch(),
+                branch.isHeadOffice());
     }
 }

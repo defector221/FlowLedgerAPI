@@ -25,6 +25,9 @@ public class PurchaseInvoice extends AuditedEntity {
     private String supplierInvoiceNumber;
     private LocalDate invoiceDate, dueDate;
     private UUID supplierId, purchaseOrderId, goodsReceiptId, warehouseId;
+
+    @Column(name = "branch_id")
+    private UUID branchId;
     private String placeOfSupply, supplierGstin, status = "DRAFT", paymentStatus = "UNPAID";
     private boolean reverseCharge, taxInclusive;
     private BigDecimal subtotal = BigDecimal.ZERO,

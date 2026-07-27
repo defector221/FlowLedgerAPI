@@ -17,4 +17,7 @@ public interface RetailShiftRepository extends JpaRepository<RetailShift, UUID> 
 
     List<RetailShift> findByOrganizationIdAndCashierIdAndStatusAndDeletedFalse(
             UUID organizationId, UUID cashierId, ShiftStatus status);
+
+    Optional<RetailShift> findFirstByOrganizationIdAndDrawerIdAndStatusOrderByOpenedAtDesc(
+            UUID organizationId, UUID drawerId, ShiftStatus status);
 }

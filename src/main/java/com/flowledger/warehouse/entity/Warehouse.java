@@ -1,7 +1,9 @@
 package com.flowledger.warehouse.entity;
 
 import com.flowledger.common.entity.AuditedEntity;
+import com.flowledger.warehouse.domain.WarehouseType;
 import jakarta.persistence.*;
+import java.util.UUID;
 import lombok.*;
 
 @Entity
@@ -34,6 +36,16 @@ public class Warehouse extends AuditedEntity {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    @Column(name = "branch_id")
+    private UUID branchId;
+
+    @Column(name = "store_id")
+    private UUID storeId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "warehouse_type", nullable = false)
+    private WarehouseType warehouseType = WarehouseType.CENTRAL;
 
     @Version
     private Long version;

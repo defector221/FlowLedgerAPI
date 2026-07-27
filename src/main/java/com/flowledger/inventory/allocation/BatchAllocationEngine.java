@@ -3,6 +3,7 @@ package com.flowledger.inventory.allocation;
 import com.flowledger.inventory.allocation.strategy.*;
 import com.flowledger.inventory.entity.InventoryBatch;
 import com.flowledger.inventory.repository.InventoryBatchRepository;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -15,11 +16,13 @@ import org.springframework.stereotype.Component;
 public class BatchAllocationEngine {
     private final AllocationCandidateProvider candidateProvider;
     private final InventoryBatchRepository batches;
+    private final ReservationAvailabilityService availability;
     private final Map<AllocationStrategyType, AllocationStrategy> strategies;
 
     public BatchAllocationEngine(
             AllocationCandidateProvider candidateProvider,
             InventoryBatchRepository batches,
+            ReservationAvailabilityService availability,
             FifoAllocationStrategy fifo,
             FefoAllocationStrategy fefo,
             LifoAllocationStrategy lifo,
@@ -27,13 +30,18 @@ public class BatchAllocationEngine {
             PreferredWarehouseAllocationStrategy preferredWarehouse) {
         this.candidateProvider = candidateProvider;
         this.batches = batches;
+        this.availability = availability;
         this.strategies = List.of(fifo, fefo, lifo, highestQuantity, preferredWarehouse).stream()
                 .collect(Collectors.toMap(AllocationStrategy::type, Function.identity()));
     }
 
     public AllocationResult allocate(AllocationRequest request, AllocationStrategyType strategyType, UUID preferredWarehouseId) {
         List<AllocationCandidate> eligible = candidateProvider.eligibleBatches(
-                request.organizationId(), request.productId(), request.warehouseId(), request.quantity());
+                request.organizationId(),
+                request.productId(),
+                request.warehouseId(),
+                request.quantity(),
+                request.excludeReservationId());
         if (eligible.isEmpty()) {
             return AllocationResult.outOfStock("No eligible batches with sufficient quantity");
         }
@@ -72,10 +80,15 @@ public class BatchAllocationEngine {
         if (batch.getExpiryDate() != null && batch.getExpiryDate().isBefore(java.time.LocalDate.now())) {
             return AllocationResult.outOfStock("Selected batch is expired");
         }
-        if (n(batch.getQuantity()).compareTo(request.quantity()) < 0) {
+        BigDecimal available = availability.batchAvailable(
+                request.organizationId(), batchId, request.excludeReservationId());
+        if (available.compareTo(request.quantity()) < 0) {
             return AllocationResult.outOfStock("Insufficient quantity in selected batch");
         }
-        return AllocationResult.auto(toAllocated(candidateProvider.toCandidate(batch), AllocationMode.BATCH_MANUAL, request.quantity()));
+        return AllocationResult.auto(toAllocated(
+                candidateProvider.toCandidate(batch, request.organizationId(), request.excludeReservationId()),
+                AllocationMode.BATCH_MANUAL,
+                request.quantity()));
     }
 
     private AllocatedInventory toAllocated(AllocationCandidate candidate, AllocationMode mode, java.math.BigDecimal qty) {
@@ -89,9 +102,5 @@ public class BatchAllocationEngine {
                 candidate.receivedDate(),
                 candidate.lotNumber(),
                 mode);
-    }
-
-    private static java.math.BigDecimal n(java.math.BigDecimal v) {
-        return v == null ? java.math.BigDecimal.ZERO : v;
     }
 }

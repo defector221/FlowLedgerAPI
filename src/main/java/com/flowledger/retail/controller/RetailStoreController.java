@@ -48,9 +48,9 @@ public class RetailStoreController {
 
     // ------------------------------------------------------------------ Stores
     @GetMapping("/stores")
-    @PreAuthorize("hasAuthority('RETAIL_VIEW')")
-    public List<StoreResponse> listStores() {
-        return service.listStores();
+    @PreAuthorize("hasAuthority('RETAIL_VIEW') or hasAuthority('STORE_READ')")
+    public List<StoreResponse> listStores(@RequestParam(required = false) UUID branchId) {
+        return service.listStores(branchId);
     }
 
     @GetMapping("/stores/{id}")

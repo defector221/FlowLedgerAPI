@@ -28,4 +28,7 @@ public class RetailTerminal extends RetailAuditedEntity {
 
     @Column(nullable = false)
     private String status = "ACTIVE";
+
+    @Column(name = "device_id")
+    private String deviceId;
 }

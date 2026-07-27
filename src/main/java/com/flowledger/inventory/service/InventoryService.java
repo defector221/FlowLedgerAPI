@@ -5,6 +5,7 @@ import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
 import com.flowledger.finance.voucher.adapter.StockAdjustmentVoucherBuilder;
 import com.flowledger.inventory.dto.InventoryDtos.*;
+import com.flowledger.location.service.LocationHierarchyService;
 import com.flowledger.inventory.entity.*;
 import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.repository.*;
@@ -31,6 +32,7 @@ public class InventoryService {
     private final InventoryCostingService costing;
     private final StockAdjustmentVoucherBuilder stockAdjustmentBuilder;
     private final DocumentVoucherFacade documentPosting;
+    private final LocationHierarchyService hierarchy;
 
     public InventoryService(
             InventoryTransactionRepository transactionRepository,
@@ -41,7 +43,8 @@ public class InventoryService {
             InventoryMovementValidator movementValidator,
             InventoryCostingService costing,
             StockAdjustmentVoucherBuilder stockAdjustmentBuilder,
-            DocumentVoucherFacade documentPosting) {
+            DocumentVoucherFacade documentPosting,
+            LocationHierarchyService hierarchy) {
         txns = transactionRepository;
         batches = batchRepository;
         serials = serialRepository;
@@ -51,6 +54,7 @@ public class InventoryService {
         this.costing = costing;
         this.stockAdjustmentBuilder = stockAdjustmentBuilder;
         this.documentPosting = documentPosting;
+        this.hierarchy = hierarchy;
     }
 
     @Transactional
@@ -75,6 +79,8 @@ public class InventoryService {
         transaction.setTransactionType(request.type());
         transaction.setProductId(request.productId());
         transaction.setWarehouseId(request.warehouseId());
+        transaction.setBranchId(hierarchy.resolveBranchId(hierarchy.resolveStoreId(request.warehouseId()), request.warehouseId()));
+        transaction.setStoreId(hierarchy.resolveStoreId(request.warehouseId()));
         transaction.setTransactionDate(request.transactionDate() == null ? LocalDate.now() : request.transactionDate());
         transaction.setInwardQty(in);
         transaction.setOutwardQty(out);

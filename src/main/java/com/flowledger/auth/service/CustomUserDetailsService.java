@@ -29,6 +29,10 @@ public class CustomUserDetailsService implements org.springframework.security.co
     }
 
     public UserPrincipal load(UUID userId, UUID organizationId) {
+        return load(userId, organizationId, null, null, null);
+    }
+
+    public UserPrincipal load(UUID userId, UUID organizationId, UUID branchId, UUID storeId, UUID warehouseId) {
         User user =
                 users.findByIdAndActiveTrue(userId).orElseThrow(() -> new UsernameNotFoundException("User not found"));
         UUID activeOrgId = organizationId != null ? organizationId : user.getLastActiveOrganizationId();
@@ -45,6 +49,14 @@ public class CustomUserDetailsService implements org.springframework.security.co
             role.getPermissions().forEach(permission -> authorities.add(permission.getCode()));
         });
         return UserPrincipal.of(
-                user.getId(), activeOrgId, user.getEmail(), user.getPasswordHash(), authorities, user.isActive());
+                user.getId(),
+                activeOrgId,
+                branchId,
+                storeId,
+                warehouseId,
+                user.getEmail(),
+                user.getPasswordHash(),
+                authorities,
+                user.isActive());
     }
 }
