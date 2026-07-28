@@ -100,6 +100,19 @@ flowledger:
     client-secret: ${PAYPAL_CLIENT_SECRET:}
     webhook-id: ${PAYPAL_WEBHOOK_ID:}
     mode: ${PAYPAL_MODE:sandbox}
+  platform:
+    super-admin:
+      email: ${FLOWLEDGER_SUPER_ADMIN_EMAIL:superadmin@flowledger.local}
+      password: ${FLOWLEDGER_SUPER_ADMIN_PASSWORD:}
+      first-name: Super
+      last-name: Admin
+      reset-password-on-startup: ${FLOWLEDGER_SUPER_ADMIN_RESET_PASSWORD:false}
+  demo:
+    enabled: ${FLOWLEDGER_DEMO_ENABLED:false}
+    seed-on-startup: ${FLOWLEDGER_DEMO_SEED_ON_STARTUP:false}
+    scenario: ${FLOWLEDGER_DEMO_SCENARIO:retail-small}
+    default-password: ${FLOWLEDGER_DEMO_DEFAULT_PASSWORD:Password@123}
+    allow-reset: ${FLOWLEDGER_DEMO_ALLOW_RESET:false}
   ai:
     # Set FLOWLEDGER_AI_ENABLED=false to disable (ERP unchanged; AI beans/routes off).
     enabled: ${FLOWLEDGER_AI_ENABLED:true}
