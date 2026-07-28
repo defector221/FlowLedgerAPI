@@ -23,7 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class DemoSeedJobService {
     private static final Logger log = LoggerFactory.getLogger(DemoSeedJobService.class);
-    private static final int PIPELINE_STAGES = 12;
+    private static final int PIPELINE_STAGES = com.flowledger.demo.util.ProgressLogger.DEFAULT_PIPELINE_STAGES;
     private static final int MAX_JOBS = 50;
 
     private final ConcurrentHashMap<UUID, DemoSeedJob> jobs = new ConcurrentHashMap<>();
@@ -48,7 +48,9 @@ public class DemoSeedJobService {
 
     public Map<String, Object> enqueue(DemoSeedRequest request) {
         DemoScenario scenario = DemoScenario.fromCommand(request != null ? request.scenario() : null);
-        String orgName = request != null && request.organizationName() != null && !request.organizationName().isBlank()
+        String orgName = request != null
+                        && request.organizationName() != null
+                        && !request.organizationName().isBlank()
                 ? request.organizationName()
                 : registry.require(scenario).organizationName();
         DemoSeedJob job = new DemoSeedJob(scenario.command(), orgName, PIPELINE_STAGES);

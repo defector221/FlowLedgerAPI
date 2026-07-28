@@ -22,14 +22,14 @@ public class FefoAllocationStrategy implements AllocationStrategy {
         return eligible.stream()
                 .sorted(Comparator.comparing(
                                 AllocationCandidate::expiryDate, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparing(AllocationCandidate::receivedDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(
+                                AllocationCandidate::receivedDate, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(AllocationCandidate::batchId))
                 .toList();
     }
 
     @Override
     public boolean ties(AllocationCandidate a, AllocationCandidate b) {
-        return Objects.equals(a.expiryDate(), b.expiryDate())
-                && Objects.equals(a.receivedDate(), b.receivedDate());
+        return Objects.equals(a.expiryDate(), b.expiryDate()) && Objects.equals(a.receivedDate(), b.receivedDate());
     }
 }

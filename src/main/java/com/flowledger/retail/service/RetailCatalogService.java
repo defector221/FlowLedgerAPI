@@ -4,7 +4,6 @@ import static com.flowledger.retail.dto.RetailDtos.*;
 
 import com.flowledger.barcode.service.BarcodeResolveService;
 import com.flowledger.common.tenant.TenantContext;
-import com.flowledger.product.entity.Product;
 import com.flowledger.product.repository.ProductRepository;
 import com.flowledger.retail.entity.RetailBrand;
 import com.flowledger.retail.entity.RetailCollection;
@@ -18,7 +17,6 @@ import com.flowledger.retail.repository.RetailProductBarcodeRepository;
 import com.flowledger.retail.repository.RetailProductVariantRepository;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -243,13 +241,16 @@ public class RetailCatalogService {
     // ---------------------------------------------------------------- Barcodes
     @Transactional(readOnly = true)
     public List<BarcodeResponse> listBarcodes(UUID productId) {
-        return barcodes.findByOrganizationIdAndProductIdAndDeletedAtIsNullOrderByPrimaryDescCreatedAtAsc(org(), productId).stream()
+        return barcodes
+                .findByOrganizationIdAndProductIdAndDeletedAtIsNullOrderByPrimaryDescCreatedAtAsc(org(), productId)
+                .stream()
                 .map(this::map)
                 .toList();
     }
 
     public BarcodeResponse createBarcode(BarcodeRequest r) {
-        barcodes.findActiveByOrganizationIdAndBarcode(org(), r.barcode()).ifPresent(b -> conflict("Barcode already exists"));
+        barcodes.findActiveByOrganizationIdAndBarcode(org(), r.barcode())
+                .ifPresent(b -> conflict("Barcode already exists"));
         RetailProductBarcode e = new RetailProductBarcode();
         e.setOrganizationId(org());
         e.setProductId(r.productId());

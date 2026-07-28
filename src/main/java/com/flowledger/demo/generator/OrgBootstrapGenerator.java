@@ -3,6 +3,7 @@ package com.flowledger.demo.generator;
 import com.flowledger.accounting.service.ChartOfAccountsBootstrapService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.demo.DemoSeedContext;
+import com.flowledger.demo.config.DemoProperties;
 import com.flowledger.demo.scenario.DemoBlueprint;
 import com.flowledger.demo.util.ProgressLogger;
 import com.flowledger.organization.entity.Organization;
@@ -36,6 +37,7 @@ public class OrgBootstrapGenerator {
     private final EditionService editions;
     private final SubscriptionService subscriptions;
     private final UserGenerator userGenerator;
+    private final DemoProperties demoProperties;
 
     public OrgBootstrapGenerator(
             OrganizationRepository organizations,
@@ -44,7 +46,8 @@ public class OrgBootstrapGenerator {
             OrganizationModuleService organizationModuleService,
             EditionService editions,
             SubscriptionService subscriptions,
-            UserGenerator userGenerator) {
+            UserGenerator userGenerator,
+            DemoProperties demoProperties) {
         this.organizations = organizations;
         this.settings = settings;
         this.accounting = accounting;
@@ -52,6 +55,7 @@ public class OrgBootstrapGenerator {
         this.editions = editions;
         this.subscriptions = subscriptions;
         this.userGenerator = userGenerator;
+        this.demoProperties = demoProperties;
     }
 
     @Transactional
@@ -65,7 +69,9 @@ public class OrgBootstrapGenerator {
         org.setCountry("India");
         org.setCurrency("INR");
         org.setFinancialYearStart("04-01");
-        org.setInvoicePrefix(ctx.getScenario().slug().substring(0, Math.min(4, ctx.getScenario().slug().length()))
+        org.setInvoicePrefix(ctx.getScenario()
+                .slug()
+                .substring(0, Math.min(4, ctx.getScenario().slug().length()))
                 .toUpperCase(Locale.ROOT));
         org.setInvoiceNumberFormat("{PREFIX}/{FY}/{SEQ:6}");
         org.setOnboardingCompleted(true);
@@ -96,9 +102,14 @@ public class OrgBootstrapGenerator {
             userGenerator.createOrgUser(ctx, spec, progress, false);
         }
 
-        editions.provisionNewOrganization(orgId, "FREE", adminId);
-        subscriptions.ensureDefaultSubscription(adminId, "FREE");
-        subscriptions.ensureOrganizationSubscription(orgId, "FREE");
+        String planCode = demoProperties.getPlanCode() == null
+                        || demoProperties.getPlanCode().isBlank()
+                ? "BUSINESS"
+                : demoProperties.getPlanCode().trim().toUpperCase(Locale.ROOT);
+
+        editions.provisionNewOrganization(orgId, planCode, adminId);
+        subscriptions.ensureDefaultSubscription(adminId, planCode);
+        subscriptions.ensureOrganizationSubscription(orgId, planCode);
 
         // Dependencies before RETAIL (module graph: RETAIL → INVENTORY, ACCOUNTING)
         organizationModuleService.setModuleEnabled(orgId, ModuleCodes.INVENTORY, true, adminId);

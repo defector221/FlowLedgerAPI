@@ -15,11 +15,7 @@ public final class LocationDtos {
     public record LocationContextRequest(UUID branchId, UUID storeId, UUID warehouseId) {}
 
     public record LocationContextResponse(
-            UUID branchId,
-            UUID storeId,
-            UUID warehouseId,
-            String accessToken,
-            long expiresIn) {}
+            UUID branchId, UUID storeId, UUID warehouseId, String accessToken, long expiresIn) {}
 
     public record AccessibleLocationResponse(
             List<BranchOption> branches, List<StoreOption> stores, List<WarehouseOption> warehouses) {}

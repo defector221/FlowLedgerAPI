@@ -11,6 +11,9 @@ import com.flowledger.purchase.dto.PurchaseDtos.OrderRequest;
 import com.flowledger.purchase.entity.PurchaseOrder;
 import com.flowledger.purchase.entity.PurchaseOrderItem;
 import com.flowledger.tax.TaxSplitDefaults;
+import com.flowledger.tax.dto.TaxCalculationDtos.TaxResult;
+import com.flowledger.tax.service.TaxLineCalculator;
+import com.flowledger.tax.service.TaxLineCalculator.DocumentLineInput;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
@@ -33,14 +36,17 @@ public class PurchaseOrderService {
     private final DocumentNumberService numbers;
     private final OrganizationRepository organizations;
     private final SupplierCatalogService supplierCatalog;
+    private final TaxLineCalculator taxLineCalculator;
 
     public PurchaseOrderService(
             DocumentNumberService documentNumberService,
             OrganizationRepository organizationRepository,
-            SupplierCatalogService supplierCatalog) {
+            SupplierCatalogService supplierCatalog,
+            TaxLineCalculator taxLineCalculator) {
         numbers = documentNumberService;
         organizations = organizationRepository;
         this.supplierCatalog = supplierCatalog;
+        this.taxLineCalculator = taxLineCalculator;
     }
 
     public PurchaseOrder create(OrderRequest request) {
@@ -127,7 +133,9 @@ public class PurchaseOrderService {
 
     private LocalDate resolveExpectedDelivery(OrderRequest request) {
         if (request.expectedDeliveryDate() != null) return request.expectedDeliveryDate();
-        if (request.orderDate() == null || request.items() == null || request.items().isEmpty()) return null;
+        if (request.orderDate() == null
+                || request.items() == null
+                || request.items().isEmpty()) return null;
         int maxLead = 0;
         boolean any = false;
         UUID org = TenantContext.getOrganizationId();
@@ -173,36 +181,40 @@ public class PurchaseOrderService {
             item.setCgstSharePercent(TaxSplitDefaults.cgstShare(strategy, taxType, line.cgstSharePercent()));
             item.setSgstSharePercent(TaxSplitDefaults.sgstShare(strategy, taxType, line.sgstSharePercent()));
             item.setLineOrder(i++);
-            calculate(item);
+            calculate(item, po);
             po.getItems().add(item);
         }
         totals(po);
     }
 
-    private void calculate(PurchaseOrderItem item) {
+    private void calculate(PurchaseOrderItem item, PurchaseOrder po) {
         BigDecimal gross = item.getQuantity().multiply(item.getRate());
         item.setDiscountAmount(
                 gross.multiply(item.getDiscountPercent()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
-        item.setTaxableAmount(gross.subtract(item.getDiscountAmount()));
-        BigDecimal tax = item.getTaxableAmount()
-                .multiply(item.getTaxRate())
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-        String strategy = TaxSplitDefaults.normalizeStrategy(item.getSplitStrategy(), item.getTaxType());
-        switch (strategy) {
-            case "NO_SPLIT_IGST", "NO_SPLIT_OTHER" -> {
-                item.setCgstAmount(BigDecimal.ZERO);
-                item.setSgstAmount(BigDecimal.ZERO);
-                item.setIgstAmount(tax);
-            }
-            default -> {
-                BigDecimal cgstShare =
-                        item.getCgstSharePercent() == null ? new BigDecimal("50") : item.getCgstSharePercent();
-                item.setCgstAmount(tax.multiply(cgstShare).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
-                item.setSgstAmount(tax.subtract(item.getCgstAmount()));
-                item.setIgstAmount(BigDecimal.ZERO);
-            }
-        }
-        item.setLineTotal(item.getTaxableAmount().add(tax));
+        Organization org = organizations
+                .findById(TenantContext.getOrganizationId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found"));
+        String orgState = org.getStateCode() == null || org.getStateCode().isBlank()
+                ? "00"
+                : org.getStateCode().trim();
+        TaxResult taxResult = taxLineCalculator.calculateDocumentLine(new DocumentLineInput(
+                orgState,
+                orgState,
+                "IN",
+                po.getOrderDate(),
+                item.getProductId(),
+                null,
+                null,
+                item.getQuantity(),
+                item.getRate(),
+                item.getDiscountAmount(),
+                false,
+                item.getTaxRate(),
+                item.getTaxType(),
+                item.getSplitStrategy(),
+                item.getCgstSharePercent(),
+                item.getSgstSharePercent()));
+        taxLineCalculator.applyTaxSnapshots(item, taxResult);
     }
 
     private void totals(PurchaseOrder po) {

@@ -70,9 +70,7 @@ public class ProductBarcodeManagementService extends OrganizationScopedService {
     @Transactional(readOnly = true)
     public List<BarcodeHistoryResponse> history(UUID productId) {
         requireProduct(productId);
-        return historyRepository
-                .findByOrganizationIdAndProductIdOrderByCreatedAtDesc(orgId(), productId)
-                .stream()
+        return historyRepository.findByOrganizationIdAndProductIdOrderByCreatedAtDesc(orgId(), productId).stream()
                 .map(h -> new BarcodeHistoryResponse(
                         h.getId(),
                         h.getProductId(),
@@ -133,23 +131,16 @@ public class ProductBarcodeManagementService extends OrganizationScopedService {
             syncProductBarcode(product, value);
         }
         history.record(
-                orgId(),
-                productId,
-                saved.getId(),
-                null,
-                value,
-                "GENERATED",
-                request == null ? null : request.reason());
+                orgId(), productId, saved.getId(), null, value, "GENERATED", request == null ? null : request.reason());
         return toResponse(saved);
     }
 
     public BarcodeResponse regenerate(UUID productId, RegenerateBarcodeRequest request) {
         Product product = requireProduct(productId);
-        RetailProductBarcode current = barcodes
-                .findByOrganizationIdAndProductIdAndPrimaryTrueAndDeletedAtIsNull(orgId(), productId)
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> notFound("Primary barcode not found"));
+        RetailProductBarcode current =
+                barcodes.findByOrganizationIdAndProductIdAndPrimaryTrueAndDeletedAtIsNull(orgId(), productId).stream()
+                        .findFirst()
+                        .orElseThrow(() -> notFound("Primary barcode not found"));
         String oldValue = current.getBarcode();
         softDelete(current, request == null ? null : request.reason());
         String newValue = generator.generateEan13(orgId(), productId, product.getSku());
@@ -177,8 +168,8 @@ public class ProductBarcodeManagementService extends OrganizationScopedService {
 
     public void softDelete(UUID productId, UUID barcodeId, String reason) {
         requireProduct(productId);
-        RetailProductBarcode row = barcodes
-                .findByIdAndOrganizationIdAndProductIdAndDeletedAtIsNull(barcodeId, orgId(), productId)
+        RetailProductBarcode row = barcodes.findByIdAndOrganizationIdAndProductIdAndDeletedAtIsNull(
+                        barcodeId, orgId(), productId)
                 .orElseThrow(() -> notFound("Barcode not found"));
         softDelete(row, reason);
     }
@@ -191,8 +182,7 @@ public class ProductBarcodeManagementService extends OrganizationScopedService {
         List<String> errors = new ArrayList<>();
         for (Product product : targets) {
             try {
-                if (!barcodes
-                        .findByOrganizationIdAndProductIdAndPrimaryTrueAndDeletedAtIsNull(orgId(), product.getId())
+                if (!barcodes.findByOrganizationIdAndProductIdAndPrimaryTrueAndDeletedAtIsNull(orgId(), product.getId())
                         .isEmpty()) {
                     skipped++;
                     continue;
@@ -281,18 +271,11 @@ public class ProductBarcodeManagementService extends OrganizationScopedService {
         row.setPrimary(false);
         audit(row, false);
         barcodes.save(row);
-        history.record(
-                orgId(),
-                row.getProductId(),
-                row.getId(),
-                row.getBarcode(),
-                null,
-                "DELETED",
-                reason);
-        if (barcodes.findByOrganizationIdAndProductIdAndPrimaryTrueAndDeletedAtIsNull(
-                        orgId(), row.getProductId())
+        history.record(orgId(), row.getProductId(), row.getId(), row.getBarcode(), null, "DELETED", reason);
+        if (barcodes.findByOrganizationIdAndProductIdAndPrimaryTrueAndDeletedAtIsNull(orgId(), row.getProductId())
                 .isEmpty()) {
-            barcodes.findByOrganizationIdAndProductIdAndDeletedAtIsNullOrderByPrimaryDescCreatedAtAsc(
+            barcodes
+                    .findByOrganizationIdAndProductIdAndDeletedAtIsNullOrderByPrimaryDescCreatedAtAsc(
                             orgId(), row.getProductId())
                     .stream()
                     .findFirst()
@@ -358,20 +341,19 @@ public class ProductBarcodeManagementService extends OrganizationScopedService {
         List<Product> targets = resolveProducts(productIds, false);
         List<BarcodeSheetItem> items = new ArrayList<>();
         for (Product product : targets) {
-            RetailProductBarcode primary = barcodes
-                    .findByOrganizationIdAndProductIdAndPrimaryTrueAndDeletedAtIsNull(orgId(), product.getId())
-                    .stream()
-                    .findFirst()
-                    .orElse(null);
+            RetailProductBarcode primary =
+                    barcodes
+                            .findByOrganizationIdAndProductIdAndPrimaryTrueAndDeletedAtIsNull(orgId(), product.getId())
+                            .stream()
+                            .findFirst()
+                            .orElse(null);
             String value = primary != null
                     ? primary.getBarcode()
                     : (product.getBarcode() == null || product.getBarcode().isBlank() ? null : product.getBarcode());
             if (value == null) {
                 continue;
             }
-            String type = primary != null && primary.getBarcodeType() != null
-                    ? primary.getBarcodeType()
-                    : "CODE128";
+            String type = primary != null && primary.getBarcodeType() != null ? primary.getBarcodeType() : "CODE128";
             items.add(new BarcodeSheetItem(
                     product.getId(),
                     Objects.toString(product.getSku(), ""),
@@ -419,8 +401,7 @@ public class ProductBarcodeManagementService extends OrganizationScopedService {
         if (value == null) {
             return "";
         }
-        return value
-                .replace("&", "&amp;")
+        return value.replace("&", "&amp;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;")
                 .replace("\"", "&quot;");

@@ -137,8 +137,7 @@ public class OrganizationModuleService {
             UUID actorId,
             List<UpsertOrganizationModuleRequest> requests,
             boolean validateDependencies) {
-        List<UpsertOrganizationModuleRequest> ordered =
-                ModuleEnableOrder.order(requests, catalog::dependenciesOf);
+        List<UpsertOrganizationModuleRequest> ordered = ModuleEnableOrder.order(requests, catalog::dependenciesOf);
         for (UpsertOrganizationModuleRequest request : ordered) {
             upsertModule(organizationId, actorId, request, validateDependencies);
         }

@@ -3,7 +3,6 @@ package com.flowledger.inventory.allocation;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.flowledger.inventory.entity.StockReservation;
@@ -89,8 +88,7 @@ class InventoryAllocationEngineReservationTest {
         Product product = new Product();
         product.setBatchTracking(false);
         when(products.findByIdAndOrganizationId(productId, org)).thenReturn(Optional.of(product));
-        when(warehousePoolAllocator.allocate(any()))
-                .thenReturn(AllocationResult.conflict(java.util.List.of()));
+        when(warehousePoolAllocator.allocate(any())).thenReturn(AllocationResult.conflict(java.util.List.of()));
 
         ReservationResult result = engine.reserveForDocument(new DocumentLineAllocationRequest(
                 org,

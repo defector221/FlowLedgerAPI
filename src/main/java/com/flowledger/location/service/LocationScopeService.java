@@ -1,11 +1,9 @@
 package com.flowledger.location.service;
 
-import com.flowledger.common.exception.ResourceNotFoundException;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.location.domain.LocationScopeType;
 import com.flowledger.location.entity.UserLocationAssignment;
 import com.flowledger.location.repository.UserLocationAssignmentRepository;
-import com.flowledger.organization.entity.Branch;
 import com.flowledger.organization.repository.BranchRepository;
 import com.flowledger.retail.entity.RetailStore;
 import com.flowledger.retail.repository.RetailStoreRepository;
@@ -46,11 +44,11 @@ public class LocationScopeService {
         if (hasRole("ORGANIZATION_ADMIN") || hasRole("RETAIL_ADMIN")) {
             return true;
         }
-        return assignments
-                        .findByOrganizationIdAndUserIdAndActiveTrue(org(), userId())
-                        .stream()
+        return assignments.findByOrganizationIdAndUserIdAndActiveTrue(org(), userId()).stream()
                         .anyMatch(a -> a.getScopeType() == LocationScopeType.ORGANIZATION)
-                || assignments.findByOrganizationIdAndUserIdAndActiveTrue(org(), userId()).isEmpty()
+                || assignments
+                                .findByOrganizationIdAndUserIdAndActiveTrue(org(), userId())
+                                .isEmpty()
                         && hasRole("ORGANIZATION_ADMIN");
     }
 
@@ -158,7 +156,9 @@ public class LocationScopeService {
                 }
                 case BRANCH -> {
                     if (a.getBranchId() != null) {
-                        warehouses.findByOrganizationIdAndBranchId(org(), a.getBranchId()).forEach(w -> ids.add(w.getId()));
+                        warehouses
+                                .findByOrganizationIdAndBranchId(org(), a.getBranchId())
+                                .forEach(w -> ids.add(w.getId()));
                     }
                 }
                 default -> {}

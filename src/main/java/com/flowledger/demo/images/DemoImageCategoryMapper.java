@@ -64,13 +64,14 @@ public final class DemoImageCategoryMapper {
             case ELECTRONICS -> "electronics/tv";
             case PHARMACY -> "pharmacy/medicine";
             case WHOLESALE -> "grocery/oil";
-            case MIXED_RETAIL -> switch (scenario) {
-                case GROCERY_CHAIN -> "grocery/snacks";
-                case FASHION_CHAIN -> "fashion/shirts";
-                case ELECTRONICS_CHAIN -> "digital/laptop";
-                case PHARMACY -> "pharmacy/medicine";
-                default -> "digital/phone";
-            };
+            case MIXED_RETAIL ->
+                switch (scenario) {
+                    case GROCERY_CHAIN -> "grocery/snacks";
+                    case FASHION_CHAIN -> "fashion/shirts";
+                    case ELECTRONICS_CHAIN -> "digital/laptop";
+                    case PHARMACY -> "pharmacy/medicine";
+                    default -> "digital/phone";
+                };
         };
     }
 

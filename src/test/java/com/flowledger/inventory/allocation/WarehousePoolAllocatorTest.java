@@ -26,8 +26,8 @@ class WarehousePoolAllocatorTest {
         UUID warehouse = UUID.randomUUID();
         when(availability.warehouseAvailable(org, product, warehouse, null)).thenReturn(new BigDecimal("10"));
 
-        AllocationResult result = allocator.allocate(
-                new AllocationRequest(org, product, warehouse, new BigDecimal("3"), null));
+        AllocationResult result =
+                allocator.allocate(new AllocationRequest(org, product, warehouse, new BigDecimal("3"), null));
 
         assertEquals(AllocationStatus.AUTO_ALLOCATED, result.status());
         assertEquals(AllocationMode.WAREHOUSE_POOL, result.allocated().allocationMode());
@@ -40,8 +40,8 @@ class WarehousePoolAllocatorTest {
         UUID warehouse = UUID.randomUUID();
         when(availability.warehouseAvailable(org, product, warehouse, null)).thenReturn(new BigDecimal("1"));
 
-        AllocationResult result = allocator.allocate(
-                new AllocationRequest(org, product, warehouse, new BigDecimal("3"), null));
+        AllocationResult result =
+                allocator.allocate(new AllocationRequest(org, product, warehouse, new BigDecimal("3"), null));
 
         assertEquals(AllocationStatus.OUT_OF_STOCK, result.status());
     }
@@ -53,8 +53,8 @@ class WarehousePoolAllocatorTest {
         UUID warehouse = UUID.randomUUID();
         when(availability.warehouseAvailable(org, product, warehouse, null)).thenReturn(new BigDecimal("2"));
 
-        AllocationResult result = allocator.allocate(
-                new AllocationRequest(org, product, warehouse, new BigDecimal("3"), null));
+        AllocationResult result =
+                allocator.allocate(new AllocationRequest(org, product, warehouse, new BigDecimal("3"), null));
 
         assertEquals(AllocationStatus.OUT_OF_STOCK, result.status());
     }

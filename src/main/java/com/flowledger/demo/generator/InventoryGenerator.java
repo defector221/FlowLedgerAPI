@@ -29,9 +29,7 @@ public class InventoryGenerator {
     private final DemoIsolatedWork isolated;
 
     public InventoryGenerator(
-            InventoryService inventoryService,
-            OrganizationSettingsRepository settings,
-            DemoIsolatedWork isolated) {
+            InventoryService inventoryService, OrganizationSettingsRepository settings, DemoIsolatedWork isolated) {
         this.inventoryService = inventoryService;
         this.settings = settings;
         this.isolated = isolated;
@@ -64,9 +62,12 @@ public class InventoryGenerator {
         for (UUID productId : products) {
             for (UUID warehouseId : targetWarehouses) {
                 // Solid POS-ready stock on every store warehouse (not random / not zero).
-                BigDecimal qty = BigDecimal.valueOf(100 + ThreadLocalRandom.current().nextInt(101));
-                boolean ok = tryPost(ctx, () -> inventoryService.openingStock(
-                        new Adjustment(productId, warehouseId, qty, "Demo opening stock")));
+                BigDecimal qty =
+                        BigDecimal.valueOf(100 + ThreadLocalRandom.current().nextInt(101));
+                boolean ok = tryPost(
+                        ctx,
+                        () -> inventoryService.openingStock(
+                                new Adjustment(productId, warehouseId, qty, "Demo opening stock")));
                 if (ok) {
                     posted++;
                 } else {
@@ -82,8 +83,8 @@ public class InventoryGenerator {
         ctx.getMeta().put("openingStockPosted", posted);
         ctx.getMeta().put("openingStockFailures", failures);
         ctx.getMeta().put("openingStockWarehouses", targetWarehouses.size());
-        progress.done("Opening stock (posted=" + posted + ", warehouses=" + targetWarehouses.size()
-                + ", failures=" + failures + ")");
+        progress.done("Opening stock (posted=" + posted + ", warehouses=" + targetWarehouses.size() + ", failures="
+                + failures + ")");
     }
 
     private static List<UUID> storeFirstWarehouses(DemoSeedContext ctx) {

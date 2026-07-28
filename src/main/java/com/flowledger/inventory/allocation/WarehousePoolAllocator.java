@@ -1,7 +1,6 @@
 package com.flowledger.inventory.allocation;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /** Non-batch products: warehouse pool only — never CONFLICT. */
@@ -15,10 +14,7 @@ public class WarehousePoolAllocator {
 
     public AllocationResult allocate(AllocationRequest request) {
         BigDecimal available = availability.warehouseAvailable(
-                request.organizationId(),
-                request.productId(),
-                request.warehouseId(),
-                request.excludeReservationId());
+                request.organizationId(), request.productId(), request.warehouseId(), request.excludeReservationId());
         if (available.compareTo(request.quantity()) >= 0) {
             return AllocationResult.auto(new AllocatedInventory(
                     null,

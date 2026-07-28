@@ -64,8 +64,7 @@ public class SalesInvoiceModuleWriter implements DocumentModuleWriter {
         List<Item> items = new ArrayList<>();
         for (Map<String, String> row : rows) {
             String productCode = required(row, "productCode").toUpperCase(Locale.ROOT);
-            var product = products
-                    .findByOrganizationIdAndSku(organizationId, productCode)
+            var product = products.findByOrganizationIdAndSku(organizationId, productCode)
                     .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productCode));
             items.add(new Item(
                     product.getId(),
@@ -101,9 +100,8 @@ public class SalesInvoiceModuleWriter implements DocumentModuleWriter {
                 null,
                 items));
 
-        SalesInvoice entity = salesRepo
-                .findByIdAndOrganizationId(detail.id(), organizationId)
-                .orElseThrow();
+        SalesInvoice entity =
+                salesRepo.findByIdAndOrganizationId(detail.id(), organizationId).orElseThrow();
         entity.setInvoiceNumber(invoiceNumber);
         salesRepo.save(entity);
         return WriteResult.imported(entity.getId(), "SALES_INVOICE");

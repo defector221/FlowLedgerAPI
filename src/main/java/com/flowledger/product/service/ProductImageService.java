@@ -25,8 +25,7 @@ public class ProductImageService extends OrganizationScopedService {
     private final ProductImageRepository images;
     private final StorageService storage;
 
-    public ProductImageService(
-            ProductRepository products, ProductImageRepository images, StorageService storage) {
+    public ProductImageService(ProductRepository products, ProductImageRepository images, StorageService storage) {
         this.products = products;
         this.images = images;
         this.storage = storage;
@@ -82,7 +81,8 @@ public class ProductImageService extends OrganizationScopedService {
         if (primary) {
             clearPrimary(productId);
         }
-        int sortOrder = images.findByOrganizationIdAndProductIdOrderBySortOrderAsc(orgId(), productId).size();
+        int sortOrder = images.findByOrganizationIdAndProductIdOrderBySortOrderAsc(orgId(), productId)
+                .size();
         ProductImage row = new ProductImage();
         row.setOrganizationId(orgId());
         row.setProductId(productId);
@@ -113,8 +113,7 @@ public class ProductImageService extends OrganizationScopedService {
 
     public List<ImageResponse> reorder(UUID productId, ReorderImagesRequest request) {
         requireProduct(productId);
-        List<ProductImage> existing =
-                images.findByOrganizationIdAndProductIdOrderBySortOrderAsc(orgId(), productId);
+        List<ProductImage> existing = images.findByOrganizationIdAndProductIdOrderBySortOrderAsc(orgId(), productId);
         List<UUID> order = request.imageIds() == null ? List.of() : request.imageIds();
         List<ProductImage> updated = new ArrayList<>();
         for (int i = 0; i < order.size(); i++) {

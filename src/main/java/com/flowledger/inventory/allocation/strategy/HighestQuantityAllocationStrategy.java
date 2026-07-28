@@ -4,7 +4,6 @@ import com.flowledger.inventory.allocation.AllocationCandidate;
 import com.flowledger.inventory.allocation.AllocationContext;
 import com.flowledger.inventory.allocation.AllocationStrategy;
 import com.flowledger.inventory.allocation.AllocationStrategyType;
-import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Component;

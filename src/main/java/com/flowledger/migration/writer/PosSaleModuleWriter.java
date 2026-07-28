@@ -55,22 +55,22 @@ public class PosSaleModuleWriter implements DocumentModuleWriter {
         UUID terminalId = null;
         String terminalCode = str(first, "terminalCode");
         if (terminalCode != null) {
-            terminalId = terminals
-                    .findByOrganizationIdAndStoreIdAndDeletedFalseOrderByNameAsc(organizationId, store.getId())
-                    .stream()
-                    .filter(t -> terminalCode.equalsIgnoreCase(t.getCode()))
-                    .map(t -> t.getId())
-                    .findFirst()
-                    .orElse(null);
+            terminalId =
+                    terminals
+                            .findByOrganizationIdAndStoreIdAndDeletedFalseOrderByNameAsc(organizationId, store.getId())
+                            .stream()
+                            .filter(t -> terminalCode.equalsIgnoreCase(t.getCode()))
+                            .map(t -> t.getId())
+                            .findFirst()
+                            .orElse(null);
         }
 
-        var sale = posSales.createDraft(new PosSaleRequest(
-                store.getId(), null, terminalId, null, null, null, "Migration " + groupKey(first)));
+        var sale = posSales.createDraft(
+                new PosSaleRequest(store.getId(), null, terminalId, null, null, null, "Migration " + groupKey(first)));
 
         for (Map<String, String> row : rows) {
             String productCode = required(row, "productCode").toUpperCase(Locale.ROOT);
-            var product = products
-                    .findByOrganizationIdAndSku(organizationId, productCode)
+            var product = products.findByOrganizationIdAndSku(organizationId, productCode)
                     .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productCode));
             posSales.addLine(
                     sale.id(),

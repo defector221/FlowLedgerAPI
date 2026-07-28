@@ -40,8 +40,7 @@ public class InventoryAllocationEngineImpl implements InventoryAllocationEngine 
 
     @Override
     public AllocationResult allocate(AllocationRequest request) {
-        Product product = products
-                .findByIdAndOrganizationId(request.productId(), request.organizationId())
+        Product product = products.findByIdAndOrganizationId(request.productId(), request.organizationId())
                 .orElse(null);
         if (product == null) {
             return AllocationResult.invalidProduct("Product not found");
@@ -59,8 +58,7 @@ public class InventoryAllocationEngineImpl implements InventoryAllocationEngine 
 
     @Override
     public AllocationResult allocateWithBatch(AllocationRequest request, UUID batchId) {
-        Product product = products
-                .findByIdAndOrganizationId(request.productId(), request.organizationId())
+        Product product = products.findByIdAndOrganizationId(request.productId(), request.organizationId())
                 .orElse(null);
         if (product == null) {
             return AllocationResult.invalidProduct("Product not found");
@@ -78,8 +76,7 @@ public class InventoryAllocationEngineImpl implements InventoryAllocationEngine 
         AllocationStatus overall = AllocationStatus.AUTO_ALLOCATED;
 
         for (CartLineAllocation line : cartLines) {
-            Product product = products
-                    .findByIdAndOrganizationId(line.productId(), line.organizationId())
+            Product product = products.findByIdAndOrganizationId(line.productId(), line.organizationId())
                     .orElse(null);
             if (product == null) {
                 issues.add(new CheckoutLineIssue(

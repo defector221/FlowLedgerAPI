@@ -25,8 +25,9 @@ import com.flowledger.sales.dto.SalesDtos.*;
 import com.flowledger.sales.entity.*;
 import com.flowledger.sales.repository.*;
 import com.flowledger.tax.TaxSplitDefaults;
-import com.flowledger.tax.dto.GstCalculationDtos;
-import com.flowledger.tax.service.GstCalculationService;
+import com.flowledger.tax.dto.TaxCalculationDtos.TaxResult;
+import com.flowledger.tax.service.TaxLineCalculator;
+import com.flowledger.tax.service.TaxLineCalculator.DocumentLineInput;
 import com.flowledger.transport.domain.TransportEnums.ShipmentStatus;
 import com.flowledger.transport.repository.ShipmentRepository;
 import java.math.BigDecimal;
@@ -60,7 +61,7 @@ public class SalesDocumentService {
     private final ProductRepository products;
     private final DocumentNumberService numbers;
     private final SalesInvoiceService invoiceService;
-    private final GstCalculationService gst;
+    private final TaxLineCalculator taxLineCalculator;
     private final InventoryService inventory;
     private final DocumentVoucherFacade documentPosting;
     private final ObjectProvider<AiWorkflowGateService> workflowGate;
@@ -86,7 +87,7 @@ public class SalesDocumentService {
             ProductRepository products,
             DocumentNumberService numbers,
             SalesInvoiceService invoiceService,
-            GstCalculationService gst,
+            TaxLineCalculator taxLineCalculator,
             InventoryService inventory,
             DocumentVoucherFacade documentPosting,
             ObjectProvider<AiWorkflowGateService> workflowGate,
@@ -103,7 +104,7 @@ public class SalesDocumentService {
         this.products = products;
         this.numbers = numbers;
         this.invoiceService = invoiceService;
-        this.gst = gst;
+        this.taxLineCalculator = taxLineCalculator;
         this.inventory = inventory;
         this.documentPosting = documentPosting;
         this.workflowGate = workflowGate;
@@ -333,7 +334,8 @@ public class SalesDocumentService {
         if (order.getStatus() != SalesOrder.Status.DRAFT) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only draft orders can be confirmed");
         }
-        UUID warehouseId = inventoryCoordinator.resolveWarehouseId(orgId(), request == null ? null : request.warehouseId());
+        UUID warehouseId =
+                inventoryCoordinator.resolveWarehouseId(orgId(), request == null ? null : request.warehouseId());
         order.setWarehouseId(warehouseId);
         if (inventoryCoordinator.shouldReserveOnSalesOrderConfirm(orgId())) {
             reserveOrderLines(order, warehouseId, null);
@@ -422,8 +424,8 @@ public class SalesDocumentService {
         }
         gate("SALES_ORDER", order.getId(), order.getGrandTotal(), "convert to delivery challan");
         Organization org = organization();
-        UUID warehouseId = inventoryCoordinator.resolveWarehouseId(
-                orgId(), request == null ? null : request.warehouseId());
+        UUID warehouseId =
+                inventoryCoordinator.resolveWarehouseId(orgId(), request == null ? null : request.warehouseId());
         if (order.getWarehouseId() == null) {
             order.setWarehouseId(warehouseId);
         } else if (request != null && request.warehouseId() != null) {
@@ -459,8 +461,7 @@ public class SalesDocumentService {
             if (qty.compareTo(remaining) > 0) {
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT,
-                        "Challan quantity exceeds remaining order quantity for line "
-                                + orderItem.getId());
+                        "Challan quantity exceeds remaining order quantity for line " + orderItem.getId());
             }
             DeliveryChallanItem item = new DeliveryChallanItem();
             item.setDeliveryChallan(challan);
@@ -788,26 +789,27 @@ public class SalesDocumentService {
                 ? null
                 : challans.findDetailedByIdAndOrganizationId(challanId, orgId())
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Challan not found"));
-        var requestItems = (challan != null ? challan.getItems() : order.getItems()).stream()
-                .map(sourceLine -> {
-                    SalesOrderItem orderLine = resolveOrderLineForInvoice(order, challan, sourceLine);
-                    return new Item(
-                            orderLine.getProductId(),
-                            orderLine.getDescription(),
-                            orderLine.getHsnSacCode(),
-                            sourceLine instanceof DeliveryChallanItem dcLine
-                                    ? dcLine.getQuantity()
-                                    : orderLine.getQuantity(),
-                            orderLine.getUnitId(),
-                            orderLine.getRate(),
-                            orderLine.getDiscountPercent(),
-                            orderLine.getTaxRate(),
-                            orderLine.getTaxType(),
-                            orderLine.getSplitStrategy(),
-                            orderLine.getCgstSharePercent(),
-                            orderLine.getSgstSharePercent());
-                })
-                .toList();
+        var requestItems = (challan != null ? challan.getItems() : order.getItems())
+                .stream()
+                        .map(sourceLine -> {
+                            SalesOrderItem orderLine = resolveOrderLineForInvoice(order, challan, sourceLine);
+                            return new Item(
+                                    orderLine.getProductId(),
+                                    orderLine.getDescription(),
+                                    orderLine.getHsnSacCode(),
+                                    sourceLine instanceof DeliveryChallanItem dcLine
+                                            ? dcLine.getQuantity()
+                                            : orderLine.getQuantity(),
+                                    orderLine.getUnitId(),
+                                    orderLine.getRate(),
+                                    orderLine.getDiscountPercent(),
+                                    orderLine.getTaxRate(),
+                                    orderLine.getTaxType(),
+                                    orderLine.getSplitStrategy(),
+                                    orderLine.getCgstSharePercent(),
+                                    orderLine.getSgstSharePercent());
+                        })
+                        .toList();
         var request = new Invoice(
                 order.getCustomerId(),
                 LocalDate.now(),
@@ -828,16 +830,13 @@ public class SalesDocumentService {
                 requestItems);
         InvoiceDetail draft = invoiceService.createDraft(request);
         invoiceService.applyAllocationSnapshots(
-                draft.id(),
-                challan != null ? challan.getItems() : null,
-                order.getItems());
+                draft.id(), challan != null ? challan.getItems() : null, order.getItems());
         invoiceService.confirmConverted(draft.id());
         return invoices.findDetailedByIdAndOrganizationId(draft.id(), orgId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
     }
 
-    private SalesOrderItem resolveOrderLineForInvoice(
-            SalesOrder order, DeliveryChallan challan, Object sourceLine) {
+    private SalesOrderItem resolveOrderLineForInvoice(SalesOrder order, DeliveryChallan challan, Object sourceLine) {
         if (sourceLine instanceof DeliveryChallanItem dcLine) {
             if (dcLine.getSalesOrderItemId() != null) {
                 return order.getItems().stream()
@@ -893,6 +892,9 @@ public class SalesDocumentService {
                     quotationItem.setSgstAmount(line.sgst());
                     quotationItem.setIgstAmount(line.igst());
                     quotationItem.setLineTotal(line.lineTotal());
+                    if (line.taxResult() != null) {
+                        taxLineCalculator.applyTaxSnapshots(quotationItem, line.taxResult());
+                    }
                     quotationItem.setLineOrder(order);
                     quotation.getItems().add(quotationItem);
                 });
@@ -938,6 +940,9 @@ public class SalesDocumentService {
             orderItem.setSgstAmount(line.sgst());
             orderItem.setIgstAmount(line.igst());
             orderItem.setLineTotal(line.lineTotal());
+            if (line.taxResult() != null) {
+                taxLineCalculator.applyTaxSnapshots(orderItem, line.taxResult());
+            }
             orderItem.setLineOrder(n);
             order.getItems().add(orderItem);
         });
@@ -989,35 +994,43 @@ public class SalesDocumentService {
                     .multiply(item.rate())
                     .multiply(z(item.discountPercent()))
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-            var gstResult = gst.calculate(new GstCalculationDtos.Request(
+            String taxType = TaxSplitDefaults.normalizeTaxType(item.taxType());
+            String strategy = TaxSplitDefaults.normalizeStrategy(item.splitStrategy(), taxType);
+            TaxResult taxResult = taxLineCalculator.calculateDocumentLine(new DocumentLineInput(
                     state.isBlank() ? "00" : state,
                     supply.isBlank() ? "00" : supply,
-                    z(item.taxRate()),
-                    false,
+                    "IN",
+                    LocalDate.now(),
+                    item.productId(),
+                    null,
+                    null,
                     item.quantity(),
                     item.rate(),
                     discount,
-                    item.taxType(),
-                    item.splitStrategy(),
+                    false,
+                    z(item.taxRate()),
+                    taxType,
+                    strategy,
                     item.cgstSharePercent(),
                     item.sgstSharePercent()));
             consumer.accept(
                     item,
                     new CalculatedLine(
                             discount,
-                            gstResult.taxable(),
-                            gstResult.cgst(),
-                            gstResult.sgst(),
-                            gstResult.igst().add(gstResult.otherTax()),
-                            gstResult.lineTotal()),
+                            taxResult.taxableAmount(),
+                            taxResult.cgstAmount(),
+                            taxResult.sgstAmount(),
+                            taxResult.igstAmount().add(taxResult.otherTaxAmount()),
+                            taxResult.lineTotal(),
+                            taxResult),
                     n++);
             sub = sub.add(item.quantity().multiply(item.rate()));
             disc = disc.add(discount);
-            tax = tax.add(gstResult.cgst())
-                    .add(gstResult.sgst())
-                    .add(gstResult.igst())
-                    .add(gstResult.otherTax());
-            grand = grand.add(gstResult.lineTotal());
+            tax = tax.add(taxResult.cgstAmount())
+                    .add(taxResult.sgstAmount())
+                    .add(taxResult.igstAmount())
+                    .add(taxResult.otherTaxAmount());
+            grand = grand.add(taxResult.lineTotal());
         }
         return new LineTotals(sub, disc, tax, grand);
     }
@@ -1121,7 +1134,8 @@ public class SalesDocumentService {
             BigDecimal cgst,
             BigDecimal sgst,
             BigDecimal igst,
-            BigDecimal lineTotal) {}
+            BigDecimal lineTotal,
+            TaxResult taxResult) {}
 
     private record LineTotals(
             BigDecimal subtotal, BigDecimal discountTotal, BigDecimal taxTotal, BigDecimal grandTotal) {}

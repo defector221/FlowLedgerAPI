@@ -74,8 +74,7 @@ public class PurchaseInvoiceModuleWriter implements DocumentModuleWriter {
         List<Line> lines = new ArrayList<>();
         for (Map<String, String> row : rows) {
             String productCode = required(row, "productCode").toUpperCase(Locale.ROOT);
-            var product = products
-                    .findByOrganizationIdAndSku(organizationId, productCode)
+            var product = products.findByOrganizationIdAndSku(organizationId, productCode)
                     .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productCode));
             lines.add(new Line(
                     product.getId(),

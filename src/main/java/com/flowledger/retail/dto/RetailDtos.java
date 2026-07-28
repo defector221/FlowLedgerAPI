@@ -163,10 +163,7 @@ public final class RetailDtos {
             String allocationMode) {}
 
     public record PosScanRequest(
-            @NotBlank String barcode,
-            @NotNull @Positive BigDecimal quantity,
-            UUID warehouseId,
-            UUID posSaleId) {}
+            @NotBlank String barcode, @NotNull @Positive BigDecimal quantity, UUID warehouseId, UUID posSaleId) {}
 
     public record PosScanConfirmRequest(
             @NotBlank String barcode,
@@ -215,7 +212,8 @@ public final class RetailDtos {
             String message,
             List<AllocationCandidateResponse> candidates) {}
 
-    public record PosCheckoutConflictResponse(boolean allocationChanged, String message, List<CheckoutConflictLineResponse> lines) {}
+    public record PosCheckoutConflictResponse(
+            boolean allocationChanged, String message, List<CheckoutConflictLineResponse> lines) {}
 
     public record PosLineUpdateRequest(
             @Positive BigDecimal quantity, BigDecimal discountPercent, BigDecimal rate, BigDecimal taxRate) {}

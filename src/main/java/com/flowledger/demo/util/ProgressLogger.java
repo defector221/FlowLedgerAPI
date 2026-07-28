@@ -10,8 +10,10 @@ public final class ProgressLogger {
     private final int totalStages;
     private int stageIndex;
 
+    public static final int DEFAULT_PIPELINE_STAGES = 13;
+
     public ProgressLogger(Logger log, String scenario) {
-        this(log, scenario, null, 12);
+        this(log, scenario, null, DEFAULT_PIPELINE_STAGES);
     }
 
     public ProgressLogger(Logger log, String scenario, DemoSeedProgressSink sink, int totalStages) {

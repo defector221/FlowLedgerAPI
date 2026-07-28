@@ -8,7 +8,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.List;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -21,19 +20,19 @@ public class PreferredWarehouseAllocationStrategy implements AllocationStrategy 
 
     @Override
     public List<AllocationCandidate> rank(List<AllocationCandidate> eligible, AllocationContext context) {
-        UUID preferred = context.preferredWarehouseId() != null
-                ? context.preferredWarehouseId()
-                : context.warehouseId();
+        UUID preferred =
+                context.preferredWarehouseId() != null ? context.preferredWarehouseId() : context.warehouseId();
         return eligible.stream()
-                .sorted(Comparator.comparing((AllocationCandidate c) -> !c.warehouseId().equals(preferred))
-                        .thenComparing(AllocationCandidate::receivedDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                .sorted(Comparator.comparing(
+                                (AllocationCandidate c) -> !c.warehouseId().equals(preferred))
+                        .thenComparing(
+                                AllocationCandidate::receivedDate, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(AllocationCandidate::batchId))
                 .toList();
     }
 
     @Override
     public boolean ties(AllocationCandidate a, AllocationCandidate b) {
-        return Objects.equals(a.warehouseId(), b.warehouseId())
-                && Objects.equals(a.receivedDate(), b.receivedDate());
+        return Objects.equals(a.warehouseId(), b.warehouseId()) && Objects.equals(a.receivedDate(), b.receivedDate());
     }
 }

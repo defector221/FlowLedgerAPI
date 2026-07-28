@@ -6,6 +6,7 @@ import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.search.event.SearchIndexDeleteEvent;
 import com.flowledger.search.event.SearchIndexUpsertEvent;
 import com.flowledger.search.model.SearchEntityType;
+import com.flowledger.search.service.SearchEntityDocumentLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -23,17 +24,34 @@ public class AiSearchEventBridge {
 
     private final RecommendationGenerator recommendationGenerator;
     private final AiLifecycleEventPublisher lifecycleEvents;
+    private final SearchEntityDocumentLoader documentLoader;
+    private final AiEntityCleanupService cleanupService;
 
     public AiSearchEventBridge(
-            RecommendationGenerator recommendationGenerator, AiLifecycleEventPublisher lifecycleEvents) {
+            RecommendationGenerator recommendationGenerator,
+            AiLifecycleEventPublisher lifecycleEvents,
+            SearchEntityDocumentLoader documentLoader,
+            AiEntityCleanupService cleanupService) {
         this.recommendationGenerator = recommendationGenerator;
         this.lifecycleEvents = lifecycleEvents;
+        this.documentLoader = documentLoader;
+        this.cleanupService = cleanupService;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUpsert(SearchIndexUpsertEvent event) {
         try {
             TenantContext.set(event.organizationId(), null);
+            if (documentLoader.load(event.organizationId(), event.entityType(), event.entityId()) == null) {
+                int removed =
+                        cleanupService.cleanupEntity(event.organizationId(), event.entityType(), event.entityId());
+                log.debug(
+                        "AI cleanup on missing upsert type={} entityId={} removed={}",
+                        event.entityType(),
+                        event.entityId(),
+                        removed);
+                return;
+            }
             SearchEntityType type = event.entityType();
             switch (type) {
                 case PRODUCT -> {
@@ -71,19 +89,18 @@ public class AiSearchEventBridge {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDelete(SearchIndexDeleteEvent event) {
         try {
-            // Knowledge / embedding cleanup hooks can be added later; keep bridge present for symmetry.
-            lifecycleEvents.publish(
-                    event.organizationId(),
-                    AiLifecycleEvent.KNOWLEDGE_REFRESH,
-                    event.entityType().name(),
-                    event.entityId(),
-                    java.util.Map.of("action", "delete"));
+            TenantContext.set(event.organizationId(), null);
+            int removed = cleanupService.cleanupEntity(event.organizationId(), event.entityType(), event.entityId());
+            log.debug(
+                    "AI delete cleanup type={} entityId={} removed={}", event.entityType(), event.entityId(), removed);
         } catch (Exception ex) {
             log.warn(
                     "AFTER_COMMIT AI delete bridge failed type={} entityId={}: {}",
                     event.entityType(),
                     event.entityId(),
                     ex.getMessage());
+        } finally {
+            TenantContext.clear();
         }
     }
 }

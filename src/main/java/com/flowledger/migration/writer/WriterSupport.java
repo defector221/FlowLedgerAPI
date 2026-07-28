@@ -64,9 +64,6 @@ final class WriterSupport {
     static boolean bool(Map<String, String> row, String key) {
         String v = str(row, key);
         if (v == null) return false;
-        return v.equalsIgnoreCase("true")
-                || v.equalsIgnoreCase("yes")
-                || v.equalsIgnoreCase("y")
-                || v.equals("1");
+        return v.equalsIgnoreCase("true") || v.equalsIgnoreCase("yes") || v.equalsIgnoreCase("y") || v.equals("1");
     }
 }

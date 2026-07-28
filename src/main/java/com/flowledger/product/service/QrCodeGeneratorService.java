@@ -51,14 +51,17 @@ public class QrCodeGeneratorService extends OrganizationScopedService {
 
     public QrCodeResponse generate(UUID productId, QrCodeRequest request) {
         Product product = requireProduct(productId);
-        String template = request == null || request.payloadTemplate() == null || request.payloadTemplate().isBlank()
+        String template = request == null
+                        || request.payloadTemplate() == null
+                        || request.payloadTemplate().isBlank()
                 ? "{{productUrl}}"
                 : request.payloadTemplate();
         String resolved = resolveTemplate(template, product);
         byte[] png = encodePng(resolved);
         String pngKey = objectKey(productId, "png");
         storage.store(pngKey, new BytesMultipartFile("qr.png", "image/png", png));
-        ProductQrCode row = qrCodes.findByOrganizationIdAndProductId(orgId(), productId).orElseGet(ProductQrCode::new);
+        ProductQrCode row =
+                qrCodes.findByOrganizationIdAndProductId(orgId(), productId).orElseGet(ProductQrCode::new);
         if (row.getId() == null) {
             row.setOrganizationId(orgId());
             row.setProductId(productId);
@@ -75,8 +78,7 @@ public class QrCodeGeneratorService extends OrganizationScopedService {
     private String resolveTemplate(String template, Product product) {
         String productUrl = publicProducts.publishedProductUrl(product.getId());
         String warrantyUrl = productUrl + "/warranty";
-        return template
-                .replace("{{sku}}", product.getSku() == null ? "" : product.getSku())
+        return template.replace("{{sku}}", product.getSku() == null ? "" : product.getSku())
                 .replace("{{productName}}", product.getName() == null ? "" : product.getName())
                 .replace("{{barcode}}", product.getBarcode() == null ? "" : product.getBarcode())
                 .replace("{{productUrl}}", productUrl)

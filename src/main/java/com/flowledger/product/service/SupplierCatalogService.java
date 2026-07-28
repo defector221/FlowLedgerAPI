@@ -106,7 +106,10 @@ public class SupplierCatalogService extends OrganizationScopedService {
             }
         }
         if (dto.supplierBarcode() != null) {
-            item.setSupplierBarcode(dto.supplierBarcode().isBlank() ? null : dto.supplierBarcode().trim());
+            item.setSupplierBarcode(
+                    dto.supplierBarcode().isBlank()
+                            ? null
+                            : dto.supplierBarcode().trim());
         }
         if (dto.supplierProductName() != null) item.setSupplierProductName(dto.supplierProductName());
         if (dto.purchasePrice() != null) item.setPurchasePrice(dto.purchasePrice());

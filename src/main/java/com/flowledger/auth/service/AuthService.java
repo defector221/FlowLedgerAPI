@@ -291,7 +291,8 @@ public class AuthService {
 
     public LoginResponse issueTokensWithLocation(
             UUID userId, UUID organizationId, UUID branchId, UUID storeId, UUID warehouseId) {
-        User user = users.findByIdAndActiveTrue(userId).orElseThrow(() -> new UnauthorizedException("User unavailable"));
+        User user =
+                users.findByIdAndActiveTrue(userId).orElseThrow(() -> new UnauthorizedException("User unavailable"));
         membershipService.requireActiveMembership(userId, organizationId);
         return tokens(user, organizationId, branchId, storeId, warehouseId);
     }

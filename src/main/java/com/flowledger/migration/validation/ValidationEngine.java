@@ -15,8 +15,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class ValidationEngine {
-    private static final Pattern GSTIN =
-            Pattern.compile("^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$");
+    private static final Pattern GSTIN = Pattern.compile("^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$");
     private static final Pattern PAN = Pattern.compile("^[A-Z]{5}[0-9]{4}[A-Z]{1}$");
 
     private final ModuleFieldCatalog catalog;
@@ -47,7 +46,8 @@ public class ValidationEngine {
             validateQuantity(row, issues);
             String dupeKey = duplicateKey(module, row);
             if (dupeKey != null && !seenKeys.add(dupeKey)) {
-                issues.add(new Issue(null, "DUPLICATE_IN_FILE", "Duplicate row in file: " + dupeKey, ValidationSeverity.ERROR));
+                issues.add(new Issue(
+                        null, "DUPLICATE_IN_FILE", "Duplicate row in file: " + dupeKey, ValidationSeverity.ERROR));
             }
             boolean hasError = issues.stream().anyMatch(i -> i.severity() == ValidationSeverity.ERROR);
             boolean hasWarn = issues.stream().anyMatch(i -> i.severity() == ValidationSeverity.WARNING);
@@ -79,7 +79,8 @@ public class ValidationEngine {
         if (!blank(v)) {
             String digits = v.replaceAll("\\D", "");
             if (digits.length() < 4 || digits.length() > 8) {
-                issues.add(new Issue("hsnSacCode", "INVALID_HSN", "HSN/SAC should be 4–8 digits", ValidationSeverity.WARNING));
+                issues.add(new Issue(
+                        "hsnSacCode", "INVALID_HSN", "HSN/SAC should be 4–8 digits", ValidationSeverity.WARNING));
             }
         }
     }
@@ -89,10 +90,12 @@ public class ValidationEngine {
         if (!blank(v)) {
             try {
                 if (new java.math.BigDecimal(v.trim()).signum() < 0) {
-                    issues.add(new Issue("quantity", "NEGATIVE_QTY", "Quantity cannot be negative", ValidationSeverity.ERROR));
+                    issues.add(new Issue(
+                            "quantity", "NEGATIVE_QTY", "Quantity cannot be negative", ValidationSeverity.ERROR));
                 }
             } catch (NumberFormatException e) {
-                issues.add(new Issue("quantity", "INVALID_NUMBER", "Quantity must be a number", ValidationSeverity.ERROR));
+                issues.add(
+                        new Issue("quantity", "INVALID_NUMBER", "Quantity must be a number", ValidationSeverity.ERROR));
             }
         }
     }

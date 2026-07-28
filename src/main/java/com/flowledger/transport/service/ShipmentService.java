@@ -6,10 +6,7 @@ import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.common.util.DocumentNumberService;
 import com.flowledger.customer.repository.CustomerRepository;
 import com.flowledger.inventory.allocation.InventoryDeductionCoordinator;
-import com.flowledger.inventory.dto.InventoryDtos.PostTransaction;
-import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.service.InventoryService;
-import com.flowledger.organization.entity.OrganizationSettings;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.organization.repository.OrganizationSettingsRepository;
 import com.flowledger.product.entity.Product;
@@ -624,8 +621,7 @@ public class ShipmentService {
         if (shipment.getFromWarehouseId() == null) conflict("Warehouse is required for inventory deduction");
         DeliveryChallan challan = null;
         if ("DELIVERY_CHALLAN".equalsIgnoreCase(String.valueOf(shipment.getSourceDocumentType()))) {
-            challan = challans
-                    .findDetailedByIdAndOrganizationId(shipment.getSourceDocumentId(), org)
+            challan = challans.findDetailedByIdAndOrganizationId(shipment.getSourceDocumentId(), org)
                     .orElse(null);
         }
         Map<UUID, DeliveryChallanItem> challanItemsById = new HashMap<>();

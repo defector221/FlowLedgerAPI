@@ -18,7 +18,6 @@ import com.flowledger.warehouse.repository.WarehouseRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -107,11 +106,7 @@ public class InventoryDeductionCoordinator {
         }
 
         StockReservation transferred = reservations.splitReservation(
-                orderLine.getStockReservationId(),
-                qty,
-                REF_DELIVERY_CHALLAN,
-                challanId,
-                challanLineId);
+                orderLine.getStockReservationId(), qty, REF_DELIVERY_CHALLAN, challanId, challanLineId);
         challanItem.setStockReservationId(transferred.getId());
         challanItem.setInventoryBatchId(transferred.getInventoryBatchId());
         challanItem.setWarehouseId(transferred.getWarehouseId());
@@ -140,7 +135,8 @@ public class InventoryDeductionCoordinator {
 
             UUID reservationId = line.getStockReservationId();
             if (reservationId != null) {
-                StockReservation reservation = reservations.findById(reservationId).orElse(null);
+                StockReservation reservation =
+                        reservations.findById(reservationId).orElse(null);
                 if (reservation != null && reservation.getStatus() == Status.CONSUMED) {
                     continue;
                 }
@@ -160,8 +156,7 @@ public class InventoryDeductionCoordinator {
                         line.getId(),
                         null,
                         null));
-                if (result.status() == AllocationStatus.CONFLICT
-                        || result.status() == AllocationStatus.OUT_OF_STOCK) {
+                if (result.status() == AllocationStatus.CONFLICT || result.status() == AllocationStatus.OUT_OF_STOCK) {
                     throw new SalesAllocationConflictException(line.getId(), line.getProductId(), result);
                 }
                 if (result.reservationId() != null) {
@@ -232,7 +227,9 @@ public class InventoryDeductionCoordinator {
         return orgSettings
                 .findByOrganizationId(orgId)
                 .map(OrganizationSettings::getDefaultWarehouseId)
-                .or(() -> warehouses.findFirstByOrganizationIdAndDefaultWarehouseTrue(orgId).map(w -> w.getId()))
+                .or(() -> warehouses
+                        .findFirstByOrganizationIdAndDefaultWarehouseTrue(orgId)
+                        .map(w -> w.getId()))
                 .orElseThrow(() -> new IllegalArgumentException("Warehouse is required for sales order confirm"));
     }
 

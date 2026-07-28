@@ -20,9 +20,7 @@ class FifoAllocationStrategyTest {
         UUID batchOld = UUID.randomUUID();
         UUID batchNew = UUID.randomUUID();
         List<AllocationCandidate> ranked = strategy.rank(
-                List.of(
-                        candidate(batchNew, LocalDate.of(2026, 2, 1)),
-                        candidate(batchOld, LocalDate.of(2026, 1, 1))),
+                List.of(candidate(batchNew, LocalDate.of(2026, 2, 1)), candidate(batchOld, LocalDate.of(2026, 1, 1))),
                 new AllocationContext(UUID.randomUUID(), UUID.randomUUID(), null));
         assertEquals(batchOld, ranked.get(0).batchId());
     }

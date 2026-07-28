@@ -2,10 +2,8 @@ package com.flowledger.migration.dto;
 
 import com.flowledger.migration.domain.ExportFormat;
 import com.flowledger.migration.domain.ExportJobStatus;
-import com.flowledger.migration.domain.ImportJobStatus;
 import com.flowledger.migration.domain.ImportModule;
 import com.flowledger.migration.domain.ImportRowStatus;
-import com.flowledger.migration.domain.ImportSourceType;
 import com.flowledger.migration.domain.ValidationSeverity;
 import com.flowledger.migration.mapping.FieldMapping;
 import jakarta.validation.constraints.NotBlank;
@@ -78,8 +76,7 @@ public final class MigrationDtos {
             String entityType,
             UUID entityId) {}
 
-    public record ValidationIssue(
-            String field, String code, String message, ValidationSeverity severity) {}
+    public record ValidationIssue(String field, String code, String message, ValidationSeverity severity) {}
 
     public record ImportReportResponse(
             UUID id,
@@ -108,9 +105,7 @@ public final class MigrationDtos {
             OffsetDateTime completedAt) {}
 
     public static ImportJobResponse toJob(
-            com.flowledger.migration.entity.ImportJob job,
-            List<String> columns,
-            List<FieldMapping> mappings) {
+            com.flowledger.migration.entity.ImportJob job, List<String> columns, List<FieldMapping> mappings) {
         return new ImportJobResponse(
                 job.getId(),
                 job.getModule().name(),

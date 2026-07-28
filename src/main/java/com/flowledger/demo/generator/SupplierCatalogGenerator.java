@@ -54,19 +54,17 @@ public class SupplierCatalogGenerator {
         for (int i = 0; i < productIds.size(); i++) {
             UUID productId = productIds.get(i);
             UUID primarySupplier = supplierIds.get(i % supplierIds.size());
-            UUID secondarySupplier = supplierIds.size() > 1
-                    ? supplierIds.get((i + 1) % supplierIds.size())
-                    : null;
+            UUID secondarySupplier = supplierIds.size() > 1 ? supplierIds.get((i + 1) % supplierIds.size()) : null;
 
-            Product product = products
-                    .findByIdAndOrganizationId(productId, ctx.getOrganizationId())
+            Product product = products.findByIdAndOrganizationId(productId, ctx.getOrganizationId())
                     .orElse(null);
             if (product == null) {
                 failures++;
                 continue;
             }
 
-            BigDecimal purchase = product.getPurchasePrice() != null && product.getPurchasePrice().signum() > 0
+            BigDecimal purchase = product.getPurchasePrice() != null
+                            && product.getPurchasePrice().signum() > 0
                     ? product.getPurchasePrice()
                     : new BigDecimal("100.00");
             String sku = product.getSku() != null ? product.getSku() : "SKU-" + (i + 1);
@@ -81,8 +79,8 @@ public class SupplierCatalogGenerator {
             if (secondarySupplier != null
                     && !secondarySupplier.equals(primarySupplier)
                     && ThreadLocalRandom.current().nextInt(100) < 40) {
-                BigDecimal alt = purchase
-                        .multiply(BigDecimal.valueOf(0.95 + ThreadLocalRandom.current().nextDouble() * 0.15))
+                BigDecimal alt = purchase.multiply(BigDecimal.valueOf(
+                                0.95 + ThreadLocalRandom.current().nextDouble() * 0.15))
                         .setScale(2, RoundingMode.HALF_UP);
                 if (link(ctx, productId, secondarySupplier, sku + "-ALT", alt, false)) {
                     linked++;

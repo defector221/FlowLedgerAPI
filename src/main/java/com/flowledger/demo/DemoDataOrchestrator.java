@@ -12,18 +12,18 @@ import com.flowledger.demo.generator.PosSalesHistoryGenerator;
 import com.flowledger.demo.generator.ProductImageSeeder;
 import com.flowledger.demo.generator.PurchaseHistoryGenerator;
 import com.flowledger.demo.generator.SupplierCatalogGenerator;
+import com.flowledger.demo.generator.TaxSetupGenerator;
 import com.flowledger.demo.generator.TransferScenarioGenerator;
+import com.flowledger.demo.job.DemoSeedProgressSink;
 import com.flowledger.demo.scenario.DemoBlueprint;
 import com.flowledger.demo.scenario.DemoScenario;
 import com.flowledger.demo.scenario.DemoScenarioRegistry;
 import com.flowledger.demo.util.ProgressLogger;
 import com.flowledger.demo.verify.ScenarioVerifier;
-import com.flowledger.demo.job.DemoSeedProgressSink;
 import com.flowledger.organization.repository.OrganizationRepository;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +37,7 @@ public class DemoDataOrchestrator {
     private final DemoScenarioRegistry registry;
     private final OrganizationRepository organizations;
     private final OrgBootstrapGenerator orgBootstrap;
+    private final TaxSetupGenerator taxSetup;
     private final LocationGenerator locations;
     private final CatalogGenerator catalog;
     private final ProductImageSeeder productImages;
@@ -54,6 +55,7 @@ public class DemoDataOrchestrator {
             DemoScenarioRegistry registry,
             OrganizationRepository organizations,
             OrgBootstrapGenerator orgBootstrap,
+            TaxSetupGenerator taxSetup,
             LocationGenerator locations,
             CatalogGenerator catalog,
             ProductImageSeeder productImages,
@@ -69,6 +71,7 @@ public class DemoDataOrchestrator {
         this.registry = registry;
         this.organizations = organizations;
         this.orgBootstrap = orgBootstrap;
+        this.taxSetup = taxSetup;
         this.locations = locations;
         this.catalog = catalog;
         this.productImages = productImages;
@@ -107,7 +110,9 @@ public class DemoDataOrchestrator {
             overrides.putAll(request.overrides());
         }
         blueprint = blueprint.withOverrides(overrides);
-        String orgName = request != null && request.organizationName() != null && !request.organizationName().isBlank()
+        String orgName = request != null
+                        && request.organizationName() != null
+                        && !request.organizationName().isBlank()
                 ? request.organizationName()
                 : blueprint.organizationName();
         // rebuild blueprint with optional org name override via meta — generators use blueprint.organizationName()
@@ -178,7 +183,8 @@ public class DemoDataOrchestrator {
         }
 
         long start = System.currentTimeMillis();
-        ProgressLogger progress = new ProgressLogger(log, scenario.command(), sink, 12);
+        ProgressLogger progress =
+                new ProgressLogger(log, scenario.command(), sink, ProgressLogger.DEFAULT_PIPELINE_STAGES);
         DemoSeedContext ctx = new DemoSeedContext();
         ctx.setScenario(scenario);
         ctx.setBlueprint(blueprint);
@@ -186,6 +192,7 @@ public class DemoDataOrchestrator {
         try {
             progress.stage("Starting seed " + scenario.command());
             orgBootstrap.generate(ctx, progress);
+            taxSetup.generate(ctx, progress);
             locations.generate(ctx, progress);
             catalog.generate(ctx, progress);
             productImages.generate(ctx, progress);
@@ -204,17 +211,7 @@ public class DemoDataOrchestrator {
             TenantContext.clear();
         }
 
-        Map<String, Object> counts = new LinkedHashMap<>();
-        counts.put("branches", ctx.getBranchIds().size());
-        counts.put("warehouses", ctx.getWarehouseIds().size());
-        counts.put("stores", ctx.getStoreIds().size());
-        counts.put("terminals", ctx.getTerminalIds().size());
-        counts.put("products", ctx.getProductIds().size());
-        counts.put("customers", ctx.getCustomerIds().size());
-        counts.put("suppliers", ctx.getSupplierIds().size());
-        counts.put("supplierCatalogLinks", ctx.getMeta().getOrDefault("supplierCatalogLinks", 0));
-        counts.put("imagesUploaded", ctx.getMeta().getOrDefault("imagesUploaded", 0));
-        counts.put("imagesReused", ctx.getMeta().getOrDefault("imagesReused", 0));
+        Map<String, Object> counts = DemoSeedResult.baseCounts(ctx);
 
         return new DemoSeedResult(
                 scenario.command(),

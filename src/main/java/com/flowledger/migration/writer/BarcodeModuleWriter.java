@@ -36,15 +36,13 @@ public class BarcodeModuleWriter implements ModuleWriter {
     public WriteResult write(UUID organizationId, Map<String, String> row) {
         String code = required(row, "productCode").toUpperCase(Locale.ROOT);
         String barcode = required(row, "barcode");
-        var product = products
-                .findByOrganizationIdAndSku(organizationId, code)
+        var product = products.findByOrganizationIdAndSku(organizationId, code)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + code));
         if (barcodeRepo.existsActiveByOrganizationIdAndBarcode(organizationId, barcode)) {
             return WriteResult.skipped("Barcode already exists: " + barcode);
         }
         var created = barcodes.create(
-                product.getId(),
-                new CreateBarcodeRequest(barcode, str(row, "barcodeType"), true, null));
+                product.getId(), new CreateBarcodeRequest(barcode, str(row, "barcodeType"), true, null));
         return WriteResult.imported(created.id(), "BARCODE");
     }
 }

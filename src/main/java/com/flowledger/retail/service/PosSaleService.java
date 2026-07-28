@@ -5,6 +5,14 @@ import static com.flowledger.retail.dto.RetailDtos.*;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.customer.entity.Customer;
 import com.flowledger.customer.repository.CustomerRepository;
+import com.flowledger.inventory.allocation.AllocationMode;
+import com.flowledger.inventory.allocation.CartLineAllocation;
+import com.flowledger.inventory.allocation.CheckoutLineIssue;
+import com.flowledger.inventory.allocation.CheckoutValidationResult;
+import com.flowledger.inventory.allocation.InventoryAllocationEngine;
+import com.flowledger.inventory.service.InventoryService;
+import com.flowledger.organization.entity.Organization;
+import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.payment.dto.PaymentDtos;
 import com.flowledger.payment.entity.Payment;
 import com.flowledger.payment.service.PaymentService;
@@ -16,20 +24,16 @@ import com.flowledger.retail.entity.PosSale;
 import com.flowledger.retail.entity.PosSaleLine;
 import com.flowledger.retail.entity.PosSalePayment;
 import com.flowledger.retail.entity.RetailStore;
+import com.flowledger.retail.exception.PosCheckoutConflictException;
 import com.flowledger.retail.repository.PosSaleLineRepository;
 import com.flowledger.retail.repository.PosSalePaymentRepository;
 import com.flowledger.retail.repository.PosSaleRepository;
 import com.flowledger.retail.repository.RetailStoreRepository;
-import com.flowledger.inventory.allocation.AllocationMode;
-import com.flowledger.inventory.allocation.AllocationStatus;
-import com.flowledger.inventory.allocation.CartLineAllocation;
-import com.flowledger.inventory.allocation.CheckoutLineIssue;
-import com.flowledger.inventory.allocation.CheckoutValidationResult;
-import com.flowledger.inventory.allocation.InventoryAllocationEngine;
-import com.flowledger.inventory.service.InventoryService;
-import com.flowledger.retail.exception.PosCheckoutConflictException;
 import com.flowledger.sales.dto.SalesDtos;
 import com.flowledger.sales.service.SalesInvoiceService;
+import com.flowledger.tax.dto.TaxCalculationDtos.TaxResult;
+import com.flowledger.tax.service.TaxLineCalculator;
+import com.flowledger.tax.service.TaxLineCalculator.DocumentLineInput;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -55,6 +59,8 @@ public class PosSaleService {
     private final RetailStoreRepository stores;
     private final ProductRepository products;
     private final CustomerRepository customers;
+    private final OrganizationRepository organizations;
+    private final TaxLineCalculator taxLineCalculator;
     private final SalesInvoiceService salesInvoiceService;
     private final PaymentService paymentService;
     private final RetailLoyaltyService loyaltyService;
@@ -70,6 +76,8 @@ public class PosSaleService {
             RetailStoreRepository stores,
             ProductRepository products,
             CustomerRepository customers,
+            OrganizationRepository organizations,
+            TaxLineCalculator taxLineCalculator,
             SalesInvoiceService salesInvoiceService,
             PaymentService paymentService,
             RetailLoyaltyService loyaltyService,
@@ -83,6 +91,8 @@ public class PosSaleService {
         this.stores = stores;
         this.products = products;
         this.customers = customers;
+        this.organizations = organizations;
+        this.taxLineCalculator = taxLineCalculator;
         this.salesInvoiceService = salesInvoiceService;
         this.paymentService = paymentService;
         this.loyaltyService = loyaltyService;
@@ -476,7 +486,7 @@ public class PosSaleService {
                         customerId,
                         null,
                         paymentAmount,
-                        input.paymentMode().name(),
+                        PosPaymentModeMapper.toLedgerMode(input.paymentMode()),
                         input.reference(),
                         null,
                         "POS sale " + saleId,
@@ -538,18 +548,38 @@ public class PosSaleService {
         BigDecimal lineDiscountTotal = BigDecimal.ZERO;
         BigDecimal taxTotal = BigDecimal.ZERO;
         BigDecimal lineGrand = BigDecimal.ZERO;
+        String orgState = organizationState();
+        String placeOfSupply = placeOfSupply(sale);
         for (PosSaleLine line : lines.findByOrganizationIdAndPosSaleIdOrderByLineOrderAsc(org(), sale.getId())) {
             BigDecimal base = line.getQuantity().multiply(line.getRate());
             BigDecimal discount = base.multiply(nz(line.getDiscountPercent())).divide(HUNDRED, 2, RoundingMode.HALF_UP);
-            BigDecimal taxable = base.subtract(discount);
-            BigDecimal tax = taxable.multiply(nz(line.getTaxRate())).divide(HUNDRED, 2, RoundingMode.HALF_UP);
-            BigDecimal total = taxable.add(tax).setScale(2, RoundingMode.HALF_UP);
-            line.setLineTotal(total);
+            TaxResult taxResult = taxLineCalculator.calculateDocumentLine(new DocumentLineInput(
+                    orgState,
+                    placeOfSupply,
+                    "IN",
+                    LocalDate.now(),
+                    line.getProductId(),
+                    null,
+                    null,
+                    line.getQuantity(),
+                    line.getRate(),
+                    discount,
+                    false,
+                    line.getTaxRate(),
+                    "GST",
+                    null,
+                    null,
+                    null));
+            taxLineCalculator.applyPosSnapshot(line, taxResult);
             lines.save(line);
             subtotal = subtotal.add(base.setScale(2, RoundingMode.HALF_UP));
             lineDiscountTotal = lineDiscountTotal.add(discount);
-            taxTotal = taxTotal.add(tax);
-            lineGrand = lineGrand.add(total);
+            taxTotal = taxTotal.add(taxResult
+                    .cgstAmount()
+                    .add(taxResult.sgstAmount())
+                    .add(taxResult.igstAmount())
+                    .add(taxResult.otherTaxAmount()));
+            lineGrand = lineGrand.add(taxResult.lineTotal());
         }
         BigDecimal afterLine = subtotal.subtract(lineDiscountTotal).max(BigDecimal.ZERO);
         BigDecimal headerDisc = headerDiscountAmount(sale, afterLine);
@@ -592,11 +622,51 @@ public class PosSaleService {
     }
 
     private BigDecimal lineTotal(PosSaleLine line) {
+        PosSale sale = sales.findById(line.getPosSaleId()).orElse(null);
+        String orgState = organizationState();
+        String placeOfSupply = sale == null ? orgState : placeOfSupply(sale);
         BigDecimal base = line.getQuantity().multiply(line.getRate());
         BigDecimal discount = base.multiply(nz(line.getDiscountPercent())).divide(HUNDRED, 2, RoundingMode.HALF_UP);
-        BigDecimal taxable = base.subtract(discount);
-        BigDecimal tax = taxable.multiply(nz(line.getTaxRate())).divide(HUNDRED, 2, RoundingMode.HALF_UP);
-        return taxable.add(tax).setScale(2, RoundingMode.HALF_UP);
+        TaxResult taxResult = taxLineCalculator.calculateDocumentLine(new DocumentLineInput(
+                orgState,
+                placeOfSupply,
+                "IN",
+                LocalDate.now(),
+                line.getProductId(),
+                null,
+                null,
+                line.getQuantity(),
+                line.getRate(),
+                discount,
+                false,
+                line.getTaxRate(),
+                "GST",
+                null,
+                null,
+                null));
+        taxLineCalculator.applyPosSnapshot(line, taxResult);
+        return taxResult.lineTotal();
+    }
+
+    private String organizationState() {
+        return organizations
+                .findById(org())
+                .map(Organization::getStateCode)
+                .filter(code -> code != null && !code.isBlank())
+                .map(String::trim)
+                .orElse("00");
+    }
+
+    private String placeOfSupply(PosSale sale) {
+        if (sale.getCustomerId() == null) {
+            return organizationState();
+        }
+        return customers
+                .findByIdAndOrganizationId(sale.getCustomerId(), org())
+                .map(Customer::getStateCode)
+                .filter(code -> code != null && !code.isBlank())
+                .map(String::trim)
+                .orElse(organizationState());
     }
 
     private PosSale load(UUID id) {

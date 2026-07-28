@@ -18,6 +18,7 @@ import com.flowledger.payment.dto.PaymentDtos.ContraRequest;
 import com.flowledger.payment.dto.PaymentDtos.PaymentRequest;
 import com.flowledger.payment.entity.Payment;
 import com.flowledger.payment.entity.PaymentAllocation;
+import com.flowledger.payment.support.PaymentModeSupport;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
@@ -74,7 +75,7 @@ public class PaymentService {
         payment.setCustomerId(request.customerId());
         payment.setSupplierId(request.supplierId());
         payment.setAmount(request.amount());
-        payment.setPaymentMode(request.paymentMode());
+        payment.setPaymentMode(PaymentModeSupport.normalize(request.paymentMode()));
         payment.setTransactionReference(request.transactionReference());
         payment.setBankReference(request.bankReference());
         payment.setNotes(request.notes());

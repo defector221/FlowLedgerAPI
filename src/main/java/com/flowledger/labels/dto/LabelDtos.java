@@ -55,8 +55,7 @@ public final class LabelDtos {
             String bindingKey,
             int zIndex) {}
 
-    public record RenderRequest(
-            @NotNull UUID templateId, Map<String, String> values, UUID productId) {}
+    public record RenderRequest(@NotNull UUID templateId, Map<String, String> values, UUID productId) {}
 
     public record RenderResponse(UUID templateId, byte[] pdfBytes, String contentType) {}
 

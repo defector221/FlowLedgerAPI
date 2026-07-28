@@ -24,13 +24,15 @@ public class BranchController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('BRANCH_READ') or hasAuthority('BRANCH_MANAGE') or hasAnyRole('ORGANIZATION_ADMIN', 'ACCOUNTANT')")
+    @PreAuthorize(
+            "hasAuthority('BRANCH_READ') or hasAuthority('BRANCH_MANAGE') or hasAnyRole('ORGANIZATION_ADMIN', 'ACCOUNTANT')")
     public ApiResponse<List<BranchResponse>> list() {
         return ApiResponse.of(service.list());
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAuthority('BRANCH_READ') or hasAuthority('BRANCH_MANAGE') or hasAnyRole('ORGANIZATION_ADMIN', 'ACCOUNTANT')")
+    @PreAuthorize(
+            "hasAuthority('BRANCH_READ') or hasAuthority('BRANCH_MANAGE') or hasAnyRole('ORGANIZATION_ADMIN', 'ACCOUNTANT')")
     public ApiResponse<PageResponse<BranchResponse>> search(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Boolean active,
@@ -39,7 +41,8 @@ public class BranchController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('BRANCH_READ') or hasAuthority('BRANCH_MANAGE') or hasAnyRole('ORGANIZATION_ADMIN', 'ACCOUNTANT')")
+    @PreAuthorize(
+            "hasAuthority('BRANCH_READ') or hasAuthority('BRANCH_MANAGE') or hasAnyRole('ORGANIZATION_ADMIN', 'ACCOUNTANT')")
     public ApiResponse<BranchResponse> get(@PathVariable UUID id) {
         return ApiResponse.of(service.get(id));
     }

@@ -29,8 +29,7 @@ public class CustomerModuleWriter implements ModuleWriter {
     @Override
     public WriteResult write(UUID organizationId, Map<String, String> row) {
         String code = str(row, "customerCode");
-        if (code != null
-                && repo.existsByOrganizationIdAndCustomerCode(organizationId, code.toUpperCase(Locale.ROOT))) {
+        if (code != null && repo.existsByOrganizationIdAndCustomerCode(organizationId, code.toUpperCase(Locale.ROOT))) {
             return WriteResult.skipped("Customer already exists: " + code);
         }
         var created = customers.create(new Create(

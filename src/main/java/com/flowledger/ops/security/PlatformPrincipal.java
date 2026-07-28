@@ -20,21 +20,14 @@ public class PlatformPrincipal implements UserDetails {
     private final Collection<? extends GrantedAuthority> authorities;
 
     public PlatformPrincipal(
-            UUID id,
-            String email,
-            String password,
-            boolean enabled,
-            Set<String> roles,
-            Set<String> permissions) {
+            UUID id, String email, String password, boolean enabled, Set<String> roles, Set<String> permissions) {
         this.id = id;
         this.email = email;
         this.password = password;
         this.enabled = enabled;
         this.roles = roles;
         this.permissions = permissions;
-        this.authorities = permissions.stream()
-                .map(SimpleGrantedAuthority::new)
-                .collect(Collectors.toSet());
+        this.authorities = permissions.stream().map(SimpleGrantedAuthority::new).collect(Collectors.toSet());
     }
 
     public boolean hasPermission(String code) {

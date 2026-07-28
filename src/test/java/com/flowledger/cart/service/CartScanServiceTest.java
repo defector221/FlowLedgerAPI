@@ -69,7 +69,8 @@ class CartScanServiceTest {
 
     @Test
     void scan_returnsAllocatedProduct() {
-        var response = service.scan(new CartScanRequest("8901234567890", BigDecimal.ONE, warehouseId, null, null, null));
+        var response =
+                service.scan(new CartScanRequest("8901234567890", BigDecimal.ONE, warehouseId, null, null, null));
         assertEquals(AllocationStatus.AUTO_ALLOCATED.name(), response.status());
         assertNotNull(response.product());
         assertEquals(productId, response.product().productId());
@@ -89,7 +90,8 @@ class CartScanServiceTest {
                 return orgId;
             }
         };
-        CartScanService local = new CartScanService(guard, missing, stubAllocationEngine(warehouseId), new StubPosSaleService());
+        CartScanService local =
+                new CartScanService(guard, missing, stubAllocationEngine(warehouseId), new StubPosSaleService());
 
         var response = local.scan(new CartScanRequest("missing", BigDecimal.ONE, warehouseId, null, null, null));
         assertEquals(AllocationStatus.INVALID_PRODUCT.name(), response.status());
@@ -141,7 +143,7 @@ class CartScanServiceTest {
 
     private static final class StubPosSaleService extends PosSaleService {
         private StubPosSaleService() {
-            super(null, null, null, null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
         }
     }
 }

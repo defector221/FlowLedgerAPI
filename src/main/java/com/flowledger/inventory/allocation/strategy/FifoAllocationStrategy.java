@@ -4,7 +4,6 @@ import com.flowledger.inventory.allocation.AllocationCandidate;
 import com.flowledger.inventory.allocation.AllocationContext;
 import com.flowledger.inventory.allocation.AllocationStrategy;
 import com.flowledger.inventory.allocation.AllocationStrategyType;
-import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;

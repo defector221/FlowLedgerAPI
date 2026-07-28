@@ -21,12 +21,7 @@ public class UserPrincipal implements UserDetails {
     private final boolean enabled;
 
     public static UserPrincipal of(
-            UUID id,
-            UUID orgId,
-            String email,
-            String password,
-            Collection<String> authorities,
-            boolean enabled) {
+            UUID id, UUID orgId, String email, String password, Collection<String> authorities, boolean enabled) {
         return of(id, orgId, null, null, null, email, password, authorities, enabled);
     }
 

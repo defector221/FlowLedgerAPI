@@ -2,15 +2,36 @@ package com.flowledger.tax;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.flowledger.tax.calculator.TaxAmountCalculator;
+import com.flowledger.tax.config.TaxEngineProperties;
 import com.flowledger.tax.dto.GstCalculationDtos.Request;
 import com.flowledger.tax.dto.GstCalculationDtos.Response;
+import com.flowledger.tax.provider.EuropeVATProvider;
+import com.flowledger.tax.provider.IndiaGSTProvider;
+import com.flowledger.tax.provider.USSalesTaxProvider;
 import com.flowledger.tax.service.GstCalculationService;
+import com.flowledger.tax.service.TaxCalculationService;
+import com.flowledger.tax.service.TaxLineCalculator;
+import com.flowledger.tax.strategy.TaxProviderRegistry;
 import java.math.BigDecimal;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class GstCalculationServiceTest {
 
-    private final GstCalculationService service = new GstCalculationService();
+    private final GstCalculationService service = buildService();
+
+    private static GstCalculationService buildService() {
+        TaxEngineProperties properties = new TaxEngineProperties();
+        TaxAmountCalculator calculator = new TaxAmountCalculator(properties);
+        TaxProviderRegistry registry = new TaxProviderRegistry(List.of(
+                new IndiaGSTProvider(calculator),
+                new EuropeVATProvider(calculator),
+                new USSalesTaxProvider(calculator)));
+        TaxCalculationService taxCalculationService = new TaxCalculationService(null, null, null, registry);
+        TaxLineCalculator taxLineCalculator = new TaxLineCalculator(taxCalculationService);
+        return new GstCalculationService(taxLineCalculator);
+    }
 
     @Test
     void gstIntraStateSplitsCgstAndSgstFiftyFifty() {

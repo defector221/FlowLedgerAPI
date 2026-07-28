@@ -33,7 +33,8 @@ public class LocationHierarchyService {
                     .orElseThrow(() -> new ResourceNotFoundException("Store not found"));
         }
         if (warehouseId != null) {
-            Warehouse w = warehouses.findByIdAndOrganizationId(warehouseId, org())
+            Warehouse w = warehouses
+                    .findByIdAndOrganizationId(warehouseId, org())
                     .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found"));
             if (w.getBranchId() != null) return w.getBranchId();
             if (w.getStoreId() != null) {
@@ -48,7 +49,8 @@ public class LocationHierarchyService {
     @Transactional(readOnly = true)
     public UUID resolveStoreId(UUID warehouseId) {
         if (warehouseId == null) return null;
-        return warehouses.findByIdAndOrganizationId(warehouseId, org())
+        return warehouses
+                .findByIdAndOrganizationId(warehouseId, org())
                 .map(Warehouse::getStoreId)
                 .orElse(null);
     }

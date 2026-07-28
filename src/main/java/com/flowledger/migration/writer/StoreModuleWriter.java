@@ -50,8 +50,7 @@ public class StoreModuleWriter implements ModuleWriter {
             return WriteResult.skipped("Store already exists: " + code);
         }
         String branchCode = required(row, "branchCode").toUpperCase(Locale.ROOT);
-        var branch = branches
-                .findByOrganizationIdAndCode(organizationId, branchCode)
+        var branch = branches.findByOrganizationIdAndCode(organizationId, branchCode)
                 .orElseThrow(() -> new IllegalArgumentException("Branch not found: " + branchCode));
 
         UUID warehouseId;

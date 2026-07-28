@@ -86,7 +86,8 @@ class InventoryAllocationEngineTest {
         when(transactions.stockBalance(org, productId, warehouse)).thenReturn(new BigDecimal("5"));
         when(reservations.activeReservedQty(org, productId, warehouse, null)).thenReturn(BigDecimal.ZERO);
 
-        AllocationResult result = engine.allocate(new AllocationRequest(org, productId, warehouse, BigDecimal.ONE, null));
+        AllocationResult result =
+                engine.allocate(new AllocationRequest(org, productId, warehouse, BigDecimal.ONE, null));
 
         assertEquals(AllocationStatus.AUTO_ALLOCATED, result.status());
         assertEquals(AllocationMode.WAREHOUSE_POOL, result.allocated().allocationMode());

@@ -20,10 +20,10 @@ public class WarehouseController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('WAREHOUSE_READ') or hasAuthority('WAREHOUSE_MANAGE') or hasAnyRole('ORGANIZATION_ADMIN', 'INVENTORY_MANAGER')")
+    @PreAuthorize(
+            "hasAuthority('WAREHOUSE_READ') or hasAuthority('WAREHOUSE_MANAGE') or hasAnyRole('ORGANIZATION_ADMIN', 'INVENTORY_MANAGER')")
     public List<Response> list(
-            @RequestParam(required = false) WarehouseType type,
-            @RequestParam(required = false) UUID branchId) {
+            @RequestParam(required = false) WarehouseType type, @RequestParam(required = false) UUID branchId) {
         return service.list(type, branchId);
     }
 

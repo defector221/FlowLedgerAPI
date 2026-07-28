@@ -19,9 +19,7 @@ class FefoAllocationStrategyTest {
         UUID sooner = UUID.randomUUID();
         UUID later = UUID.randomUUID();
         List<AllocationCandidate> ranked = strategy.rank(
-                List.of(
-                        candidate(later, LocalDate.of(2026, 12, 1)),
-                        candidate(sooner, LocalDate.of(2026, 6, 1))),
+                List.of(candidate(later, LocalDate.of(2026, 12, 1)), candidate(sooner, LocalDate.of(2026, 6, 1))),
                 new AllocationContext(UUID.randomUUID(), UUID.randomUUID(), null));
         assertEquals(sooner, ranked.get(0).batchId());
     }

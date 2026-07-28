@@ -34,8 +34,7 @@ public class OpeningStockModuleWriter implements ModuleWriter {
     public WriteResult write(UUID organizationId, Map<String, String> row) {
         String productCode = required(row, "productCode").toUpperCase(Locale.ROOT);
         String whCode = required(row, "warehouseCode");
-        var product = products
-                .findByOrganizationIdAndSku(organizationId, productCode)
+        var product = products.findByOrganizationIdAndSku(organizationId, productCode)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productCode));
         var warehouse = warehouses.findByOrganizationId(organizationId).stream()
                 .filter(w -> w.getWarehouseCode().equalsIgnoreCase(whCode))

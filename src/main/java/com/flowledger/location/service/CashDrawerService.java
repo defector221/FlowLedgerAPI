@@ -50,7 +50,8 @@ public class CashDrawerService {
     }
 
     public CashDrawerResponse create(CashDrawerRequest request) {
-        terminals.findByIdAndOrganizationIdAndDeletedFalse(request.terminalId(), org())
+        terminals
+                .findByIdAndOrganizationIdAndDeletedFalse(request.terminalId(), org())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Terminal not found"));
         String code = request.drawerCode().trim().toUpperCase(Locale.ROOT);
         if (drawers.existsByOrganizationIdAndTerminalIdAndDrawerCodeIgnoreCaseAndDeletedFalse(
@@ -93,8 +94,8 @@ public class CashDrawerService {
     }
 
     private CashDrawerResponse map(CashDrawer drawer) {
-        RetailShift openShift = shifts
-                .findFirstByOrganizationIdAndDrawerIdAndStatusOrderByOpenedAtDesc(org(), drawer.getId(), ShiftStatus.OPEN)
+        RetailShift openShift = shifts.findFirstByOrganizationIdAndDrawerIdAndStatusOrderByOpenedAtDesc(
+                        org(), drawer.getId(), ShiftStatus.OPEN)
                 .orElse(null);
         return new CashDrawerResponse(
                 drawer.getId(),

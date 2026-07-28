@@ -13,14 +13,7 @@ public class PharmacyCatalogStrategy implements CatalogStrategy {
     @Override
     public List<String> categoryNames() {
         return List.of(
-                "Tablets",
-                "Syrups",
-                "Ointments",
-                "Vitamins",
-                "First Aid",
-                "Personal Hygiene",
-                "OTC",
-                "Rx Required");
+                "Tablets", "Syrups", "Ointments", "Vitamins", "First Aid", "Personal Hygiene", "OTC", "Rx Required");
     }
 
     @Override

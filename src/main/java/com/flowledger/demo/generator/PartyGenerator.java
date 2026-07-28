@@ -35,25 +35,36 @@ public class PartyGenerator {
         TenantContext.set(ctx.getOrganizationId(), ctx.getAdminUserId());
         progress.stage("Creating customers and suppliers");
 
-        boolean wholesale = blueprint.scenario() == DemoScenario.WHOLESALE || blueprint.workflow().creditSalesHeavy();
+        boolean wholesale = blueprint.scenario() == DemoScenario.WHOLESALE
+                || blueprint.workflow().creditSalesHeavy();
         int customerCount = blueprint.customerCount();
         for (int i = 1; i <= customerCount; i++) {
             String note = wholesale ? "Wholesale" : CUSTOMER_NOTES.get((i - 1) % CUSTOMER_NOTES.size());
             String name = note + " Customer " + i;
             boolean withGst = i % 3 == 0;
+            String state = "Karnataka";
+            String stateCode = "29";
+            if (i % 4 == 0) {
+                state = "Maharashtra";
+                stateCode = "27";
+            } else if (i % 5 == 0) {
+                state = "Tamil Nadu";
+                stateCode = "33";
+            }
             var created = customerService.create(new CustomerDtos.Create(
                     null,
                     name,
                     i % 5 == 0 ? name + " Pvt Ltd" : null,
                     withGst ? faker.gstin() : null,
                     null,
-                    name.replace(" ", ".").toLowerCase() + "@" + ctx.getScenario().slug() + ".demo",
+                    name.replace(" ", ".").toLowerCase() + "@"
+                            + ctx.getScenario().slug() + ".demo",
                     faker.phone(),
                     faker.faker().address().streetAddress(),
                     null,
                     faker.faker().address().city(),
-                    "Karnataka",
-                    "29",
+                    state,
+                    stateCode,
                     "India",
                     wholesale ? new BigDecimal("500000") : BigDecimal.valueOf(10_000 + i * 100L),
                     wholesale ? "NET30" : "COD",
@@ -95,6 +106,7 @@ public class PartyGenerator {
         }
 
         progress.done(String.format(
-                "Parties (%d customers, %d suppliers)", ctx.getCustomerIds().size(), ctx.getSupplierIds().size()));
+                "Parties (%d customers, %d suppliers)",
+                ctx.getCustomerIds().size(), ctx.getSupplierIds().size()));
     }
 }

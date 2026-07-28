@@ -5,10 +5,10 @@ import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
 import com.flowledger.finance.voucher.adapter.StockAdjustmentVoucherBuilder;
 import com.flowledger.inventory.dto.InventoryDtos.*;
-import com.flowledger.location.service.LocationHierarchyService;
 import com.flowledger.inventory.entity.*;
 import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.repository.*;
+import com.flowledger.location.service.LocationHierarchyService;
 import com.flowledger.product.entity.Product;
 import com.flowledger.product.repository.ProductRepository;
 import com.flowledger.sales.repository.SalesInvoiceRepository;
@@ -79,7 +79,8 @@ public class InventoryService {
         transaction.setTransactionType(request.type());
         transaction.setProductId(request.productId());
         transaction.setWarehouseId(request.warehouseId());
-        transaction.setBranchId(hierarchy.resolveBranchId(hierarchy.resolveStoreId(request.warehouseId()), request.warehouseId()));
+        transaction.setBranchId(
+                hierarchy.resolveBranchId(hierarchy.resolveStoreId(request.warehouseId()), request.warehouseId()));
         transaction.setStoreId(hierarchy.resolveStoreId(request.warehouseId()));
         transaction.setTransactionDate(request.transactionDate() == null ? LocalDate.now() : request.transactionDate());
         transaction.setInwardQty(in);
@@ -343,7 +344,16 @@ public class InventoryService {
             String referenceNumber,
             String idempotencyKey) {
         return postPurchase(
-                warehouseId, productId, quantity, unitCost, date, referenceId, referenceNumber, idempotencyKey, null, null);
+                warehouseId,
+                productId,
+                quantity,
+                unitCost,
+                date,
+                referenceId,
+                referenceNumber,
+                idempotencyKey,
+                null,
+                null);
     }
 
     @Transactional
@@ -404,7 +414,8 @@ public class InventoryService {
         LocalDate expiryDate = null;
         if (batchId != null) {
             InventoryBatch batch = batches.findByIdAndOrganizationId(batchId, TenantContext.getOrganizationId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Inventory batch not found"));
+                    .orElseThrow(
+                            () -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Inventory batch not found"));
             if (n(batch.getQuantity()).compareTo(quantity) < 0) {
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT,
@@ -479,9 +490,7 @@ public class InventoryService {
                 batch.setExpiryDate(transaction.getExpiryDate());
                 batch.setQuantity(BigDecimal.ZERO);
                 batch.setReceivedDate(
-                        transaction.getTransactionDate() != null
-                                ? transaction.getTransactionDate()
-                                : LocalDate.now());
+                        transaction.getTransactionDate() != null ? transaction.getTransactionDate() : LocalDate.now());
                 batch.setQualityStatus("AVAILABLE");
             }
             batch.setQuantity(n(batch.getQuantity()).add(delta));

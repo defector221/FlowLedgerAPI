@@ -38,12 +38,14 @@ public class PublicProductService {
     }
 
     public PublicProductCard getPublishedProduct(UUID productId) {
-        Product product = products
-                .findById(productId)
+        Product product = products.findById(productId)
                 .filter(Product::isActive)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
 
-        String orgName = organizations.findById(product.getOrganizationId()).map(o -> o.getName()).orElse(null);
+        String orgName = organizations
+                .findById(product.getOrganizationId())
+                .map(o -> o.getName())
+                .orElse(null);
         String imageUrl = resolveImageUrl(product);
 
         return new PublicProductCard(
@@ -65,9 +67,11 @@ public class PublicProductService {
 
     private String resolveImageUrl(Product product) {
         return images.findFirstByProductIdAndPrimaryTrueOrderBySortOrderAsc(product.getId())
-                .or(() -> images.findByProductIdOrderBySortOrderAsc(product.getId()).stream().findFirst())
+                .or(() -> images.findByProductIdOrderBySortOrderAsc(product.getId()).stream()
+                        .findFirst())
                 .map(ProductImage::getObjectKey)
-                .or(() -> java.util.Optional.ofNullable(product.getImageObjectKey()).filter(k -> !k.isBlank()))
+                .or(() -> java.util.Optional.ofNullable(product.getImageObjectKey())
+                        .filter(k -> !k.isBlank()))
                 .map(key -> storage.getPresignedUrl(key, Duration.ofHours(1)))
                 .orElse(null);
     }

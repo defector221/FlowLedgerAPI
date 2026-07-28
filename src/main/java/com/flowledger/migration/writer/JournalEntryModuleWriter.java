@@ -46,25 +46,19 @@ public class JournalEntryModuleWriter implements DocumentModuleWriter {
         BigDecimal creditTotal = BigDecimal.ZERO;
         for (Map<String, String> row : rows) {
             String accountCode = required(row, "accountCode").toUpperCase(Locale.ROOT);
-            var account = accounts
-                    .findByOrganizationIdAndAccountCode(organizationId, accountCode)
+            var account = accounts.findByOrganizationIdAndAccountCode(organizationId, accountCode)
                     .orElseThrow(() -> new IllegalArgumentException("Account not found: " + accountCode));
             BigDecimal debit = decimalOrZero(row, "debit");
             BigDecimal credit = decimalOrZero(row, "credit");
             debitTotal = debitTotal.add(debit);
             creditTotal = creditTotal.add(credit);
-            lines.add(new JournalLineRequest(
-                    account.getId(), str(row, "narration"), debit, credit, null, null, null));
+            lines.add(new JournalLineRequest(account.getId(), str(row, "narration"), debit, credit, null, null, null));
         }
         if (debitTotal.compareTo(creditTotal) != 0) {
             return WriteResult.failed("Unbalanced journal: debit=" + debitTotal + " credit=" + creditTotal);
         }
         var created = posting.createDraft(new JournalRequest(
-                dateOrToday(first, "voucherDate"),
-                null,
-                str(first, "narration"),
-                str(first, "voucherNumber"),
-                lines));
+                dateOrToday(first, "voucherDate"), null, str(first, "narration"), str(first, "voucherNumber"), lines));
         var posted = posting.postJournal(created.id());
         return WriteResult.imported(posted.id(), "JOURNAL_ENTRY");
     }

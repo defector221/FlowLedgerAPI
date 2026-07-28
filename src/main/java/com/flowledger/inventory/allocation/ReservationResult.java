@@ -16,7 +16,8 @@ public record ReservationResult(
     }
 
     public static ReservationResult conflict(List<AllocationCandidate> candidates) {
-        return new ReservationResult(AllocationStatus.CONFLICT, null, null, candidates, "Multiple inventory candidates");
+        return new ReservationResult(
+                AllocationStatus.CONFLICT, null, null, candidates, "Multiple inventory candidates");
     }
 
     public static ReservationResult outOfStock(String reason) {

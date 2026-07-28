@@ -11,7 +11,8 @@ public record ParsedSheet(String name, List<String> columns, List<Map<String, St
     }
 
     public ParsedSheet withNormalizedColumns() {
-        List<String> normalized = columns.stream().map(c -> c == null ? "" : c.trim()).toList();
+        List<String> normalized =
+                columns.stream().map(c -> c == null ? "" : c.trim()).toList();
         List<Map<String, String>> remapped = new ArrayList<>();
         for (Map<String, String> row : rows) {
             Map<String, String> copy = new LinkedHashMap<>();

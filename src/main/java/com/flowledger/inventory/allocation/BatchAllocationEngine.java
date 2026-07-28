@@ -35,7 +35,8 @@ public class BatchAllocationEngine {
                 .collect(Collectors.toMap(AllocationStrategy::type, Function.identity()));
     }
 
-    public AllocationResult allocate(AllocationRequest request, AllocationStrategyType strategyType, UUID preferredWarehouseId) {
+    public AllocationResult allocate(
+            AllocationRequest request, AllocationStrategyType strategyType, UUID preferredWarehouseId) {
         List<AllocationCandidate> eligible = candidateProvider.eligibleBatches(
                 request.organizationId(),
                 request.productId(),
@@ -68,8 +69,7 @@ public class BatchAllocationEngine {
     }
 
     public AllocationResult allocateWithBatch(AllocationRequest request, UUID batchId) {
-        InventoryBatch batch = batches
-                .findByIdAndOrganizationId(batchId, request.organizationId())
+        InventoryBatch batch = batches.findByIdAndOrganizationId(batchId, request.organizationId())
                 .orElse(null);
         if (batch == null || !batch.getProductId().equals(request.productId())) {
             return AllocationResult.outOfStock("Selected batch is not available");
@@ -80,8 +80,8 @@ public class BatchAllocationEngine {
         if (batch.getExpiryDate() != null && batch.getExpiryDate().isBefore(java.time.LocalDate.now())) {
             return AllocationResult.outOfStock("Selected batch is expired");
         }
-        BigDecimal available = availability.batchAvailable(
-                request.organizationId(), batchId, request.excludeReservationId());
+        BigDecimal available =
+                availability.batchAvailable(request.organizationId(), batchId, request.excludeReservationId());
         if (available.compareTo(request.quantity()) < 0) {
             return AllocationResult.outOfStock("Insufficient quantity in selected batch");
         }
@@ -91,7 +91,8 @@ public class BatchAllocationEngine {
                 request.quantity()));
     }
 
-    private AllocatedInventory toAllocated(AllocationCandidate candidate, AllocationMode mode, java.math.BigDecimal qty) {
+    private AllocatedInventory toAllocated(
+            AllocationCandidate candidate, AllocationMode mode, java.math.BigDecimal qty) {
         return new AllocatedInventory(
                 candidate.batchId(),
                 candidate.warehouseId(),

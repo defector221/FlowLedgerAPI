@@ -110,15 +110,13 @@ public class OpsController {
 
     @PatchMapping("/organizations/{id}/status")
     @PreAuthorize("hasAuthority('ORG_WRITE')")
-    public ApiResponse<Map<String, Object>> status(
-            @PathVariable UUID id, @RequestBody Map<String, String> body) {
+    public ApiResponse<Map<String, Object>> status(@PathVariable UUID id, @RequestBody Map<String, String> body) {
         return ApiResponse.of(organizations.setStatus(id, body.get("status")));
     }
 
     @DeleteMapping("/organizations/{id}")
     @PreAuthorize("hasAuthority('ORG_WRITE')")
-    public ApiResponse<Map<String, Object>> deleteOrg(
-            @PathVariable UUID id, @RequestBody Map<String, String> body) {
+    public ApiResponse<Map<String, Object>> deleteOrg(@PathVariable UUID id, @RequestBody Map<String, String> body) {
         return ApiResponse.of(organizations.purge(id, body == null ? null : body.get("confirmName")));
     }
 
@@ -187,6 +185,7 @@ public class OpsController {
         opts.put("enabled", demoProps.isEnabled());
         opts.put("allowReset", demoProps.isAllowReset());
         opts.put("defaultScenario", demoProps.getScenario());
+        opts.put("planCode", demoProps.getPlanCode());
         return ApiResponse.of(opts);
     }
 
@@ -199,12 +198,7 @@ public class OpsController {
         try {
             Map<String, Object> job =
                     demoSeedJobs.enqueue(request == null ? new DemoSeedRequest(null, null, null, null) : request);
-            audit.record(
-                    "DEMO_SEED_ENQUEUED",
-                    null,
-                    "DemoSeedJob",
-                    String.valueOf(job.get("id")),
-                    "SUCCESS");
+            audit.record("DEMO_SEED_ENQUEUED", null, "DemoSeedJob", String.valueOf(job.get("id")), "SUCCESS");
             return ApiResponse.of(job);
         } catch (DemoDisabledException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);

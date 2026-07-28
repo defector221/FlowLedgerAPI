@@ -1,6 +1,7 @@
 package com.flowledger.sales.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.flowledger.tax.service.TaxLineCalculator;
 import jakarta.persistence.*;
 import java.math.*;
 import java.util.*;
@@ -11,7 +12,7 @@ import lombok.*;
 @Getter
 @Setter
 @NoArgsConstructor
-public class SalesOrderItem {
+public class SalesOrderItem implements TaxLineCalculator.LineTaxSnapshots {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -63,4 +64,19 @@ public class SalesOrderItem {
 
     @Column(name = "stock_reservation_id")
     private UUID stockReservationId;
+
+    @Transient
+    private BigDecimal cessAmount = BigDecimal.ZERO;
+
+    @Column(name = "tax_category_id")
+    private UUID taxCategoryId;
+
+    @Column(name = "tax_rule_id")
+    private UUID taxRuleId;
+
+    @Column(name = "tax_category_code", length = 50)
+    private String taxCategoryCode;
+
+    @Column(name = "tax_rule_version", length = 50)
+    private String taxRuleVersion;
 }

@@ -54,12 +54,7 @@ public class BarcodeResolveService {
         try {
             ResolvedMatch match = resolveInternal(trimmed);
             logScan(trimmed, request.source(), request.module(), match, true, null);
-            return new ScanResolveResponse(
-                    true,
-                    trimmed,
-                    match.matchType(),
-                    match.product(),
-                    null);
+            return new ScanResolveResponse(true, trimmed, match.matchType(), match.product(), null);
         } catch (ResponseStatusException ex) {
             if (ex.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
                 logScan(trimmed, request.source(), request.module(), null, false, ex.getReason());
@@ -135,9 +130,7 @@ public class BarcodeResolveService {
                 .findFirst();
         if (exact.isPresent()) {
             Product p = exact.get();
-            return new ResolvedMatch(
-                    "SKU_OR_NAME",
-                    fromProduct(p, p.getBarcode() != null ? p.getBarcode() : barcode));
+            return new ResolvedMatch("SKU_OR_NAME", fromProduct(p, p.getBarcode() != null ? p.getBarcode() : barcode));
         }
         Optional<Product> partial = active.stream()
                 .filter(p -> (p.getName() != null
@@ -145,10 +138,8 @@ public class BarcodeResolveService {
                         || (p.getSku() != null
                                 && p.getSku().toLowerCase(Locale.ROOT).contains(needle)))
                 .findFirst();
-        return partial
-                .map(p -> new ResolvedMatch(
-                        "SKU_OR_NAME_PARTIAL",
-                        fromProduct(p, p.getBarcode() != null ? p.getBarcode() : barcode)))
+        return partial.map(p -> new ResolvedMatch(
+                        "SKU_OR_NAME_PARTIAL", fromProduct(p, p.getBarcode() != null ? p.getBarcode() : barcode)))
                 .orElseThrow(() -> notFound("No product found for \"" + barcode + "\""));
     }
 
@@ -181,12 +172,7 @@ public class BarcodeResolveService {
     }
 
     private void logScan(
-            String barcode,
-            String source,
-            String module,
-            ResolvedMatch match,
-            boolean success,
-            String failureReason) {
+            String barcode, String source, String module, ResolvedMatch match, boolean success, String failureReason) {
         ScanHistory row = new ScanHistory();
         row.setOrganizationId(org());
         row.setBarcode(barcode);

@@ -152,9 +152,7 @@ public class ExportEngine {
     }
 
     private ExportJobResponse toResponse(ExportJob job) {
-        String url = job.getFileObjectKey() == null
-                ? null
-                : "/api/v1/migration/export/" + job.getId() + "/download";
+        String url = job.getFileObjectKey() == null ? null : "/api/v1/migration/export/" + job.getId() + "/download";
         return new ExportJobResponse(
                 job.getId(),
                 job.getModule().name(),
@@ -171,101 +169,140 @@ public class ExportEngine {
 
     private List<List<String>> loadRows(UUID org, ImportModule module, List<String> headers) {
         return switch (module) {
-            case BRANCH -> branches.findByOrganizationIdOrderByNameAsc(org).stream()
-                    .map(b -> values(headers, MapBuilder.of()
-                            .put("branchCode", b.getCode())
-                            .put("branchName", b.getName())
-                            .put("gstNumber", b.getGstNumber())
-                            .put("pan", b.getPan())
-                            .put("city", b.getCity())
-                            .put("state", b.getState())
-                            .put("phone", b.getPhone())
-                            .put("email", b.getEmail())
-                            .build()))
-                    .toList();
-            case STORE -> stores.findByOrganizationIdAndDeletedFalseOrderByNameAsc(org).stream()
-                    .map(s -> values(headers, MapBuilder.of()
-                            .put("storeCode", s.getCode())
-                            .put("storeName", s.getName())
-                            .put("city", s.getCity())
-                            .put("state", s.getState())
-                            .put("phone", s.getPhone())
-                            .put("email", s.getEmail())
-                            .put("status", s.getStatus())
-                            .build()))
-                    .toList();
-            case WAREHOUSE -> warehouses.findByOrganizationId(org).stream()
-                    .map(w -> values(headers, MapBuilder.of()
-                            .put("warehouseCode", w.getWarehouseCode())
-                            .put("warehouseName", w.getWarehouseName())
-                            .put("warehouseType", w.getWarehouseType() == null ? null : w.getWarehouseType().name())
-                            .put("address", w.getAddress())
-                            .put("phone", w.getPhone())
-                            .build()))
-                    .toList();
-            case CUSTOMER -> customers.findByOrganizationId(org).stream()
-                    .map(c -> values(headers, MapBuilder.of()
-                            .put("customerCode", c.getCustomerCode())
-                            .put("customerName", c.getCustomerName())
-                            .put("gstin", c.getGstin())
-                            .put("pan", c.getPan())
-                            .put("email", c.getEmail())
-                            .put("phone", c.getPhone())
-                            .put("city", c.getCity())
-                            .put("state", c.getState())
-                            .build()))
-                    .toList();
-            case SUPPLIER -> suppliers.findByOrganizationId(org).stream()
-                    .map(s -> values(headers, MapBuilder.of()
-                            .put("supplierCode", s.getSupplierCode())
-                            .put("supplierName", s.getSupplierName())
-                            .put("gstin", s.getGstin())
-                            .put("pan", s.getPan())
-                            .put("email", s.getEmail())
-                            .put("phone", s.getPhone())
-                            .put("city", s.getCity())
-                            .put("state", s.getState())
-                            .build()))
-                    .toList();
-            case PRODUCT -> products.findByOrganizationId(org).stream()
-                    .map(p -> values(headers, MapBuilder.of()
-                            .put("productCode", p.getSku())
-                            .put("productName", p.getName())
-                            .put("hsnSacCode", p.getHsnSacCode())
-                            .put("barcode", p.getBarcode())
-                            .put("mrp", str(p.getMrp()))
-                            .put("sellingPrice", str(p.getSellingPrice()))
-                            .put("purchasePrice", str(p.getPurchasePrice()))
-                            .build()))
-                    .toList();
-            case BARCODE -> products.findByOrganizationId(org).stream()
-                    .flatMap(p -> barcodes
-                            .findByOrganizationIdAndProductIdAndDeletedAtIsNullOrderByPrimaryDescCreatedAtAsc(
-                                    org, p.getId())
-                            .stream()
-                            .map(b -> values(headers, MapBuilder.of()
-                                    .put("productCode", p.getSku())
-                                    .put("barcode", b.getBarcode())
-                                    .put("barcodeType", b.getBarcodeType())
-                                    .put("status", b.getStatus())
-                                    .build())))
-                    .toList();
-            case COA -> accounts.findByOrganizationIdOrderByAccountCodeAsc(org).stream()
-                    .map(a -> values(headers, MapBuilder.of()
-                            .put("accountCode", a.getAccountCode())
-                            .put("accountName", a.getAccountName())
-                            .put("accountType", a.getAccountType() == null ? null : a.getAccountType().name())
-                            .put("openingDebit", str(a.getOpeningDebit()))
-                            .put("openingCredit", str(a.getOpeningCredit()))
-                            .build()))
-                    .toList();
-            case SALES_INVOICE -> salesInvoices.findByOrganizationId(org, PageRequest.of(0, 5000)).stream()
-                    .map(i -> values(headers, MapBuilder.of()
-                            .put("invoiceNumber", i.getInvoiceNumber())
-                            .put("invoiceDate", i.getInvoiceDate() == null ? null : i.getInvoiceDate().toString())
-                            .put("grandTotal", str(i.getGrandTotal()))
-                            .build()))
-                    .toList();
+            case BRANCH ->
+                branches.findByOrganizationIdOrderByNameAsc(org).stream()
+                        .map(b -> values(
+                                headers,
+                                MapBuilder.of()
+                                        .put("branchCode", b.getCode())
+                                        .put("branchName", b.getName())
+                                        .put("gstNumber", b.getGstNumber())
+                                        .put("pan", b.getPan())
+                                        .put("city", b.getCity())
+                                        .put("state", b.getState())
+                                        .put("phone", b.getPhone())
+                                        .put("email", b.getEmail())
+                                        .build()))
+                        .toList();
+            case STORE ->
+                stores.findByOrganizationIdAndDeletedFalseOrderByNameAsc(org).stream()
+                        .map(s -> values(
+                                headers,
+                                MapBuilder.of()
+                                        .put("storeCode", s.getCode())
+                                        .put("storeName", s.getName())
+                                        .put("city", s.getCity())
+                                        .put("state", s.getState())
+                                        .put("phone", s.getPhone())
+                                        .put("email", s.getEmail())
+                                        .put("status", s.getStatus())
+                                        .build()))
+                        .toList();
+            case WAREHOUSE ->
+                warehouses.findByOrganizationId(org).stream()
+                        .map(w -> values(
+                                headers,
+                                MapBuilder.of()
+                                        .put("warehouseCode", w.getWarehouseCode())
+                                        .put("warehouseName", w.getWarehouseName())
+                                        .put(
+                                                "warehouseType",
+                                                w.getWarehouseType() == null
+                                                        ? null
+                                                        : w.getWarehouseType().name())
+                                        .put("address", w.getAddress())
+                                        .put("phone", w.getPhone())
+                                        .build()))
+                        .toList();
+            case CUSTOMER ->
+                customers.findByOrganizationId(org).stream()
+                        .map(c -> values(
+                                headers,
+                                MapBuilder.of()
+                                        .put("customerCode", c.getCustomerCode())
+                                        .put("customerName", c.getCustomerName())
+                                        .put("gstin", c.getGstin())
+                                        .put("pan", c.getPan())
+                                        .put("email", c.getEmail())
+                                        .put("phone", c.getPhone())
+                                        .put("city", c.getCity())
+                                        .put("state", c.getState())
+                                        .build()))
+                        .toList();
+            case SUPPLIER ->
+                suppliers.findByOrganizationId(org).stream()
+                        .map(s -> values(
+                                headers,
+                                MapBuilder.of()
+                                        .put("supplierCode", s.getSupplierCode())
+                                        .put("supplierName", s.getSupplierName())
+                                        .put("gstin", s.getGstin())
+                                        .put("pan", s.getPan())
+                                        .put("email", s.getEmail())
+                                        .put("phone", s.getPhone())
+                                        .put("city", s.getCity())
+                                        .put("state", s.getState())
+                                        .build()))
+                        .toList();
+            case PRODUCT ->
+                products.findByOrganizationId(org).stream()
+                        .map(p -> values(
+                                headers,
+                                MapBuilder.of()
+                                        .put("productCode", p.getSku())
+                                        .put("productName", p.getName())
+                                        .put("hsnSacCode", p.getHsnSacCode())
+                                        .put("barcode", p.getBarcode())
+                                        .put("mrp", str(p.getMrp()))
+                                        .put("sellingPrice", str(p.getSellingPrice()))
+                                        .put("purchasePrice", str(p.getPurchasePrice()))
+                                        .build()))
+                        .toList();
+            case BARCODE ->
+                products.findByOrganizationId(org).stream()
+                        .flatMap(p -> barcodes
+                                .findByOrganizationIdAndProductIdAndDeletedAtIsNullOrderByPrimaryDescCreatedAtAsc(
+                                        org, p.getId())
+                                .stream()
+                                .map(b -> values(
+                                        headers,
+                                        MapBuilder.of()
+                                                .put("productCode", p.getSku())
+                                                .put("barcode", b.getBarcode())
+                                                .put("barcodeType", b.getBarcodeType())
+                                                .put("status", b.getStatus())
+                                                .build())))
+                        .toList();
+            case COA ->
+                accounts.findByOrganizationIdOrderByAccountCodeAsc(org).stream()
+                        .map(a -> values(
+                                headers,
+                                MapBuilder.of()
+                                        .put("accountCode", a.getAccountCode())
+                                        .put("accountName", a.getAccountName())
+                                        .put(
+                                                "accountType",
+                                                a.getAccountType() == null
+                                                        ? null
+                                                        : a.getAccountType().name())
+                                        .put("openingDebit", str(a.getOpeningDebit()))
+                                        .put("openingCredit", str(a.getOpeningCredit()))
+                                        .build()))
+                        .toList();
+            case SALES_INVOICE ->
+                salesInvoices.findByOrganizationId(org, PageRequest.of(0, 5000)).stream()
+                        .map(i -> values(
+                                headers,
+                                MapBuilder.of()
+                                        .put("invoiceNumber", i.getInvoiceNumber())
+                                        .put(
+                                                "invoiceDate",
+                                                i.getInvoiceDate() == null
+                                                        ? null
+                                                        : i.getInvoiceDate().toString())
+                                        .put("grandTotal", str(i.getGrandTotal()))
+                                        .build()))
+                        .toList();
             default -> List.of();
         };
     }
@@ -284,9 +321,11 @@ public class ExportEngine {
 
     private static byte[] toCsv(List<String> headers, List<List<String>> rows) {
         StringBuilder sb = new StringBuilder();
-        sb.append(headers.stream().map(ExportEngine::csvEscape).collect(Collectors.joining(","))).append('\n');
+        sb.append(headers.stream().map(ExportEngine::csvEscape).collect(Collectors.joining(",")))
+                .append('\n');
         for (List<String> row : rows) {
-            sb.append(row.stream().map(ExportEngine::csvEscape).collect(Collectors.joining(","))).append('\n');
+            sb.append(row.stream().map(ExportEngine::csvEscape).collect(Collectors.joining(",")))
+                    .append('\n');
         }
         return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
@@ -300,7 +339,8 @@ public class ExportEngine {
     }
 
     private static byte[] toXlsx(List<String> headers, List<List<String>> rows) {
-        try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+        try (XSSFWorkbook wb = new XSSFWorkbook();
+                ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = wb.createSheet("data");
             Row header = sheet.createRow(0);
             for (int i = 0; i < headers.size(); i++) {

@@ -41,6 +41,7 @@ public class SalesInvoice extends AuditedEntity {
 
     @Column(name = "store_id")
     private UUID storeId;
+
     @Column(columnDefinition = "text")
     private String billingAddress, shippingAddress, notes, termsAndConditions;
     private String placeOfSupply, customerGstin, amountInWords;

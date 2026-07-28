@@ -26,8 +26,7 @@ public class MigrationController {
     private final MappingProfileService profiles;
     private final ExportEngine exports;
 
-    public MigrationController(
-            ImportJobService imports, MappingProfileService profiles, ExportEngine exports) {
+    public MigrationController(ImportJobService imports, MappingProfileService profiles, ExportEngine exports) {
         this.imports = imports;
         this.profiles = profiles;
         this.exports = exports;
@@ -121,8 +120,7 @@ public class MigrationController {
 
     @GetMapping("/mapping-profiles")
     @PreAuthorize("hasAuthority('MIGRATION_READ')")
-    public ApiResponse<List<MappingProfileResponse>> listProfiles(
-            @RequestParam(required = false) String module) {
+    public ApiResponse<List<MappingProfileResponse>> listProfiles(@RequestParam(required = false) String module) {
         return ApiResponse.of(profiles.list(module));
     }
 
@@ -169,8 +167,8 @@ public class MigrationController {
                 .header(
                         HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"" + module.name().toLowerCase() + "-template.xlsx\"")
-                .contentType(MediaType.parseMediaType(
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .contentType(
+                        MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(body);
     }
 }

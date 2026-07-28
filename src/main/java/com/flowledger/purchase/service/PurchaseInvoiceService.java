@@ -25,8 +25,9 @@ import com.flowledger.search.event.SearchIndexEventPublisher;
 import com.flowledger.search.model.SearchEntityType;
 import com.flowledger.supplier.repository.SupplierRepository;
 import com.flowledger.tax.TaxSplitDefaults;
-import com.flowledger.tax.dto.GstCalculationDtos;
-import com.flowledger.tax.service.GstCalculationService;
+import com.flowledger.tax.dto.TaxCalculationDtos.TaxResult;
+import com.flowledger.tax.service.TaxLineCalculator;
+import com.flowledger.tax.service.TaxLineCalculator.DocumentLineInput;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
@@ -55,7 +56,7 @@ public class PurchaseInvoiceService {
     private final DocumentNumberService numbers;
     private final OrganizationRepository organizations;
     private final SupplierRepository suppliers;
-    private final GstCalculationService gst;
+    private final TaxLineCalculator taxLineCalculator;
     private final SearchIndexEventPublisher searchEvents;
     private final DocumentVoucherFacade documentPosting;
     private final LocationHierarchyService hierarchy;
@@ -66,7 +67,7 @@ public class PurchaseInvoiceService {
             DocumentNumberService documentNumberService,
             OrganizationRepository organizationRepository,
             SupplierRepository suppliers,
-            GstCalculationService tax,
+            TaxLineCalculator taxLineCalculator,
             SearchIndexEventPublisher searchEvents,
             DocumentVoucherFacade documentPosting,
             LocationHierarchyService hierarchy) {
@@ -75,7 +76,7 @@ public class PurchaseInvoiceService {
         numbers = documentNumberService;
         organizations = organizationRepository;
         this.suppliers = suppliers;
-        gst = tax;
+        this.taxLineCalculator = taxLineCalculator;
         this.searchEvents = searchEvents;
         this.documentPosting = documentPosting;
         this.hierarchy = hierarchy;
@@ -378,7 +379,8 @@ public class PurchaseInvoiceService {
         invoice.setBranchId(hierarchy.resolveBranchId(null, wh));
         invoice.setInvoiceNumber(number(request.invoiceDate(), invoice.getBranchId()));
         applyRequest(invoice, request, lines);
-        if (request.supplierInvoiceNumber() != null && !request.supplierInvoiceNumber().isBlank()) {
+        if (request.supplierInvoiceNumber() != null
+                && !request.supplierInvoiceNumber().isBlank()) {
             invoice.setSupplierInvoiceNumber(request.supplierInvoiceNumber());
         }
         em.persist(invoice);
@@ -432,24 +434,26 @@ public class PurchaseInvoiceService {
                             || invoice.getPlaceOfSupply().isBlank()
                     ? orgState
                     : invoice.getPlaceOfSupply().trim();
-            GstCalculationDtos.Response tax = gst.calculate(new GstCalculationDtos.Request(
+            TaxResult taxResult = taxLineCalculator.calculateDocumentLine(new DocumentLineInput(
                     orgState,
                     place,
-                    item.getTaxRate(),
-                    invoice.isTaxInclusive(),
+                    "IN",
+                    invoice.getInvoiceDate(),
+                    line.productId(),
+                    null,
+                    null,
                     line.quantity(),
                     line.rate(),
                     discount,
+                    invoice.isTaxInclusive(),
+                    item.getTaxRate(),
                     item.getTaxType(),
                     item.getSplitStrategy(),
                     item.getCgstSharePercent(),
                     item.getSgstSharePercent()));
             item.setDiscountAmount(discount);
-            item.setTaxableAmount(tax.taxable());
-            item.setCgstAmount(tax.cgst());
-            item.setSgstAmount(tax.sgst());
-            item.setIgstAmount(tax.igst().add(tax.otherTax()));
-            item.setLineTotal(tax.lineTotal());
+            taxLineCalculator.applyTaxSnapshots(item, taxResult);
+            item.setIgstAmount(taxResult.igstAmount().add(taxResult.otherTaxAmount()));
             invoice.getItems().add(item);
         }
         invoice.setSubtotal(invoice.getItems().stream()

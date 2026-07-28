@@ -5,8 +5,7 @@ import java.util.Locale;
 public enum DemoScenario {
     RETAIL_SMALL("retail-small", "Retail World (Small)", "1 branch, 2 stores, ~500 products — fast local demo"),
     RETAIL_MEDIUM("retail-medium", "Retail World (Medium)", "5 branches, 20 stores, ~10k products"),
-    RETAIL_ENTERPRISE(
-            "retail-enterprise", "Retail World (Enterprise)", "100 branches, 500 stores, ~100k products"),
+    RETAIL_ENTERPRISE("retail-enterprise", "Retail World (Enterprise)", "100 branches, 500 stores, ~100k products"),
     GROCERY_CHAIN("grocery-chain", "FreshMart Demo", "Grocery catalog with batch/expiry focus"),
     FASHION_CHAIN("fashion-chain", "StyleHub Demo", "Apparel with size/color variants"),
     ELECTRONICS_CHAIN("electronics-chain", "DigiMart Demo", "Serial-number and warranty tracking"),

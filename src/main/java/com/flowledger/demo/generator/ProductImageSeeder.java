@@ -71,13 +71,14 @@ public class ProductImageSeeder {
             if (product.getItemType() != null && "SERVICE".equalsIgnoreCase(product.getItemType())) {
                 continue;
             }
-            if (!productImages.findByOrganizationIdAndProductIdOrderBySortOrderAsc(ctx.getOrganizationId(), productId)
+            if (!productImages
+                    .findByOrganizationIdAndProductIdOrderBySortOrderAsc(ctx.getOrganizationId(), productId)
                     .isEmpty()) {
                 reused.incrementAndGet();
                 continue;
             }
-            String folder = DemoImageCategoryMapper.resolve(
-                    product.getName(), blueprint.catalogStrategy(), ctx.getScenario());
+            String folder =
+                    DemoImageCategoryMapper.resolve(product.getName(), blueprint.catalogStrategy(), ctx.getScenario());
             List<DemoImageResource> pool = images.imagesFor(folder);
             if (pool.isEmpty()) {
                 DemoImageResource def = images.defaultImage();
@@ -121,8 +122,8 @@ public class ProductImageSeeder {
         progress.done("Product images (uploaded=" + uploaded.get() + ", reused=" + reused.get() + ")");
     }
 
-    private boolean attach(
-            DemoSeedContext ctx, UUID productId, DemoImageResource res, String role, boolean primary) throws Exception {
+    private boolean attach(DemoSeedContext ctx, UUID productId, DemoImageResource res, String role, boolean primary)
+            throws Exception {
         byte[] bytes;
         try (InputStream in = res.openStream()) {
             bytes = in.readAllBytes();
@@ -131,15 +132,15 @@ public class ProductImageSeeder {
         String checksum = HexFormat.of().formatHex(md.digest(bytes));
 
         var existing = productImages.findFirstByOrganizationIdAndChecksum(ctx.getOrganizationId(), checksum);
-        if (existing.isPresent()
-                && existing.get().getProductId().equals(productId)) {
+        if (existing.isPresent() && existing.get().getProductId().equals(productId)) {
             return false;
         }
 
         // Idempotent reuse of stored object for same checksum in org: still link new product_images row pointing at
         // copied stream upload (simpler than cross-product key share). Skip re-upload only if product already has this
         // checksum.
-        if (productImages.findByOrganizationIdAndProductIdOrderBySortOrderAsc(ctx.getOrganizationId(), productId)
+        if (productImages
+                .findByOrganizationIdAndProductIdOrderBySortOrderAsc(ctx.getOrganizationId(), productId)
                 .stream()
                 .anyMatch(img -> checksum.equals(img.getChecksum()))) {
             return false;

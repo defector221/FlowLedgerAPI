@@ -27,7 +27,13 @@ public class JwtService {
     }
 
     public String createAccessToken(UserPrincipal p, UUID branchId, UUID storeId, UUID warehouseId) {
-        return createWithLocation(p, Duration.ofMinutes(properties.getAccessTokenExpiryMinutes()), "access", branchId, storeId, warehouseId);
+        return createWithLocation(
+                p,
+                Duration.ofMinutes(properties.getAccessTokenExpiryMinutes()),
+                "access",
+                branchId,
+                storeId,
+                warehouseId);
     }
 
     private String create(UserPrincipal p, Duration duration, String type) {

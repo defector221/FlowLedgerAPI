@@ -91,9 +91,7 @@ public class ImportWorker {
 
         ModuleWriter writer = writers.require(job.getModule());
         List<ImportRowResult> candidates = rows.findByJobIdAndOrganizationIdAndStatusInOrderByRowNumberAsc(
-                jobId,
-                organizationId,
-                List.of(ImportRowStatus.OK, ImportRowStatus.WARNING));
+                jobId, organizationId, List.of(ImportRowStatus.OK, ImportRowStatus.WARNING));
 
         int success = 0;
         int skipped = 0;
@@ -139,8 +137,7 @@ public class ImportWorker {
             }
         } else {
             for (int i = 0; i < candidates.size(); i += CHUNK) {
-                List<ImportRowResult> chunk =
-                        candidates.subList(i, Math.min(i + CHUNK, candidates.size()));
+                List<ImportRowResult> chunk = candidates.subList(i, Math.min(i + CHUNK, candidates.size()));
                 for (ImportRowResult r : chunk) {
                     if (r.getStatus() == ImportRowStatus.IMPORTED) {
                         skipped++;
@@ -163,7 +160,8 @@ public class ImportWorker {
                     }
                 }
                 rows.saveAll(chunk);
-                updateProgress(job, Math.min(i + CHUNK, candidates.size()), candidates.size(), success, skipped, failed);
+                updateProgress(
+                        job, Math.min(i + CHUNK, candidates.size()), candidates.size(), success, skipped, failed);
             }
         }
 
@@ -174,9 +172,8 @@ public class ImportWorker {
             storage.store(errorKey, new BytesMultipartFile("errors.csv", "text/csv", csv));
         }
 
-        ImportReport report = reports
-                .findByJobIdAndOrganizationId(jobId, organizationId)
-                .orElseGet(ImportReport::new);
+        ImportReport report =
+                reports.findByJobIdAndOrganizationId(jobId, organizationId).orElseGet(ImportReport::new);
         report.setOrganizationId(organizationId);
         report.setJobId(jobId);
         report.setErrorFileObjectKey(errorKey);
@@ -221,8 +218,7 @@ public class ImportWorker {
         }
     }
 
-    private void updateProgress(
-            ImportJob job, int processed, int total, int success, int skipped, int failed) {
+    private void updateProgress(ImportJob job, int processed, int total, int success, int skipped, int failed) {
         job.setProcessedRows(processed);
         job.setSuccessRows(success);
         job.setSkippedRows(skipped);

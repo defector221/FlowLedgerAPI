@@ -21,9 +21,7 @@ public class AllocationCandidateProvider {
     private final StockReservationRepository reservations;
 
     public AllocationCandidateProvider(
-            InventoryBatchRepository batches,
-            WarehouseRepository warehouses,
-            StockReservationRepository reservations) {
+            InventoryBatchRepository batches, WarehouseRepository warehouses, StockReservationRepository reservations) {
         this.batches = batches;
         this.warehouses = warehouses;
         this.reservations = reservations;
@@ -33,8 +31,9 @@ public class AllocationCandidateProvider {
             UUID orgId, UUID productId, UUID warehouseId, BigDecimal qty, UUID excludeReservationId) {
         LocalDate today = LocalDate.now();
         List<InventoryBatch> rows =
-                batches.findByOrganizationIdAndProductIdAndWarehouseIdAndQualityStatusOrderByReceivedDateAscExpiryDateAsc(
-                        orgId, productId, warehouseId, "AVAILABLE");
+                batches
+                        .findByOrganizationIdAndProductIdAndWarehouseIdAndQualityStatusOrderByReceivedDateAscExpiryDateAsc(
+                                orgId, productId, warehouseId, "AVAILABLE");
         Map<UUID, String> warehouseNames = warehouses.findByOrganizationId(orgId).stream()
                 .collect(Collectors.toMap(Warehouse::getId, w -> w.getWarehouseName(), (a, b) -> a));
 
@@ -43,8 +42,7 @@ public class AllocationCandidateProvider {
             if (batch.getExpiryDate() != null && batch.getExpiryDate().isBefore(today)) {
                 continue;
             }
-            BigDecimal reserved =
-                    reservations.activeReservedQtyByBatch(orgId, batch.getId(), excludeReservationId);
+            BigDecimal reserved = reservations.activeReservedQtyByBatch(orgId, batch.getId(), excludeReservationId);
             BigDecimal available = n(batch.getQuantity()).subtract(reserved).max(BigDecimal.ZERO);
             if (available.compareTo(qty) < 0) {
                 continue;

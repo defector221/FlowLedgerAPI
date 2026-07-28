@@ -20,17 +20,19 @@ public class ScanHistoryService {
     }
 
     public Page<Response> list(Pageable pageable) {
-        return repository.findByOrganizationIdOrderByScannedAtDesc(org(), pageable).map(row -> new Response(
-                row.getId(),
-                row.getBarcode(),
-                row.getSource(),
-                row.getModule(),
-                row.getResolvedProductId(),
-                row.getResolvedVariantId(),
-                row.isSuccess(),
-                row.getFailureReason(),
-                row.getScannedAt(),
-                row.getCreatedBy()));
+        return repository
+                .findByOrganizationIdOrderByScannedAtDesc(org(), pageable)
+                .map(row -> new Response(
+                        row.getId(),
+                        row.getBarcode(),
+                        row.getSource(),
+                        row.getModule(),
+                        row.getResolvedProductId(),
+                        row.getResolvedVariantId(),
+                        row.isSuccess(),
+                        row.getFailureReason(),
+                        row.getScannedAt(),
+                        row.getCreatedBy()));
     }
 
     private UUID org() {

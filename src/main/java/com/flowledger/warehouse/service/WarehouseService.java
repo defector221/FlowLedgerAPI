@@ -123,7 +123,8 @@ public class WarehouseService extends OrganizationScopedService {
                     branchId = hierarchy.defaultBranchId();
                 }
                 if (branchId == null) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Branch is required for branch warehouse");
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST, "Branch is required for branch warehouse");
                 }
                 warehouse.setBranchId(branchId);
                 warehouse.setStoreId(null);

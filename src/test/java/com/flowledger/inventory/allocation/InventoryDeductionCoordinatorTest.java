@@ -100,7 +100,8 @@ class InventoryDeductionCoordinatorTest {
                         challanLineId))
                 .thenReturn(child);
 
-        coordinator.transferOrderLineToChallan(orgId, orderLine, challanItem, challanId, challanLineId, new BigDecimal("4"));
+        coordinator.transferOrderLineToChallan(
+                orgId, orderLine, challanItem, challanId, challanLineId, new BigDecimal("4"));
 
         assertEquals(child.getId(), challanItem.getStockReservationId());
         assertEquals(batchId, challanItem.getInventoryBatchId());

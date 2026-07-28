@@ -2,7 +2,6 @@ package com.flowledger.inventory.service;
 
 import com.flowledger.common.exception.BusinessException;
 import com.flowledger.inventory.allocation.ReservationAvailabilityService;
-import com.flowledger.inventory.allocation.ReservationAvailabilityService;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import java.math.BigDecimal;

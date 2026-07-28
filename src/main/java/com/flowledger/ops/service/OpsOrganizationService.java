@@ -10,7 +10,6 @@ import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.entity.OrganizationSettings;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.organization.repository.OrganizationSettingsRepository;
-import com.flowledger.subscription.entity.OrganizationSubscription;
 import com.flowledger.subscription.entity.SubscriptionPlan;
 import com.flowledger.subscription.repository.OrganizationSubscriptionRepository;
 import com.flowledger.subscription.repository.SubscriptionPlanRepository;
@@ -163,9 +162,11 @@ public class OpsOrganizationService {
 
         List<Map<String, Object>> members = loadMembers(id);
         m.put("users", members);
-        m.put("adminUsers", members.stream()
-                .filter(u -> Boolean.TRUE.equals(u.get("admin")))
-                .toList());
+        m.put(
+                "adminUsers",
+                members.stream()
+                        .filter(u -> Boolean.TRUE.equals(u.get("admin")))
+                        .toList());
         members.stream()
                 .filter(u -> Boolean.TRUE.equals(u.get("admin")))
                 .findFirst()
@@ -210,10 +211,14 @@ public class OpsOrganizationService {
             OrganizationMembership membership = byUser.get(user.getId());
             List<String> roleCodes = new ArrayList<>();
             if (membership != null && membership.getRoles() != null) {
-                roleCodes.addAll(membership.getRoles().stream().map(Role::getCode).sorted().toList());
+                roleCodes.addAll(membership.getRoles().stream()
+                        .map(Role::getCode)
+                        .sorted()
+                        .toList());
             }
             if (roleCodes.isEmpty() && user.getRoles() != null) {
-                roleCodes.addAll(user.getRoles().stream().map(Role::getCode).sorted().toList());
+                roleCodes.addAll(
+                        user.getRoles().stream().map(Role::getCode).sorted().toList());
             }
             boolean admin = roleCodes.stream()
                     .anyMatch(c -> "ORGANIZATION_ADMIN".equalsIgnoreCase(c) || "ORG_ADMIN".equalsIgnoreCase(c));
@@ -308,8 +313,7 @@ public class OpsOrganizationService {
         String name = org.getName();
 
         // Break settings ↔ warehouse cycle before CASCADE delete of warehouses.
-        em.createNativeQuery(
-                        "UPDATE organization_settings SET default_warehouse_id = NULL WHERE organization_id = :id")
+        em.createNativeQuery("UPDATE organization_settings SET default_warehouse_id = NULL WHERE organization_id = :id")
                 .setParameter("id", id)
                 .executeUpdate();
         em.createNativeQuery(
@@ -417,7 +421,8 @@ public class OpsOrganizationService {
             if (idx >= 0) {
                 String rest = lowerSql.substring(idx + prefix.length()).trim();
                 int end = 0;
-                while (end < rest.length() && (Character.isLetterOrDigit(rest.charAt(end)) || rest.charAt(end) == '_')) {
+                while (end < rest.length()
+                        && (Character.isLetterOrDigit(rest.charAt(end)) || rest.charAt(end) == '_')) {
                     end++;
                 }
                 return end > 0 ? rest.substring(0, end) : null;
@@ -457,9 +462,8 @@ public class OpsOrganizationService {
                 if (!isSafeIdentifier(table) || !isSafeIdentifier(column) || "products".equals(table)) {
                     continue;
                 }
-                deleted += em.createNativeQuery(
-                                "DELETE FROM " + table + " WHERE " + column
-                                        + " IN (SELECT id FROM products WHERE organization_id = :id)")
+                deleted += em.createNativeQuery("DELETE FROM " + table + " WHERE " + column
+                                + " IN (SELECT id FROM products WHERE organization_id = :id)")
                         .setParameter("id", orgId)
                         .executeUpdate();
             }
@@ -483,20 +487,22 @@ public class OpsOrganizationService {
         m.put("lifecycleStatus", org.getLifecycleStatus());
         m.put("active", org.isActive());
         m.put("createdAt", org.getCreatedAt());
-        subscriptions.findByOrganizationId(org.getId()).ifPresentOrElse(
-                sub -> {
-                    m.put("subscriptionStatus", sub.getStatus());
-                    m.put("billingCycle", sub.getBillingCycle());
-                    SubscriptionPlan plan = sub.getPlan();
-                    if (plan != null) {
-                        m.put("planCode", plan.getCode());
-                        m.put("planName", plan.getName());
-                    }
-                },
-                () -> {
-                    m.put("subscriptionStatus", null);
-                    m.put("planCode", null);
-                });
+        subscriptions
+                .findByOrganizationId(org.getId())
+                .ifPresentOrElse(
+                        sub -> {
+                            m.put("subscriptionStatus", sub.getStatus());
+                            m.put("billingCycle", sub.getBillingCycle());
+                            SubscriptionPlan plan = sub.getPlan();
+                            if (plan != null) {
+                                m.put("planCode", plan.getCode());
+                                m.put("planName", plan.getName());
+                            }
+                        },
+                        () -> {
+                            m.put("subscriptionStatus", null);
+                            m.put("planCode", null);
+                        });
         return m;
     }
 

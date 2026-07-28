@@ -46,8 +46,8 @@ public class CartScanService {
                     "Product not found for barcode",
                     null);
         }
-        AllocationResult result = allocationEngine.allocate(new AllocationRequest(
-                org(), product.productId(), request.warehouseId(), request.quantity(), null));
+        AllocationResult result = allocationEngine.allocate(
+                new AllocationRequest(org(), product.productId(), request.warehouseId(), request.quantity(), null));
         return finalizeScan(request.barcode(), product, result, request.cartId());
     }
 
@@ -85,8 +85,12 @@ public class CartScanService {
                             scan.product().variantId(),
                             scan.product().name(),
                             scan.product().barcode() != null ? scan.product().barcode() : barcode,
-                            scan.allocated().quantity() != null ? scan.allocated().quantity() : BigDecimal.ONE,
-                            scan.product().sellingPrice() != null ? scan.product().sellingPrice() : BigDecimal.ZERO,
+                            scan.allocated().quantity() != null
+                                    ? scan.allocated().quantity()
+                                    : BigDecimal.ONE,
+                            scan.product().sellingPrice() != null
+                                    ? scan.product().sellingPrice()
+                                    : BigDecimal.ZERO,
                             null,
                             null,
                             scan.allocated().warehouseId(),
@@ -94,12 +98,7 @@ public class CartScanService {
                             scan.allocated().allocationMode()));
         }
         return new CartScanResponse(
-                scan.status(),
-                scan.product(),
-                scan.allocated(),
-                scan.candidates(),
-                scan.reason(),
-                cart);
+                scan.status(), scan.product(), scan.allocated(), scan.candidates(), scan.reason(), cart);
     }
 
     private ProductLookupResponse lookupProduct(String barcode) {
@@ -116,11 +115,7 @@ public class CartScanService {
     private PosScanResponse mapScan(ProductLookupResponse product, AllocationResult result) {
         if (product == null) {
             return new PosScanResponse(
-                    AllocationStatus.INVALID_PRODUCT.name(),
-                    null,
-                    null,
-                    List.of(),
-                    "Product not found for barcode");
+                    AllocationStatus.INVALID_PRODUCT.name(), null, null, List.of(), "Product not found for barcode");
         }
         return new PosScanResponse(
                 result.status().name(),

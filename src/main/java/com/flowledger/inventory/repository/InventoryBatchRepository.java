@@ -8,8 +8,9 @@ public interface InventoryBatchRepository extends JpaRepository<InventoryBatch, 
     Optional<InventoryBatch> findByOrganizationIdAndProductIdAndWarehouseIdAndBatchNumber(
             UUID org, UUID product, UUID warehouse, String batch);
 
-    List<InventoryBatch> findByOrganizationIdAndProductIdAndWarehouseIdAndQualityStatusOrderByReceivedDateAscExpiryDateAsc(
-            UUID org, UUID product, UUID warehouse, String qualityStatus);
+    List<InventoryBatch>
+            findByOrganizationIdAndProductIdAndWarehouseIdAndQualityStatusOrderByReceivedDateAscExpiryDateAsc(
+                    UUID org, UUID product, UUID warehouse, String qualityStatus);
 
     Optional<InventoryBatch> findByIdAndOrganizationId(UUID id, UUID org);
 }

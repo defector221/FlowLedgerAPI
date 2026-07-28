@@ -11,11 +11,11 @@ import com.flowledger.customer.repository.CustomerRepository;
 import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
 import com.flowledger.finance.voucher.adapter.SalesVoucherBuilder;
 import com.flowledger.inventory.allocation.InventoryDeductionCoordinator;
-import com.flowledger.location.service.LocationStampingSupport;
-import com.flowledger.location.service.LocationScopeService;
 import com.flowledger.inventory.dto.InventoryDtos.PostTransaction;
 import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.service.InventoryService;
+import com.flowledger.location.service.LocationScopeService;
+import com.flowledger.location.service.LocationStampingSupport;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.organization.repository.OrganizationSettingsRepository;
@@ -30,8 +30,9 @@ import com.flowledger.search.event.SearchIndexEventPublisher;
 import com.flowledger.search.model.SearchEntityType;
 import com.flowledger.subscription.service.SubscriptionService;
 import com.flowledger.tax.TaxSplitDefaults;
-import com.flowledger.tax.dto.GstCalculationDtos;
-import com.flowledger.tax.service.GstCalculationService;
+import com.flowledger.tax.dto.TaxCalculationDtos.TaxResult;
+import com.flowledger.tax.service.TaxLineCalculator;
+import com.flowledger.tax.service.TaxLineCalculator.DocumentLineInput;
 import com.flowledger.warehouse.entity.Warehouse;
 import com.flowledger.warehouse.repository.WarehouseRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -58,7 +59,7 @@ public class SalesInvoiceService {
     private final OrganizationRepository orgs;
     private final CustomerRepository customers;
     private final DocumentNumberService numbers;
-    private final GstCalculationService gst;
+    private final TaxLineCalculator taxLineCalculator;
     private final SearchIndexEventPublisher searchEvents;
     private final DocumentVoucherFacade documentPosting;
     private final SubscriptionService subscriptions;
@@ -77,7 +78,7 @@ public class SalesInvoiceService {
             OrganizationRepository organizationRepository,
             CustomerRepository customers,
             DocumentNumberService documentNumberService,
-            GstCalculationService gstCalculationService,
+            TaxLineCalculator taxLineCalculator,
             SearchIndexEventPublisher searchEvents,
             DocumentVoucherFacade documentPosting,
             SubscriptionService subscriptions,
@@ -94,7 +95,7 @@ public class SalesInvoiceService {
         orgs = organizationRepository;
         this.customers = customers;
         numbers = documentNumberService;
-        gst = gstCalculationService;
+        this.taxLineCalculator = taxLineCalculator;
         this.searchEvents = searchEvents;
         this.documentPosting = documentPosting;
         this.subscriptions = subscriptions;
@@ -245,9 +246,8 @@ public class SalesInvoiceService {
                 }
                 if (!organization.isAllowNegativeStock()) {
                     for (var line : stocked) {
-                        UUID warehouseId = line.getWarehouseId() != null
-                                ? line.getWarehouseId()
-                                : invoice.getWarehouseId();
+                        UUID warehouseId =
+                                line.getWarehouseId() != null ? line.getWarehouseId() : invoice.getWarehouseId();
                         BigDecimal available = inventory
                                 .getStock(line.getProductId(), warehouseId)
                                 .available();
@@ -355,7 +355,8 @@ public class SalesInvoiceService {
                 }
                 var storeIds = locationScope.accessibleStoreIds();
                 if (!storeIds.isEmpty()) {
-                    predicates.add(cb.or(root.get("storeId").isNull(), root.get("storeId").in(storeIds)));
+                    predicates.add(cb.or(
+                            root.get("storeId").isNull(), root.get("storeId").in(storeIds)));
                 }
             }
             return cb.and(predicates.toArray(Predicate[]::new));
@@ -468,31 +469,32 @@ public class SalesInvoiceService {
                     .multiply(line.getRate())
                     .multiply(line.getDiscountPercent())
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-            var gstResult = gst.calculate(new GstCalculationDtos.Request(
+            TaxResult taxResult = taxLineCalculator.calculateDocumentLine(new DocumentLineInput(
                     orgState,
                     pos,
-                    line.getTaxRate(),
-                    invoice.isTaxInclusive(),
+                    "IN",
+                    invoice.getInvoiceDate(),
+                    line.getProductId(),
+                    null,
+                    null,
                     line.getQuantity(),
                     line.getRate(),
                     discount,
+                    invoice.isTaxInclusive(),
+                    line.getTaxRate(),
                     line.getTaxType(),
                     line.getSplitStrategy(),
                     line.getCgstSharePercent(),
                     line.getSgstSharePercent()));
             line.setDiscountAmount(discount);
-            line.setTaxableAmount(gstResult.taxable());
-            line.setCgstAmount(gstResult.cgst());
-            line.setSgstAmount(gstResult.sgst());
-            line.setIgstAmount(gstResult.igst().add(gstResult.otherTax()));
-            applyComponentRates(line, gstResult);
-            line.setLineTotal(gstResult.lineTotal());
+            taxLineCalculator.applyTaxSnapshots(line, taxResult);
+            applyComponentRates(line, taxResult);
             sub = sub.add(line.getQuantity().multiply(line.getRate()));
             disc = disc.add(discount);
-            taxable = taxable.add(gstResult.taxable());
-            cgst = cgst.add(gstResult.cgst());
-            sgst = sgst.add(gstResult.sgst());
-            igst = igst.add(gstResult.igst()).add(gstResult.otherTax());
+            taxable = taxable.add(taxResult.taxableAmount());
+            cgst = cgst.add(taxResult.cgstAmount());
+            sgst = sgst.add(taxResult.sgstAmount());
+            igst = igst.add(taxResult.igstAmount()).add(taxResult.otherTaxAmount());
         }
         invoice.setSubtotal(sub);
         invoice.setDiscountTotal(disc);
@@ -613,10 +615,10 @@ public class SalesInvoiceService {
         return names;
     }
 
-    private static void applyComponentRates(SalesInvoiceItem line, GstCalculationDtos.Response gstResult) {
+    private static void applyComponentRates(SalesInvoiceItem line, TaxResult taxResult) {
         BigDecimal rate = line.getTaxRate();
         BigDecimal hundred = BigDecimal.valueOf(100);
-        if (gstResult.cgst().signum() > 0 || gstResult.sgst().signum() > 0) {
+        if (taxResult.cgstAmount().signum() > 0 || taxResult.sgstAmount().signum() > 0) {
             BigDecimal cgstShare =
                     line.getCgstSharePercent() == null ? new BigDecimal("50") : line.getCgstSharePercent();
             BigDecimal sgstShare =
@@ -624,7 +626,8 @@ public class SalesInvoiceService {
             line.setCgstRate(rate.multiply(cgstShare).divide(hundred, 4, RoundingMode.HALF_UP));
             line.setSgstRate(rate.multiply(sgstShare).divide(hundred, 4, RoundingMode.HALF_UP));
             line.setIgstRate(BigDecimal.ZERO);
-        } else if (gstResult.igst().signum() > 0 || gstResult.otherTax().signum() > 0) {
+        } else if (taxResult.igstAmount().signum() > 0
+                || taxResult.otherTaxAmount().signum() > 0) {
             line.setCgstRate(BigDecimal.ZERO);
             line.setSgstRate(BigDecimal.ZERO);
             line.setIgstRate(rate);

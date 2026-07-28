@@ -26,7 +26,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     com.flowledger.finance.config.FinanceProperties.class,
     com.flowledger.demo.config.DemoProperties.class,
     com.flowledger.demo.config.PlatformSuperAdminProperties.class,
-    com.flowledger.ops.config.OpsProperties.class
+    com.flowledger.ops.config.OpsProperties.class,
+    com.flowledger.tax.config.TaxEngineProperties.class
 })
 public class FlowLedgerApplication {
     public static void main(String[] args) {

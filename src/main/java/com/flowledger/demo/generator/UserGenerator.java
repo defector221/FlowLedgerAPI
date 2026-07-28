@@ -59,7 +59,11 @@ public class UserGenerator {
             DemoSeedContext ctx, DemoUserSpec spec, ProgressLogger progress, boolean primaryAdmin) {
         Optional<Role> roleOpt = roles.findByCode(spec.roleCode());
         if (roleOpt.isEmpty()) {
-            log.warn("[{}] Skipping user {} — role {} not found", ctx.getScenario().slug(), spec.localPart(), spec.roleCode());
+            log.warn(
+                    "[{}] Skipping user {} — role {} not found",
+                    ctx.getScenario().slug(),
+                    spec.localPart(),
+                    spec.roleCode());
             return Optional.empty();
         }
         Role role = roleOpt.get();

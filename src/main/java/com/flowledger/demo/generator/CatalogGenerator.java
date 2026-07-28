@@ -5,6 +5,7 @@ import com.flowledger.barcode.service.ProductBarcodeManagementService;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.demo.DemoSeedContext;
 import com.flowledger.demo.catalog.CatalogStrategy;
+import com.flowledger.demo.catalog.CatalogStrategyId;
 import com.flowledger.demo.catalog.CatalogStrategyRegistry;
 import com.flowledger.demo.scenario.DemoBlueprint;
 import com.flowledger.demo.util.DemoFaker;
@@ -51,6 +52,7 @@ public class CatalogGenerator {
     private final CatalogStrategyRegistry catalogStrategies;
     private final ProductBarcodeManagementService barcodeManagement;
     private final RetailCatalogService retailCatalogService;
+    private final TaxSetupGenerator taxSetup;
     private final DemoFaker faker;
     private final DemoIsolatedWork isolated;
 
@@ -62,6 +64,7 @@ public class CatalogGenerator {
             CatalogStrategyRegistry catalogStrategies,
             ProductBarcodeManagementService barcodeManagement,
             RetailCatalogService retailCatalogService,
+            TaxSetupGenerator taxSetup,
             DemoFaker faker,
             DemoIsolatedWork isolated) {
         this.unitService = unitService;
@@ -71,6 +74,7 @@ public class CatalogGenerator {
         this.catalogStrategies = catalogStrategies;
         this.barcodeManagement = barcodeManagement;
         this.retailCatalogService = retailCatalogService;
+        this.taxSetup = taxSetup;
         this.faker = faker;
         this.isolated = isolated;
     }
@@ -84,10 +88,16 @@ public class CatalogGenerator {
         Map<String, UUID> units = ensureUnits(ctx);
         Map<BigDecimal, UUID> taxRates = ensureTaxRates(ctx);
         CatalogStrategy strategy = catalogStrategies.require(blueprint.catalogStrategy());
+        CatalogStrategyId strategyId = blueprint.catalogStrategy();
 
         List<UUID> categoryIds = new ArrayList<>();
         for (String name : strategy.categoryNames()) {
-            categoryIds.add(categoryService.create(new CategoryDtos.Create(name, null, null)).id());
+            UUID categoryId = categoryService
+                    .create(new CategoryDtos.Create(name, null, null))
+                    .id();
+            categoryIds.add(categoryId);
+            String segment = TaxSetupGenerator.resolveSegment(name, strategyId);
+            taxSetup.mapProductCategory(ctx, categoryId, segment);
         }
 
         int target = blueprint.productCount();
@@ -98,9 +108,13 @@ public class CatalogGenerator {
         for (int i = 1; i <= target; i++) {
             String seed = seeds.get((i - 1) % seeds.size());
             String brand = brands.get((i - 1) % brands.size());
+            String categoryName = strategy.categoryNames()
+                    .get((i - 1) % strategy.categoryNames().size());
             UUID categoryId = categoryIds.get((i - 1) % categoryIds.size());
+            String segment = TaxSetupGenerator.resolveSegment(categoryName, strategyId);
             UUID unitId = pickUnit(units, seed);
-            UUID taxRateId = pickTaxRate(taxRates);
+            UUID taxRateId = pickTaxRate(taxRates, segment);
+            String hsn = TaxSetupGenerator.hsnForSegment(ctx, segment);
 
             BigDecimal purchase = randomPrice(10, 500);
             BigDecimal selling = purchase.multiply(new BigDecimal("1.25")).setScale(2, RoundingMode.HALF_UP);
@@ -116,7 +130,7 @@ public class CatalogGenerator {
                     "Demo catalog item",
                     categoryId,
                     brand,
-                    "1001" + String.format("%04d", 1000 + (i % 9000)),
+                    hsn,
                     purchase,
                     selling,
                     mrp,
@@ -132,10 +146,11 @@ public class CatalogGenerator {
                     false,
                     null));
             ctx.getProductIds().add(created.id());
+            taxSetup.mapProduct(ctx, created.id(), segment, true);
 
             try {
-                isolated.run(() -> barcodeManagement.create(
-                        created.id(), new CreateBarcodeRequest(barcode, "EAN13", true, null)));
+                isolated.run(() ->
+                        barcodeManagement.create(created.id(), new CreateBarcodeRequest(barcode, "EAN13", true, null)));
             } catch (RuntimeException ex) {
                 log.debug("Optional barcode skipped for {}: {}", created.id(), ex.getMessage());
             }
@@ -149,7 +164,8 @@ public class CatalogGenerator {
             seedFashionVariants(ctx, strategy, brands, skuPrefix);
         }
 
-        progress.done("Catalog (" + ctx.getProductIds().size() + " products)");
+        progress.done(String.format(
+                "Catalog (%d products, %d tax mappings)", ctx.getProductIds().size(), ctx.getProductsWithTaxMapping()));
     }
 
     private Map<String, UUID> ensureUnits(DemoSeedContext ctx) {
@@ -161,10 +177,14 @@ public class CatalogGenerator {
                     .ifPresent(u -> out.putIfAbsent(normalizeUnitCode(u.code()), u.id()));
         }
         if (!out.containsKey("PCS")) {
-            out.put("PCS", unitService.create(new UnitDtos.Create("PCS", "Pieces")).id());
+            out.put(
+                    "PCS",
+                    unitService.create(new UnitDtos.Create("PCS", "Pieces")).id());
         }
         if (!out.containsKey("KG")) {
-            out.put("KG", unitService.create(new UnitDtos.Create("KG", "Kilogram")).id());
+            out.put(
+                    "KG",
+                    unitService.create(new UnitDtos.Create("KG", "Kilogram")).id());
         }
         if (!out.containsKey("LTR")) {
             UUID id = out.containsKey("LITRE")
@@ -203,7 +223,8 @@ public class CatalogGenerator {
         return byRate;
     }
 
-    private void seedFashionVariants(DemoSeedContext ctx, CatalogStrategy strategy, List<String> brands, String skuPrefix) {
+    private void seedFashionVariants(
+            DemoSeedContext ctx, CatalogStrategy strategy, List<String> brands, String skuPrefix) {
         try {
             isolated.run(() -> retailCatalogService.createBrand(new BrandRequest("DEMO", "Demo Brand")));
         } catch (RuntimeException ex) {
@@ -245,7 +266,12 @@ public class CatalogGenerator {
         return units.getOrDefault(key, units.get("PCS"));
     }
 
-    private static UUID pickTaxRate(Map<BigDecimal, UUID> taxRates) {
+    private static UUID pickTaxRate(Map<BigDecimal, UUID> taxRates, String segment) {
+        BigDecimal rate = TaxSetupGenerator.legacyRateForSegment(segment);
+        UUID exact = taxRates.get(rate);
+        if (exact != null) {
+            return exact;
+        }
         BigDecimal[] keys = taxRates.keySet().toArray(BigDecimal[]::new);
         return taxRates.get(keys[ThreadLocalRandom.current().nextInt(keys.length)]);
     }

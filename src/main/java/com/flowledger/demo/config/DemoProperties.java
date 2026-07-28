@@ -15,6 +15,8 @@ public class DemoProperties {
     private String scenario = "retail-small";
     private String defaultPassword = "Password@123";
     private boolean allowReset = false;
+    /** Subscription plan code for Demo Center seeded tenants (BUSINESS = Pro). */
+    private String planCode = "BUSINESS";
     /** Optional numeric overrides applied on top of blueprint (branchCount, storeCount, productCount, …). */
     private Map<String, Integer> overrides = new HashMap<>();
 }

@@ -109,6 +109,11 @@ flowledger:
       reset-password-on-startup: ${FLOWLEDGER_SUPER_ADMIN_RESET_PASSWORD:false}
   demo:
     enabled: ${FLOWLEDGER_DEMO_ENABLED:true}
+    plan-code: ${FLOWLEDGER_DEMO_PLAN_CODE:BUSINESS}
+  tax:
+    default-provider: IndiaGST
+    rounding-scale: 2
+    rounding-mode: HALF_UP
     seed-on-startup: ${FLOWLEDGER_DEMO_SEED_ON_STARTUP:false}
     scenario: ${FLOWLEDGER_DEMO_SCENARIO:retail-small}
     default-password: ${FLOWLEDGER_DEMO_DEFAULT_PASSWORD:Password@123}

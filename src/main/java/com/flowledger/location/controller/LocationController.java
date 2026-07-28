@@ -22,8 +22,7 @@ public class LocationController {
     private final RetailStoreService stores;
     private final CashDrawerService drawers;
 
-    public LocationController(
-            LocationContextService context, RetailStoreService stores, CashDrawerService drawers) {
+    public LocationController(LocationContextService context, RetailStoreService stores, CashDrawerService drawers) {
         this.context = context;
         this.stores = stores;
         this.drawers = drawers;

@@ -40,7 +40,9 @@ public class PurchaseHistoryGenerator {
         TenantContext.set(ctx.getOrganizationId(), ctx.getAdminUserId());
         progress.stage("Creating purchase history");
 
-        if (ctx.getSupplierIds().isEmpty() || ctx.getProductIds().isEmpty() || ctx.getWarehouseIds().isEmpty()) {
+        if (ctx.getSupplierIds().isEmpty()
+                || ctx.getProductIds().isEmpty()
+                || ctx.getWarehouseIds().isEmpty()) {
             progress.done("Purchase history skipped");
             return;
         }
@@ -53,13 +55,17 @@ public class PurchaseHistoryGenerator {
             try {
                 isolated.run(() -> {
                     TenantContext.set(ctx.getOrganizationId(), ctx.getAdminUserId());
-                    UUID supplierId =
-                            ctx.getSupplierIds().get(ThreadLocalRandom.current().nextInt(ctx.getSupplierIds().size()));
+                    UUID supplierId = ctx.getSupplierIds()
+                            .get(ThreadLocalRandom.current()
+                                    .nextInt(ctx.getSupplierIds().size()));
                     UUID warehouseId = ctx.getWarehouseIds()
-                            .get(ThreadLocalRandom.current().nextInt(ctx.getWarehouseIds().size()));
-                    LocalDate invoiceDate = LocalDate.now().minusDays(ThreadLocalRandom.current().nextInt(365));
+                            .get(ThreadLocalRandom.current()
+                                    .nextInt(ctx.getWarehouseIds().size()));
+                    LocalDate invoiceDate = LocalDate.now()
+                            .minusDays(ThreadLocalRandom.current().nextInt(365));
                     int lineCount = 1 + ThreadLocalRandom.current().nextInt(5);
-                    List<Line> lines = buildLines(ctx, lineCount, blueprint.workflow().largePurchaseOrders());
+                    List<Line> lines =
+                            buildLines(ctx, lineCount, blueprint.workflow().largePurchaseOrders());
 
                     var invoice = purchaseInvoiceService.createStandalone(
                             supplierId,
@@ -77,7 +83,8 @@ public class PurchaseHistoryGenerator {
                 created++;
             } catch (RuntimeException ex) {
                 failures++;
-                log.warn("[{}] Purchase invoice {} failed: {}", ctx.getScenario().slug(), i, ex.getMessage());
+                log.warn(
+                        "[{}] Purchase invoice {} failed: {}", ctx.getScenario().slug(), i, ex.getMessage());
             }
             TenantContext.set(ctx.getOrganizationId(), ctx.getAdminUserId());
             if (i % Math.max(1, target / 10) == 0 || i == target) {
@@ -93,9 +100,9 @@ public class PurchaseHistoryGenerator {
     private List<Line> buildLines(DemoSeedContext ctx, int lineCount, boolean largeOrders) {
         List<Line> lines = new ArrayList<>();
         for (int l = 0; l < lineCount; l++) {
-            UUID productId = ctx.getProductIds().get(ThreadLocalRandom.current().nextInt(ctx.getProductIds().size()));
-            BigDecimal rate = products
-                    .findByIdAndOrganizationId(productId, ctx.getOrganizationId())
+            UUID productId = ctx.getProductIds()
+                    .get(ThreadLocalRandom.current().nextInt(ctx.getProductIds().size()));
+            BigDecimal rate = products.findByIdAndOrganizationId(productId, ctx.getOrganizationId())
                     .map(p -> p.getPurchasePrice() != null ? p.getPurchasePrice() : p.getSellingPrice())
                     .orElse(new BigDecimal("100"));
             if (rate == null || rate.signum() <= 0) {
@@ -104,7 +111,19 @@ public class PurchaseHistoryGenerator {
             BigDecimal qty = largeOrders
                     ? BigDecimal.valueOf(100 + ThreadLocalRandom.current().nextInt(4900))
                     : BigDecimal.valueOf(1 + ThreadLocalRandom.current().nextInt(20));
-            lines.add(new Line(productId, null, "Demo line", null, qty, rate, null, new BigDecimal("18"), "GST", null, null, null));
+            lines.add(new Line(
+                    productId,
+                    null,
+                    "Demo line",
+                    null,
+                    qty,
+                    rate,
+                    null,
+                    new BigDecimal("18"),
+                    "GST",
+                    null,
+                    null,
+                    null));
         }
         return lines;
     }

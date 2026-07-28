@@ -20,8 +20,7 @@ class MappingEngineTest {
         s.setId(UUID.randomUUID());
         s.setSynonym("item code");
         s.setTargetField("productCode");
-        MappingEngine engine =
-                new MappingEngine(proxyRepo(List.of(s)), new ObjectMapper(), new ModuleFieldCatalog());
+        MappingEngine engine = new MappingEngine(proxyRepo(List.of(s)), new ObjectMapper(), new ModuleFieldCatalog());
 
         List<FieldMapping> mappings =
                 engine.autoMap(ImportModule.PRODUCT, List.of("Item Code", "productName", "unknown"));
@@ -32,8 +31,7 @@ class MappingEngineTest {
 
     @Test
     void applyMappingUsesDefaultsAndTransforms() {
-        MappingEngine engine =
-                new MappingEngine(proxyRepo(List.of()), new ObjectMapper(), new ModuleFieldCatalog());
+        MappingEngine engine = new MappingEngine(proxyRepo(List.of()), new ObjectMapper(), new ModuleFieldCatalog());
         List<FieldMapping> mappings = List.of(
                 new FieldMapping("SKU", "productCode", "UPPER", null),
                 new FieldMapping("Name", "productName", null, "Untitled"));

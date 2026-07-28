@@ -11,7 +11,6 @@ import com.flowledger.retail.entity.RetailCashier;
 import com.flowledger.retail.entity.RetailStore;
 import com.flowledger.retail.entity.RetailStoreType;
 import com.flowledger.retail.entity.RetailTerminal;
-import com.flowledger.retail.domain.StoreType;
 import com.flowledger.retail.repository.RetailCashCounterRepository;
 import com.flowledger.retail.repository.RetailCashierRepository;
 import com.flowledger.retail.repository.RetailStoreRepository;
@@ -181,8 +180,7 @@ public class RetailStoreService {
         if (effective == null) {
             conflict("Branch is required");
         }
-        branches.findByIdAndOrganizationId(effective, org())
-                .orElseThrow(() -> notFound("Branch not found"));
+        branches.findByIdAndOrganizationId(effective, org()).orElseThrow(() -> notFound("Branch not found"));
     }
 
     private RetailStore loadStore(UUID id) {

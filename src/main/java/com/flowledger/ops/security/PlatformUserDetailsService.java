@@ -21,8 +21,8 @@ public class PlatformUserDetailsService {
 
     @Transactional(readOnly = true)
     public PlatformPrincipal load(UUID userId) {
-        PlatformUser user = users.findById(userId)
-                .orElseThrow(() -> new UsernameNotFoundException("Platform user not found"));
+        PlatformUser user =
+                users.findById(userId).orElseThrow(() -> new UsernameNotFoundException("Platform user not found"));
         if (!user.isActive()) {
             throw new UsernameNotFoundException("Platform user inactive");
         }

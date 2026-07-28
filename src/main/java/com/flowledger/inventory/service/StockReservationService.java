@@ -9,7 +9,6 @@ import com.flowledger.inventory.entity.StockReservation;
 import com.flowledger.inventory.entity.StockReservation.Status;
 import com.flowledger.inventory.repository.StockReservationRepository;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -35,8 +34,7 @@ public class StockReservationService {
             String referenceType,
             UUID referenceId,
             OffsetDateTime expiresAt) {
-        return reserve(
-                productId, warehouseId, qty, null, null, referenceType, referenceId, null, expiresAt);
+        return reserve(productId, warehouseId, qty, null, null, referenceType, referenceId, null, expiresAt);
     }
 
     @Transactional
@@ -141,7 +139,12 @@ public class StockReservationService {
     }
 
     @Transactional
-    public StockReservation splitReservation(UUID reservationId, BigDecimal splitQty, String newReferenceType, UUID newReferenceId, UUID newLineReferenceId) {
+    public StockReservation splitReservation(
+            UUID reservationId,
+            BigDecimal splitQty,
+            String newReferenceType,
+            UUID newReferenceId,
+            UUID newLineReferenceId) {
         StockReservation parent = load(reservationId);
         if (parent.getStatus() != Status.ACTIVE) {
             throw new BusinessException("Only ACTIVE reservations can be split");

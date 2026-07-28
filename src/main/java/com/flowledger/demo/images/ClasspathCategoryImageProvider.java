@@ -34,7 +34,8 @@ public class ClasspathCategoryImageProvider implements CategoryImageProvider {
                 String ct = filename.toLowerCase(Locale.ROOT).endsWith(".png") ? "image/png" : "image/jpeg";
                 DemoImageResource img = new DemoImageResource(ROOT + path, filename, ct);
                 byFolder.computeIfAbsent(folder, k -> new ArrayList<>()).add(img);
-                if ("defaults".equals(folder) && filename.toLowerCase(Locale.ROOT).contains("no-image")) {
+                if ("defaults".equals(folder)
+                        && filename.toLowerCase(Locale.ROOT).contains("no-image")) {
                     fallback = img;
                 }
             }
@@ -44,9 +45,10 @@ public class ClasspathCategoryImageProvider implements CategoryImageProvider {
                     fallback = defaults.get(0);
                 }
             }
-            log.info("Indexed {} demo image folders ({} files)", byFolder.size(), byFolder.values().stream()
-                    .mapToInt(List::size)
-                    .sum());
+            log.info(
+                    "Indexed {} demo image folders ({} files)",
+                    byFolder.size(),
+                    byFolder.values().stream().mapToInt(List::size).sum());
         } catch (IOException e) {
             log.warn("Failed to index demo-images: {}", e.getMessage());
         }

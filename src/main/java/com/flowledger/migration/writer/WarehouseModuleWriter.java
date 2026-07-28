@@ -19,8 +19,7 @@ public class WarehouseModuleWriter implements ModuleWriter {
     private final WarehouseRepository repo;
     private final BranchRepository branches;
 
-    public WarehouseModuleWriter(
-            WarehouseService warehouses, WarehouseRepository repo, BranchRepository branches) {
+    public WarehouseModuleWriter(WarehouseService warehouses, WarehouseRepository repo, BranchRepository branches) {
         this.warehouses = warehouses;
         this.repo = repo;
         this.branches = branches;
@@ -48,8 +47,7 @@ public class WarehouseModuleWriter implements ModuleWriter {
         UUID branchId = null;
         String branchCode = str(row, "branchCode");
         if (branchCode != null) {
-            branchId = branches
-                    .findByOrganizationIdAndCode(organizationId, branchCode.toUpperCase(Locale.ROOT))
+            branchId = branches.findByOrganizationIdAndCode(organizationId, branchCode.toUpperCase(Locale.ROOT))
                     .map(b -> b.getId())
                     .orElseThrow(() -> new IllegalArgumentException("Branch not found: " + branchCode));
         }

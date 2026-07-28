@@ -55,8 +55,12 @@ public class OpsDashboardService {
         out.put("orgsByStatus", orgsByStatus);
 
         List<OrganizationSubscription> allSubs = subscriptions.findAll();
-        long paid = allSubs.stream().filter(s -> "ACTIVE".equalsIgnoreCase(s.getStatus())).count();
-        long trial = allSubs.stream().filter(s -> "TRIAL".equalsIgnoreCase(s.getStatus())).count();
+        long paid = allSubs.stream()
+                .filter(s -> "ACTIVE".equalsIgnoreCase(s.getStatus()))
+                .count();
+        long trial = allSubs.stream()
+                .filter(s -> "TRIAL".equalsIgnoreCase(s.getStatus()))
+                .count();
         out.put("totalSubscriptions", allSubs.size());
         out.put("paidOrganizations", paid);
         out.put("trialOrganizations", trial);

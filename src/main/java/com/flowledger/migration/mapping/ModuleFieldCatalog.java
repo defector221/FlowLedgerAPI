@@ -94,12 +94,16 @@ public class ModuleFieldCatalog {
                             "costPrice",
                             "taxRate",
                             "barcode")),
-            Map.entry(
-                    ImportModule.BARCODE,
-                    List.of("productCode", "barcode", "barcodeType", "status")),
+            Map.entry(ImportModule.BARCODE, List.of("productCode", "barcode", "barcodeType", "status")),
             Map.entry(
                     ImportModule.COA,
-                    List.of("accountCode", "accountName", "accountType", "parentCode", "openingDebit", "openingCredit")),
+                    List.of(
+                            "accountCode",
+                            "accountName",
+                            "accountType",
+                            "parentCode",
+                            "openingDebit",
+                            "openingCredit")),
             Map.entry(
                     ImportModule.OPENING_STOCK,
                     List.of(
@@ -111,8 +115,7 @@ public class ModuleFieldCatalog {
                             "expiryDate",
                             "transactionDate")),
             Map.entry(
-                    ImportModule.OPENING_BALANCE,
-                    List.of("accountCode", "openingDebit", "openingCredit", "asOfDate")),
+                    ImportModule.OPENING_BALANCE, List.of("accountCode", "openingDebit", "openingCredit", "asOfDate")),
             Map.entry(
                     ImportModule.SALES_INVOICE,
                     List.of(

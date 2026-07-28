@@ -84,7 +84,9 @@ public class LoyaltyPromotionGenerator {
                             "FLAT100",
                             OffsetDateTime.now().minusDays(1),
                             OffsetDateTime.now().plusMonths(2),
-                            ctx.getStoreIds().isEmpty() ? null : ctx.getStoreIds().get(0),
+                            ctx.getStoreIds().isEmpty()
+                                    ? null
+                                    : ctx.getStoreIds().get(0),
                             null,
                             null,
                             null,

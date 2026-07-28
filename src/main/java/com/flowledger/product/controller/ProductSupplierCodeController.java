@@ -36,9 +36,7 @@ public class ProductSupplierCodeController {
     @PutMapping("/{catalogItemId}")
     @PreAuthorize("hasAuthority('BARCODE_WRITE') or hasAuthority('PRODUCT_WRITE') or hasAuthority('PURCHASE_WRITE')")
     public Response update(
-            @PathVariable UUID productId,
-            @PathVariable UUID catalogItemId,
-            @Valid @RequestBody Update dto) {
+            @PathVariable UUID productId, @PathVariable UUID catalogItemId, @Valid @RequestBody Update dto) {
         return service.updateForProduct(productId, catalogItemId, dto);
     }
 

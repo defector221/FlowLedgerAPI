@@ -10,10 +10,7 @@ public final class ProductBarcodeDtos {
     private ProductBarcodeDtos() {}
 
     public record CreateBarcodeRequest(
-            @NotBlank @Size(max = 150) String barcode,
-            String barcodeType,
-            Boolean primary,
-            UUID variantId) {}
+            @NotBlank @Size(max = 150) String barcode, String barcodeType, Boolean primary, UUID variantId) {}
 
     public record GenerateBarcodeRequest(String barcodeType, Boolean primary, String reason) {}
 
@@ -50,6 +47,5 @@ public final class ProductBarcodeDtos {
     public record BulkGenerateResultResponse(
             int requested, int generated, int skipped, int failed, List<String> errors) {}
 
-    public record BarcodeSheetItem(
-            UUID productId, String sku, String name, String barcode, String barcodeType) {}
+    public record BarcodeSheetItem(UUID productId, String sku, String name, String barcode, String barcodeType) {}
 }

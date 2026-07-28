@@ -21,7 +21,9 @@ class ModuleEnableOrderTest {
                 List.of(req("RETAIL", true), req("ACCOUNTING", true), req("INVENTORY", true), req("TRANSPORT", true)),
                 code -> deps.getOrDefault(code, List.of()));
 
-        List<String> codes = ordered.stream().map(UpsertOrganizationModuleRequest::moduleCode).toList();
+        List<String> codes = ordered.stream()
+                .map(UpsertOrganizationModuleRequest::moduleCode)
+                .toList();
         assertTrue(codes.indexOf("INVENTORY") < codes.indexOf("RETAIL"));
         assertTrue(codes.indexOf("ACCOUNTING") < codes.indexOf("RETAIL"));
         assertTrue(codes.indexOf("INVENTORY") < codes.indexOf("TRANSPORT"));

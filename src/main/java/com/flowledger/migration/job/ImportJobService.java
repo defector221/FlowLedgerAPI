@@ -149,30 +149,28 @@ public class ImportJobService {
             batch.add(r);
         }
         rows.saveAll(batch);
-        audit.log(job.getId(), "DETECT", job.getModule().name(), Map.of("rows", sheet.rows().size()));
+        audit.log(
+                job.getId(),
+                "DETECT",
+                job.getModule().name(),
+                Map.of("rows", sheet.rows().size()));
         return toResponse(job);
     }
 
     @Transactional
     public ImportJobResponse saveMapping(UUID jobId, MappingUpdateRequest request) {
         ImportJob job = requireJob(jobId);
-        List<FieldMapping> mappings =
-                request.mappings() == null ? List.of() : request.mappings();
+        List<FieldMapping> mappings = request.mappings() == null ? List.of() : request.mappings();
         job.setMappingJson(mappingEngine.toJson(mappings));
         if (request.mappingProfileId() != null) {
             job.setMappingProfileId(request.mappingProfileId());
         }
         job.setStatus(ImportJobStatus.MAPPED);
 
-        List<ImportRowResult> existing =
-                rows.findByJobIdAndOrganizationIdAndStatusInOrderByRowNumberAsc(
-                        jobId,
-                        job.getOrganizationId(),
-                        List.of(
-                                ImportRowStatus.PENDING,
-                                ImportRowStatus.OK,
-                                ImportRowStatus.WARNING,
-                                ImportRowStatus.ERROR));
+        List<ImportRowResult> existing = rows.findByJobIdAndOrganizationIdAndStatusInOrderByRowNumberAsc(
+                jobId,
+                job.getOrganizationId(),
+                List.of(ImportRowStatus.PENDING, ImportRowStatus.OK, ImportRowStatus.WARNING, ImportRowStatus.ERROR));
         for (ImportRowResult r : existing) {
             Map<String, String> raw = readMap(r.getRawJson());
             r.setNormalizedJson(writeJson(mappingEngine.applyMapping(raw, mappings)));
@@ -189,14 +187,9 @@ public class ImportJobService {
         List<ImportRowResult> existing = rows.findByJobIdAndOrganizationIdAndStatusInOrderByRowNumberAsc(
                 jobId,
                 job.getOrganizationId(),
-                List.of(
-                        ImportRowStatus.PENDING,
-                        ImportRowStatus.OK,
-                        ImportRowStatus.WARNING,
-                        ImportRowStatus.ERROR));
-        List<Map<String, String>> normalized = existing.stream()
-                .map(r -> readMap(r.getNormalizedJson()))
-                .toList();
+                List.of(ImportRowStatus.PENDING, ImportRowStatus.OK, ImportRowStatus.WARNING, ImportRowStatus.ERROR));
+        List<Map<String, String>> normalized =
+                existing.stream().map(r -> readMap(r.getNormalizedJson())).toList();
         var results = validation.validate(job.getModule(), normalized);
         errors.deleteByJobId(jobId);
         int errorCount = 0;
@@ -347,8 +340,7 @@ public class ImportJobService {
     @Transactional(readOnly = true)
     public ImportReportResponse report(UUID jobId) {
         ImportJob job = requireJob(jobId);
-        ImportReport report = reports
-                .findByJobIdAndOrganizationId(jobId, job.getOrganizationId())
+        ImportReport report = reports.findByJobIdAndOrganizationId(jobId, job.getOrganizationId())
                 .orElse(null);
         Map<String, Object> summary = report == null ? Map.of() : readObjectMap(report.getSummaryJson());
         String url = null;
@@ -372,8 +364,7 @@ public class ImportJobService {
     @Transactional(readOnly = true)
     public byte[] errorCsv(UUID jobId) {
         ImportJob job = requireJob(jobId);
-        ImportReport report = reports
-                .findByJobIdAndOrganizationId(jobId, job.getOrganizationId())
+        ImportReport report = reports.findByJobIdAndOrganizationId(jobId, job.getOrganizationId())
                 .orElseThrow(() -> new ResourceNotFoundException("Report not found"));
         if (report.getErrorFileObjectKey() == null) {
             throw new ResourceNotFoundException("Error file not found");
@@ -399,7 +390,8 @@ public class ImportJobService {
     }
 
     private ImportJobResponse toResponse(ImportJob job) {
-        return MigrationDtos.toJob(job, readStringList(job.getColumnsJson()), mappingEngine.fromJson(job.getMappingJson()));
+        return MigrationDtos.toJob(
+                job, readStringList(job.getColumnsJson()), mappingEngine.fromJson(job.getMappingJson()));
     }
 
     private String writeJson(Object value) {

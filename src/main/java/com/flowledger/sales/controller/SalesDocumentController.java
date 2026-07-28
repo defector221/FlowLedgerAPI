@@ -82,8 +82,7 @@ public class SalesDocumentController {
     }
 
     @PostMapping("/orders/{id}/confirm")
-    public SalesOrder confirmOrder(
-            @PathVariable UUID id, @RequestBody(required = false) ConfirmOrderRequest request) {
+    public SalesOrder confirmOrder(@PathVariable UUID id, @RequestBody(required = false) ConfirmOrderRequest request) {
         return service.confirmOrder(id, request);
     }
 

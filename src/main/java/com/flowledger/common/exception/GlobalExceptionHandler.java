@@ -104,8 +104,14 @@ public class GlobalExceptionHandler {
                                     "warehouseId", c.warehouseId(),
                                     "batchNumber", c.batchNumber() != null ? c.batchNumber() : "",
                                     "availableQty", c.availableQty(),
-                                    "expiryDate", c.expiryDate() != null ? c.expiryDate().toString() : "",
-                                    "receivedDate", c.receivedDate() != null ? c.receivedDate().toString() : "",
+                                    "expiryDate",
+                                            c.expiryDate() != null
+                                                    ? c.expiryDate().toString()
+                                                    : "",
+                                    "receivedDate",
+                                            c.receivedDate() != null
+                                                    ? c.receivedDate().toString()
+                                                    : "",
                                     "lotNumber", c.lotNumber() != null ? c.lotNumber() : ""))
                             .toList());
         }

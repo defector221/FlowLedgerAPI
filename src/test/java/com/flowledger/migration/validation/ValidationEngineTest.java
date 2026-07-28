@@ -27,9 +27,8 @@ class ValidationEngineTest {
 
     @Test
     void validatesGstinFormat() {
-        var results = engine.validate(
-                ImportModule.CUSTOMER,
-                List.of(Map.of("customerName", "Acme", "gstin", "INVALID")));
+        var results =
+                engine.validate(ImportModule.CUSTOMER, List.of(Map.of("customerName", "Acme", "gstin", "INVALID")));
         assertEquals(ImportRowStatus.ERROR, results.get(0).status());
     }
 }

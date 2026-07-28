@@ -3,13 +3,13 @@ package com.flowledger.location.service;
 import com.flowledger.auth.dto.LoginResponse;
 import com.flowledger.auth.service.AuthService;
 import com.flowledger.common.security.SecurityUtils;
+import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.location.dto.LocationDtos.AccessibleLocationResponse;
 import com.flowledger.location.dto.LocationDtos.BranchOption;
 import com.flowledger.location.dto.LocationDtos.LocationContextRequest;
 import com.flowledger.location.dto.LocationDtos.LocationContextResponse;
 import com.flowledger.location.dto.LocationDtos.StoreOption;
 import com.flowledger.location.dto.LocationDtos.WarehouseOption;
-import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.organization.entity.Branch;
 import com.flowledger.organization.repository.BranchRepository;
 import com.flowledger.retail.entity.RetailStore;
@@ -19,10 +19,8 @@ import com.flowledger.warehouse.repository.WarehouseRepository;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class LocationContextService {
@@ -57,13 +55,19 @@ public class LocationContextService {
             Set<UUID> storeIds = scope.accessibleStoreIds();
             Set<UUID> warehouseIds = scope.accessibleWarehouseIds();
             if (!branchIds.isEmpty()) {
-                branchRows = branchRows.stream().filter(b -> branchIds.contains(b.getId())).toList();
+                branchRows = branchRows.stream()
+                        .filter(b -> branchIds.contains(b.getId()))
+                        .toList();
             }
             if (!storeIds.isEmpty()) {
-                storeRows = storeRows.stream().filter(s -> storeIds.contains(s.getId())).toList();
+                storeRows = storeRows.stream()
+                        .filter(s -> storeIds.contains(s.getId()))
+                        .toList();
             }
             if (!warehouseIds.isEmpty()) {
-                warehouseRows = warehouseRows.stream().filter(w -> warehouseIds.contains(w.getId())).toList();
+                warehouseRows = warehouseRows.stream()
+                        .filter(w -> warehouseIds.contains(w.getId()))
+                        .toList();
             }
         }
 
@@ -76,7 +80,11 @@ public class LocationContextService {
                         .toList(),
                 warehouseRows.stream()
                         .map(w -> new WarehouseOption(
-                                w.getId(), w.getWarehouseCode(), w.getWarehouseName(), w.getWarehouseType(), w.getBranchId()))
+                                w.getId(),
+                                w.getWarehouseCode(),
+                                w.getWarehouseName(),
+                                w.getWarehouseType(),
+                                w.getBranchId()))
                         .toList());
     }
 
@@ -95,12 +103,9 @@ public class LocationContextService {
                 scope.assertAccessibleWarehouse(request.warehouseId());
             }
         }
-        LoginResponse tokens = auth.issueTokensWithLocation(userId, org, request.branchId(), request.storeId(), request.warehouseId());
+        LoginResponse tokens =
+                auth.issueTokensWithLocation(userId, org, request.branchId(), request.storeId(), request.warehouseId());
         return new LocationContextResponse(
-                request.branchId(),
-                request.storeId(),
-                request.warehouseId(),
-                tokens.accessToken(),
-                tokens.expiresIn());
+                request.branchId(), request.storeId(), request.warehouseId(), tokens.accessToken(), tokens.expiresIn());
     }
 }

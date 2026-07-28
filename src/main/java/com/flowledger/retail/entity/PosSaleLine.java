@@ -1,6 +1,7 @@
 package com.flowledger.retail.entity;
 
 import com.flowledger.common.entity.AuditedEntity;
+import com.flowledger.tax.service.TaxLineCalculator;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -15,7 +16,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class PosSaleLine extends AuditedEntity {
+public class PosSaleLine extends AuditedEntity implements TaxLineCalculator.PosLineTaxSnapshots {
     @Column(name = "pos_sale_id", nullable = false)
     private UUID posSaleId;
 
@@ -56,4 +57,16 @@ public class PosSaleLine extends AuditedEntity {
 
     @Column(name = "allocation_mode", length = 20)
     private String allocationMode;
+
+    @Column(name = "tax_category_id")
+    private UUID taxCategoryId;
+
+    @Column(name = "tax_rule_id")
+    private UUID taxRuleId;
+
+    @Column(name = "tax_category_code", length = 50)
+    private String taxCategoryCode;
+
+    @Column(name = "tax_rule_version", length = 50)
+    private String taxRuleVersion;
 }

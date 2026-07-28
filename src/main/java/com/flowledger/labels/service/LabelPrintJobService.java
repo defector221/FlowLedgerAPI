@@ -13,7 +13,6 @@ import com.flowledger.labels.entity.BarcodePrintJob;
 import com.flowledger.labels.entity.LabelTemplateField;
 import com.flowledger.labels.repository.BarcodePrintJobRepository;
 import com.flowledger.labels.repository.LabelTemplateFieldRepository;
-import com.flowledger.pdf.HtmlDocumentPdfRenderer;
 import com.flowledger.retail.entity.RetailLabelTemplate;
 import com.flowledger.retail.repository.RetailLabelTemplateRepository;
 import com.flowledger.retail.service.RetailModuleGuard;
@@ -200,19 +199,18 @@ public class LabelPrintJobService {
     }
 
     private TemplateResponse toTemplateResponse(RetailLabelTemplate template) {
-        List<TemplateFieldResponse> fieldResponses =
-                fields.findByTemplateIdOrderByZIndexAsc(template.getId()).stream()
-                        .map(f -> new TemplateFieldResponse(
-                                f.getId(),
-                                f.getFieldType(),
-                                f.getX(),
-                                f.getY(),
-                                f.getWidth(),
-                                f.getHeight(),
-                                f.getFontSize(),
-                                f.getBindingKey(),
-                                f.getZIndex()))
-                        .toList();
+        List<TemplateFieldResponse> fieldResponses = fields.findByTemplateIdOrderByZIndexAsc(template.getId()).stream()
+                .map(f -> new TemplateFieldResponse(
+                        f.getId(),
+                        f.getFieldType(),
+                        f.getX(),
+                        f.getY(),
+                        f.getWidth(),
+                        f.getHeight(),
+                        f.getFontSize(),
+                        f.getBindingKey(),
+                        f.getZIndex()))
+                .toList();
         return new TemplateResponse(
                 template.getId(),
                 template.getCode(),

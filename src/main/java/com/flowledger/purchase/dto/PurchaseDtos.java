@@ -34,8 +34,7 @@ public final class PurchaseDtos {
             String termsAndConditions,
             @NotEmpty List<@Valid Line> items) {}
 
-    public record GrnRequest(
-            @NotNull UUID warehouseId, LocalDate receiptDate, String notes, List<@Valid Line> items) {}
+    public record GrnRequest(@NotNull UUID warehouseId, LocalDate receiptDate, String notes, List<@Valid Line> items) {}
 
     public record InvoiceRequest(
             String supplierInvoiceNumber,

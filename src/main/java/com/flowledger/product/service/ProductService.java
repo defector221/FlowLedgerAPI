@@ -324,8 +324,7 @@ public class ProductService extends OrganizationScopedService {
     private String primaryImageUrl(UUID productId) {
         return productImages
                 .findFirstByProductIdAndPrimaryTrueOrderBySortOrderAsc(productId)
-                .or(() -> productImages.findByOrganizationIdAndProductIdOrderBySortOrderAsc(orgId(), productId)
-                        .stream()
+                .or(() -> productImages.findByOrganizationIdAndProductIdOrderBySortOrderAsc(orgId(), productId).stream()
                         .findFirst())
                 .map(img -> {
                     String key = img.getThumbnailKey() != null ? img.getThumbnailKey() : img.getObjectKey();

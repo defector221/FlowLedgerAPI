@@ -22,10 +22,17 @@ public class DemoSeedContext {
     private final List<UUID> supplierIds = new ArrayList<>();
     private final List<UUID> unitIds = new ArrayList<>();
     private final List<UUID> taxRateIds = new ArrayList<>();
+    private final Map<String, UUID> taxCategoryIds = new HashMap<>();
+    private final Map<String, UUID> taxRuleByCode = new HashMap<>();
+    private final Map<String, String> hsnSacByCategory = new HashMap<>();
     /** storeId → linked store warehouseId */
     private final Map<UUID, UUID> storeWarehouseIds = new HashMap<>();
+
     private final Map<String, Object> meta = new HashMap<>();
     private final Map<String, Boolean> checks = new HashMap<>();
+    private int intraStateInvoices;
+    private int interStateInvoices;
+    private int productsWithTaxMapping;
 
     public DemoScenario getScenario() {
         return scenario;
@@ -93,6 +100,42 @@ public class DemoSeedContext {
 
     public List<UUID> getTaxRateIds() {
         return taxRateIds;
+    }
+
+    public Map<String, UUID> getTaxCategoryIds() {
+        return taxCategoryIds;
+    }
+
+    public Map<String, UUID> getTaxRuleByCode() {
+        return taxRuleByCode;
+    }
+
+    public Map<String, String> getHsnSacByCategory() {
+        return hsnSacByCategory;
+    }
+
+    public int getIntraStateInvoices() {
+        return intraStateInvoices;
+    }
+
+    public void setIntraStateInvoices(int intraStateInvoices) {
+        this.intraStateInvoices = intraStateInvoices;
+    }
+
+    public int getInterStateInvoices() {
+        return interStateInvoices;
+    }
+
+    public void setInterStateInvoices(int interStateInvoices) {
+        this.interStateInvoices = interStateInvoices;
+    }
+
+    public int getProductsWithTaxMapping() {
+        return productsWithTaxMapping;
+    }
+
+    public void setProductsWithTaxMapping(int productsWithTaxMapping) {
+        this.productsWithTaxMapping = productsWithTaxMapping;
     }
 
     public Map<UUID, UUID> getStoreWarehouseIds() {

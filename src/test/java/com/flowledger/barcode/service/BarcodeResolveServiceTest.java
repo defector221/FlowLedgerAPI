@@ -50,10 +50,11 @@ class BarcodeResolveServiceTest {
             default -> defaultValue(m.getReturnType());
         });
 
-        RetailProductBarcodeRepository barcodes = proxy(RetailProductBarcodeRepository.class, (m, a) -> switch (m.getName()) {
-            case "findActiveByOrganizationIdAndBarcode" -> Optional.ofNullable(activeBarcode.get());
-            default -> defaultValue(m.getReturnType());
-        });
+        RetailProductBarcodeRepository barcodes =
+                proxy(RetailProductBarcodeRepository.class, (m, a) -> switch (m.getName()) {
+                    case "findActiveByOrganizationIdAndBarcode" -> Optional.ofNullable(activeBarcode.get());
+                    default -> defaultValue(m.getReturnType());
+                });
 
         RetailProductVariantRepository variants =
                 proxy(RetailProductVariantRepository.class, (m, a) -> Optional.empty());

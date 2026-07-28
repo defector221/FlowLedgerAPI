@@ -11,4 +11,6 @@ public interface AiEmbeddingRepository extends JpaRepository<AiEmbedding, UUID> 
 
     Optional<AiEmbedding> findByOrganizationIdAndSourceTypeAndSourceId(
             UUID organizationId, String sourceType, UUID sourceId);
+
+    int deleteByOrganizationIdAndSourceTypeAndSourceId(UUID organizationId, String sourceType, UUID sourceId);
 }

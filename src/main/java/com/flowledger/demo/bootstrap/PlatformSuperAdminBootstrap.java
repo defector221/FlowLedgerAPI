@@ -80,9 +80,7 @@ public class PlatformSuperAdminBootstrap implements ApplicationRunner {
         Role superRole = roles.findByCode("SUPER_ADMIN")
                 .orElseThrow(() -> new IllegalStateException("SUPER_ADMIN role missing — run Flyway V7"));
 
-        Organization org = organizations
-                .findByNameIgnoreCase(PLATFORM_ORG_NAME)
-                .orElseGet(this::createPlatformOrg);
+        Organization org = organizations.findByNameIgnoreCase(PLATFORM_ORG_NAME).orElseGet(this::createPlatformOrg);
 
         String email = props.getEmail().trim().toLowerCase();
         User user = users.findByEmailIgnoreCase(email).orElse(null);

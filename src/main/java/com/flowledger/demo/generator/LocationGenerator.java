@@ -93,8 +93,7 @@ public class LocationGenerator {
 
             for (int s = 0; s < storesPerBranch[b]; s++) {
                 globalStoreIndex++;
-                boolean onlineLast =
-                        blueprint.workflow().onlineStore() && globalStoreIndex == blueprint.storeCount();
+                boolean onlineLast = blueprint.workflow().onlineStore() && globalStoreIndex == blueprint.storeCount();
                 createStore(ctx, blueprint, branch, city, branchMainWhId, globalStoreIndex, onlineLast);
             }
             progress.progress("Branches", b + 1, branchCount);
@@ -222,8 +221,8 @@ public class LocationGenerator {
         int counters = 2;
         List<UUID> counterIds = new ArrayList<>();
         for (int c = 1; c <= counters; c++) {
-            CounterResponse counter = retailStoreService.createCounter(
-                    new CounterRequest(store.id(), "C" + c, "Counter " + c, "ACTIVE"));
+            CounterResponse counter =
+                    retailStoreService.createCounter(new CounterRequest(store.id(), "C" + c, "Counter " + c, "ACTIVE"));
             counterIds.add(counter.id());
         }
 

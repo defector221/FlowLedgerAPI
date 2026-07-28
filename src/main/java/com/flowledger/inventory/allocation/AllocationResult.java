@@ -1,14 +1,10 @@
 package com.flowledger.inventory.allocation;
 
 import java.util.List;
-import java.util.UUID;
 
 /** Result returned by {@link InventoryAllocationEngine}. */
 public record AllocationResult(
-        AllocationStatus status,
-        AllocatedInventory allocated,
-        List<AllocationCandidate> candidates,
-        String reason) {
+        AllocationStatus status, AllocatedInventory allocated, List<AllocationCandidate> candidates, String reason) {
 
     public static AllocationResult auto(AllocatedInventory allocated) {
         return new AllocationResult(AllocationStatus.AUTO_ALLOCATED, allocated, List.of(), null);

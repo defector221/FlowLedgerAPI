@@ -91,10 +91,12 @@ public class DocumentNumberService {
             String prefix, String fy, String template, long nextValue, UUID branchId, UUID storeId) {
         String result = template.replace("{PREFIX}", prefix).replace("{FY}", fy);
         if (branchId != null) {
-            result = result.replace("{BRANCH_ID}", branchId.toString().substring(0, 8).toUpperCase());
+            result = result.replace(
+                    "{BRANCH_ID}", branchId.toString().substring(0, 8).toUpperCase());
         }
         if (storeId != null) {
-            result = result.replace("{STORE_ID}", storeId.toString().substring(0, 8).toUpperCase());
+            result = result.replace(
+                    "{STORE_ID}", storeId.toString().substring(0, 8).toUpperCase());
         }
         return result.replaceAll(
                 "\\{SEQ:(\\d+)}",

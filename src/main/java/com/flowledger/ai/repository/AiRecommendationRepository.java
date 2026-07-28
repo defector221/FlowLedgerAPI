@@ -18,4 +18,7 @@ public interface AiRecommendationRepository extends JpaRepository<AiRecommendati
 
     boolean existsByOrganizationIdAndTypeAndStatusInAndRelatedEntityIdIsNull(
             UUID organizationId, String type, List<String> statuses);
+
+    int deleteByOrganizationIdAndRelatedEntityTypeAndRelatedEntityId(
+            UUID organizationId, String relatedEntityType, UUID relatedEntityId);
 }

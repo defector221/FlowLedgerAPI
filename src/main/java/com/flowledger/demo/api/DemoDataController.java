@@ -29,7 +29,6 @@ public class DemoDataController {
 
     private static ResponseStatusException gone() {
         return new ResponseStatusException(
-                HttpStatus.GONE,
-                "Demo APIs moved to /api/v1/ops/demo/** (platform operator JWT required)");
+                HttpStatus.GONE, "Demo APIs moved to /api/v1/ops/demo/** (platform operator JWT required)");
     }
 }

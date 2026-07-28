@@ -1,6 +1,7 @@
 package com.flowledger.purchase.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.flowledger.tax.service.TaxLineCalculator;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -13,7 +14,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class PurchaseInvoiceItem {
+public class PurchaseInvoiceItem implements TaxLineCalculator.LineTaxSnapshots {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -53,4 +54,16 @@ public class PurchaseInvoiceItem {
     private BigDecimal sgstSharePercent = new BigDecimal("50");
 
     private Integer lineOrder = 0;
+
+    @Column(name = "tax_category_id")
+    private UUID taxCategoryId;
+
+    @Column(name = "tax_rule_id")
+    private UUID taxRuleId;
+
+    @Column(name = "tax_category_code", length = 50)
+    private String taxCategoryCode;
+
+    @Column(name = "tax_rule_version", length = 50)
+    private String taxRuleVersion;
 }

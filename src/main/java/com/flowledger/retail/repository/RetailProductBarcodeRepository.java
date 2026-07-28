@@ -25,8 +25,9 @@ public interface RetailProductBarcodeRepository extends JpaRepository<RetailProd
     List<RetailProductBarcode> findByOrganizationIdAndProductIdAndDeletedAtIsNullOrderByPrimaryDescCreatedAtAsc(
             UUID organizationId, UUID productId);
 
-    List<RetailProductBarcode> findByOrganizationIdAndProductIdAndDeletedAtIsNullAndStatusOrderByPrimaryDescCreatedAtAsc(
-            UUID organizationId, UUID productId, String status);
+    List<RetailProductBarcode>
+            findByOrganizationIdAndProductIdAndDeletedAtIsNullAndStatusOrderByPrimaryDescCreatedAtAsc(
+                    UUID organizationId, UUID productId, String status);
 
     Optional<RetailProductBarcode> findByIdAndOrganizationIdAndProductIdAndDeletedAtIsNull(
             UUID id, UUID organizationId, UUID productId);

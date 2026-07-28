@@ -26,8 +26,7 @@ public class OpeningBalanceModuleWriter implements ModuleWriter {
     @Override
     public WriteResult write(UUID organizationId, Map<String, String> row) {
         String code = required(row, "accountCode").toUpperCase(Locale.ROOT);
-        var account = accounts
-                .findByOrganizationIdAndAccountCode(organizationId, code)
+        var account = accounts.findByOrganizationIdAndAccountCode(organizationId, code)
                 .orElseThrow(() -> new IllegalArgumentException("Account not found: " + code));
         BigDecimal debit = decimalOrZero(row, "openingDebit");
         BigDecimal credit = decimalOrZero(row, "openingCredit");

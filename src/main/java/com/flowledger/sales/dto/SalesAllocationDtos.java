@@ -1,7 +1,6 @@
 package com.flowledger.sales.dto;
 
 import com.flowledger.inventory.allocation.AllocationCandidate;
-import com.flowledger.inventory.allocation.AllocationStatus;
 import com.flowledger.inventory.allocation.ReservationResult;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -17,8 +16,7 @@ public final class SalesAllocationDtos {
 
     public record ConfirmLineAllocationRequest(UUID batchId, String allocationMode) {}
 
-    public record ConvertToChallanLineRequest(
-            @NotNull UUID orderLineId, @NotNull @Positive BigDecimal quantity) {}
+    public record ConvertToChallanLineRequest(@NotNull UUID orderLineId, @NotNull @Positive BigDecimal quantity) {}
 
     public record ConvertToChallanRequest(UUID warehouseId, List<ConvertToChallanLineRequest> lines) {}
 
@@ -50,11 +48,7 @@ public final class SalesAllocationDtos {
     }
 
     public record SalesAllocationConflictResponse(
-            String status,
-            UUID lineId,
-            UUID productId,
-            String message,
-            List<AllocationCandidateResponse> candidates) {
+            String status, UUID lineId, UUID productId, String message, List<AllocationCandidateResponse> candidates) {
 
         public static SalesAllocationConflictResponse from(UUID lineId, UUID productId, ReservationResult result) {
             return new SalesAllocationConflictResponse(
@@ -62,7 +56,9 @@ public final class SalesAllocationDtos {
                     lineId,
                     productId,
                     result.reason() != null ? result.reason() : result.status().name(),
-                    result.candidates().stream().map(AllocationCandidateResponse::from).toList());
+                    result.candidates().stream()
+                            .map(AllocationCandidateResponse::from)
+                            .toList());
         }
     }
 }

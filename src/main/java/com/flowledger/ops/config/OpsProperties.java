@@ -15,6 +15,7 @@ public class OpsProperties {
     public static class Jwt {
         /** Separate from tenant JWT secret when set; falls back to tenant secret if blank. */
         private String secret = "";
+
         private int accessTokenExpiryMinutes = 60;
         private int refreshTokenExpiryDays = 14;
     }

@@ -2,7 +2,6 @@ package com.flowledger.retail.service;
 
 import static com.flowledger.retail.dto.RetailDtos.*;
 
-import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.inventory.allocation.*;
 import com.flowledger.retail.entity.RetailStore;
 import com.flowledger.retail.repository.RetailStoreRepository;
@@ -35,8 +34,8 @@ public class PosScanService {
     public PosScanResponse scan(PosScanRequest request) {
         ProductLookupResponse product = lookupProduct(request.barcode());
         UUID warehouseId = resolveWarehouse(request.warehouseId());
-        AllocationResult result = allocationEngine.allocate(new AllocationRequest(
-                org(), product.productId(), warehouseId, request.quantity(), null));
+        AllocationResult result = allocationEngine.allocate(
+                new AllocationRequest(org(), product.productId(), warehouseId, request.quantity(), null));
         return mapScan(product, result);
     }
 
@@ -63,11 +62,7 @@ public class PosScanService {
     private PosScanResponse mapScan(ProductLookupResponse product, AllocationResult result) {
         if (product == null) {
             return new PosScanResponse(
-                    AllocationStatus.INVALID_PRODUCT.name(),
-                    null,
-                    null,
-                    List.of(),
-                    "Product not found for barcode");
+                    AllocationStatus.INVALID_PRODUCT.name(), null, null, List.of(), "Product not found for barcode");
         }
         return new PosScanResponse(
                 result.status().name(),
