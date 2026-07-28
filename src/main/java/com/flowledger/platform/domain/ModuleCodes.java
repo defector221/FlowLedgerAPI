@@ -15,6 +15,7 @@ public final class ModuleCodes {
     public static final String SETTINGS = "SETTINGS";
     public static final String AUDIT = "AUDIT";
     public static final String WAREHOUSE = "WAREHOUSE";
+    public static final String COMMERCE = "COMMERCE";
 
     private ModuleCodes() {}
 }

@@ -1,5 +1,6 @@
 package com.flowledger.common.security;
 
+import com.flowledger.commerce.auth.CommerceJwtAuthenticationFilter;
 import com.flowledger.ops.security.PlatformJwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -26,7 +27,10 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain filterChain(
-            HttpSecurity h, JwtAuthenticationFilter tenantJwt, PlatformJwtAuthenticationFilter platformJwt)
+            HttpSecurity h,
+            JwtAuthenticationFilter tenantJwt,
+            PlatformJwtAuthenticationFilter platformJwt,
+            CommerceJwtAuthenticationFilter commerceJwt)
             throws Exception {
         return h.csrf(c -> c.disable())
                 .cors(c -> {})
@@ -46,6 +50,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/v1/auth/**",
                                 "/api/v1/ops/auth/**",
+                                "/api/v1/commerce/auth/request-otp",
+                                "/api/v1/commerce/auth/verify-otp",
                                 "/api/v1/public/**",
                                 "/api/v1/subscriptions/webhooks/**",
                                 "/swagger-ui/**",
@@ -55,11 +61,16 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/error")
                         .permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/commerce/customers")
+                        .permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/commerce/marketplace/**")
+                        .permitAll()
                         .requestMatchers("/api/v1/ops/**")
                         .authenticated()
                         .anyRequest()
                         .authenticated())
                 .addFilterBefore(platformJwt, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(commerceJwt, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(tenantJwt, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

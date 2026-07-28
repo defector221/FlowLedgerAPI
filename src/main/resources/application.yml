@@ -123,6 +123,25 @@ flowledger:
       secret: ${FLOWLEDGER_OPS_JWT_SECRET:}
       access-token-expiry-minutes: 60
       refresh-token-expiry-days: 14
+  commerce:
+    jwt:
+      secret: ${FLOWLEDGER_COMMERCE_JWT_SECRET:}
+      access-token-expiry-minutes: 30
+      refresh-token-expiry-days: 14
+    otp:
+      dev-return-in-response: true
+      ttl-seconds: 300
+      stub-code: "000000"
+    health-check-interval-ms: 300000
+    marketplace:
+      search:
+        backend: opensearch
+        index: flowledger-marketplace-search-v1
+      image-url-ttl-minutes: 1440
+      sync:
+        max-retries: 5
+        batch-size: 100
+        poll-interval-ms: 60000
   ai:
     # Set FLOWLEDGER_AI_ENABLED=false to disable (ERP unchanged; AI beans/routes off).
     enabled: ${FLOWLEDGER_AI_ENABLED:true}

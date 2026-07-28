@@ -30,8 +30,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        // Platform ops uses PlatformJwtAuthenticationFilter exclusively
-        return path != null && path.startsWith("/api/v1/ops/");
+        if (path != null && path.startsWith("/api/v1/ops/")) {
+            return true;
+        }
+        if (path != null && isCommerceCustomerPath(path)) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean isCommerceCustomerPath(String path) {
+        if (path.startsWith("/api/v1/commerce/auth/")) {
+            return !path.equals("/api/v1/commerce/auth/refresh");
+        }
+        return path.startsWith("/api/v1/commerce/customers/me")
+                || path.startsWith("/api/v1/commerce/customers/address");
     }
 
     @Override
