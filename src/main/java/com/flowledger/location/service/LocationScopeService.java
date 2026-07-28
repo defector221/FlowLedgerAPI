@@ -53,6 +53,11 @@ public class LocationScopeService {
     }
 
     @Transactional(readOnly = true)
+    public Optional<UUID> activeViewBranchId() {
+        return TenantContext.branchId();
+    }
+
+    @Transactional(readOnly = true)
     public void assertAccessibleBranch(UUID branchId) {
         if (branchId == null || isOrgWideAdmin()) return;
         if (!accessibleBranchIds().contains(branchId)) {

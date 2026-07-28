@@ -359,6 +359,7 @@ public class SalesInvoiceService {
                             root.get("storeId").isNull(), root.get("storeId").in(storeIds)));
                 }
             }
+            locationScope.activeViewBranchId().ifPresent(branchId -> predicates.add(cb.equal(root.get("branchId"), branchId)));
             return cb.and(predicates.toArray(Predicate[]::new));
         };
         return PageResponse.from(repo.findAll(spec, pageable));

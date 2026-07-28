@@ -9,6 +9,7 @@ import com.flowledger.common.util.PaymentTermsDates;
 import com.flowledger.finance.voucher.adapter.DocumentVoucherFacade;
 import com.flowledger.finance.voucher.adapter.PurchaseVoucherBuilder;
 import com.flowledger.location.service.LocationHierarchyService;
+import com.flowledger.location.service.LocationScopeService;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.purchase.dto.PurchaseDtos.InvoiceRequest;
@@ -36,6 +37,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -60,6 +62,7 @@ public class PurchaseInvoiceService {
     private final SearchIndexEventPublisher searchEvents;
     private final DocumentVoucherFacade documentPosting;
     private final LocationHierarchyService hierarchy;
+    private final LocationScopeService locationScope;
 
     public PurchaseInvoiceService(
             GoodsReceiptService goodsReceiptService,
@@ -70,7 +73,8 @@ public class PurchaseInvoiceService {
             TaxLineCalculator taxLineCalculator,
             SearchIndexEventPublisher searchEvents,
             DocumentVoucherFacade documentPosting,
-            LocationHierarchyService hierarchy) {
+            LocationHierarchyService hierarchy,
+            LocationScopeService locationScope) {
         grns = goodsReceiptService;
         orders = purchaseOrderService;
         numbers = documentNumberService;
@@ -80,6 +84,7 @@ public class PurchaseInvoiceService {
         this.searchEvents = searchEvents;
         this.documentPosting = documentPosting;
         this.hierarchy = hierarchy;
+        this.locationScope = locationScope;
     }
 
     public PurchaseInvoice fromGrn(UUID grnId, InvoiceRequest request) {
@@ -316,9 +321,11 @@ public class PurchaseInvoiceService {
 
     public PageResponse<PurchaseInvoice> list(Pageable pageable, UUID purchaseOrderId, UUID goodsReceiptId) {
         UUID org = TenantContext.getOrganizationId();
+        Optional<UUID> viewBranch = locationScope.activeViewBranchId();
         String where = "i.organizationId=:org"
                 + (purchaseOrderId != null ? " and i.purchaseOrderId=:po" : "")
-                + (goodsReceiptId != null ? " and i.goodsReceiptId=:grn" : "");
+                + (goodsReceiptId != null ? " and i.goodsReceiptId=:grn" : "")
+                + (viewBranch.isPresent() ? " and i.branchId=:branchId" : "");
         var countQ = em.createQuery("select count(i) from PurchaseInvoice i where " + where, Long.class)
                 .setParameter("org", org);
         var listQ = em.createQuery(
@@ -331,6 +338,10 @@ public class PurchaseInvoiceService {
         if (goodsReceiptId != null) {
             countQ.setParameter("grn", goodsReceiptId);
             listQ.setParameter("grn", goodsReceiptId);
+        }
+        if (viewBranch.isPresent()) {
+            countQ.setParameter("branchId", viewBranch.get());
+            listQ.setParameter("branchId", viewBranch.get());
         }
         long total = countQ.getSingleResult();
         List<PurchaseInvoice> content = listQ.setFirstResult((int) pageable.getOffset())
