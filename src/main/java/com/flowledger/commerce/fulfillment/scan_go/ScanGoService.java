@@ -26,9 +26,12 @@ import com.flowledger.commerce.publisher.entity.MarketplaceProductIndex;
 import com.flowledger.commerce.publisher.entity.MarketplaceStoreIndex;
 import com.flowledger.commerce.publisher.repository.MarketplaceProductIndexRepository;
 import com.flowledger.commerce.publisher.repository.MarketplaceStoreIndexRepository;
+import com.flowledger.commerce.reservation.CommerceInventoryReservationService;
 import com.flowledger.common.exception.BusinessException;
 import com.flowledger.common.exception.ResourceNotFoundException;
 import com.flowledger.common.security.SecurityUtils;
+import com.flowledger.retail.entity.RetailStore;
+import com.flowledger.retail.repository.RetailStoreRepository;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -55,6 +58,8 @@ public class ScanGoService {
     private final FulfillmentOrchestrator fulfillmentOrchestrator;
     private final QrTokenService qrTokens;
     private final ObjectMapper objectMapper;
+    private final RetailStoreRepository retailStores;
+    private final CommerceInventoryReservationService inventoryReservations;
 
     public ScanGoService(
             ScanSessionRepository sessions,
@@ -68,7 +73,9 @@ public class ScanGoService {
             CommerceCustomerBridgeService customerBridge,
             FulfillmentOrchestrator fulfillmentOrchestrator,
             QrTokenService qrTokens,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            RetailStoreRepository retailStores,
+            CommerceInventoryReservationService inventoryReservations) {
         this.sessions = sessions;
         this.items = items;
         this.exitTokens = exitTokens;
@@ -81,6 +88,8 @@ public class ScanGoService {
         this.fulfillmentOrchestrator = fulfillmentOrchestrator;
         this.qrTokens = qrTokens;
         this.objectMapper = objectMapper;
+        this.retailStores = retailStores;
+        this.inventoryReservations = inventoryReservations;
     }
 
     public CommerceDtos.ScanSessionResponse openSession(CommerceDtos.OpenScanSessionRequest request) {
@@ -124,6 +133,19 @@ public class ScanGoService {
             throw new IllegalStateException(e);
         }
         items.save(line);
+        RetailStore store = retailStores
+                .findByIdAndOrganizationIdAndDeletedFalse(session.getStoreId(), session.getOrganizationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Store not found"));
+        if (store.getWarehouseId() == null) {
+            throw new BusinessException("Store warehouse is not configured");
+        }
+        inventoryReservations.reserveForScanItem(
+                session.getOrganizationId(),
+                sessionId,
+                line.getId(),
+                index.getProductId(),
+                store.getWarehouseId(),
+                qty);
         recalc(session);
         return toResponse(session, items.findBySessionIdOrderByCreatedAtAsc(sessionId));
     }
@@ -165,6 +187,8 @@ public class ScanGoService {
         token.setVerifiedAt(OffsetDateTime.now());
         token.setVerifiedBy(actorId);
         exitTokens.save(token);
+
+        inventoryReservations.releaseForScanSession(session.getOrganizationId(), session.getId());
 
         CommerceOrder order = createOrderFromSession(session);
         FulfillmentOrder fulfillment = fulfillmentOrchestrator.createFromOrder(order, session.getCustomerId());

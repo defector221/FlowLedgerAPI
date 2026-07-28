@@ -21,6 +21,7 @@ public class CommerceProperties {
         private int renewalExtensionMinutes = 15;
         private int checkoutTtlMinutes = 30;
         private int maxItemQty = 99;
+        private int scanSessionReservationTtlMinutes = 120;
     }
 
     @Getter

@@ -19,6 +19,7 @@ import com.flowledger.commerce.fulfillment.delivery.domain.DeliveryAssignmentSta
 import com.flowledger.commerce.fulfillment.delivery.entity.DeliveryAssignment;
 import com.flowledger.commerce.fulfillment.delivery.repository.DeliveryAssignmentRepository;
 import com.flowledger.commerce.fulfillment.notification.FulfillmentNotificationHooks;
+import com.flowledger.commerce.fulfillment.FulfillmentType;
 import com.flowledger.commerce.fulfillment.order.domain.FulfillmentOrderStatus;
 import com.flowledger.commerce.fulfillment.order.domain.FulfillmentSubStatus;
 import com.flowledger.commerce.fulfillment.order.entity.FulfillmentOrder;
@@ -174,7 +175,7 @@ public class FulfillmentOrchestrator {
     public FulfillmentOrder completePicking(UUID fulfillmentOrderId, UUID actorId) {
         FulfillmentOrder order = requireFulfillment(fulfillmentOrderId);
         assertStatus(order, FulfillmentOrderStatus.PICKING);
-        tasks.completePicking(fulfillmentOrderId);
+        tasks.completePicking(fulfillmentOrderId, actorId);
         transition(order, FulfillmentOrderStatus.PACKING, FulfillmentSubStatus.NONE, actorId, "Picking completed");
         notifications.publish(new PickingCompletedEvent(
                 this, order.getOrganizationId(), actorId, order.getId()));
@@ -193,7 +194,7 @@ public class FulfillmentOrchestrator {
     public FulfillmentOrder completePacking(UUID fulfillmentOrderId, UUID actorId) {
         FulfillmentOrder order = requireFulfillment(fulfillmentOrderId);
         assertStatus(order, FulfillmentOrderStatus.PACKING);
-        tasks.completePacking(fulfillmentOrderId);
+        tasks.completePacking(fulfillmentOrderId, actorId);
         transition(order, FulfillmentOrderStatus.READY, FulfillmentSubStatus.NONE, actorId, "Ready for handoff");
         order.setReadyAt(OffsetDateTime.now());
         fulfillmentOrders.save(order);
@@ -210,9 +211,8 @@ public class FulfillmentOrchestrator {
     public FulfillmentOrder customerArrived(UUID fulfillmentOrderId, UUID actorId) {
         FulfillmentOrder order = requireFulfillment(fulfillmentOrderId);
         assertStatus(order, FulfillmentOrderStatus.READY);
-        PickupSession session = pickupSessions
-                .findByFulfillmentOrderId(fulfillmentOrderId)
-                .orElseThrow(() -> new BusinessException("Pickup session not found"));
+        requirePickupFulfillment(order);
+        PickupSession session = ensurePickupSession(order);
         session.setStatus(PickupSessionStatus.ARRIVED);
         session.setArrivedAt(OffsetDateTime.now());
         pickupSessions.save(session);
@@ -225,6 +225,7 @@ public class FulfillmentOrchestrator {
 
     public FulfillmentOrder verifyPickup(UUID fulfillmentOrderId, UUID actorId) {
         FulfillmentOrder order = requireFulfillment(fulfillmentOrderId);
+        requirePickupFulfillment(order);
         FulfillmentContext ctx = buildContext(order, actorId);
         erpDocuments.postAtMilestone(
                 order.getFulfillmentType(),
@@ -233,9 +234,7 @@ public class FulfillmentOrchestrator {
                 ctx.commerceOrder().getErpCustomerId(),
                 ErpDocumentStrategy.ErpMilestone.PICKED_UP);
 
-        PickupSession session = pickupSessions
-                .findByFulfillmentOrderId(fulfillmentOrderId)
-                .orElseThrow(() -> new BusinessException("Pickup session not found"));
+        PickupSession session = ensurePickupSession(order);
         session.setStatus(PickupSessionStatus.COLLECTED);
         session.setCollectedAt(OffsetDateTime.now());
         pickupSessions.save(session);
@@ -289,6 +288,14 @@ public class FulfillmentOrchestrator {
 
     public FulfillmentOrder dispatchDelivery(UUID fulfillmentOrderId, UUID actorId) {
         FulfillmentOrder order = requireFulfillment(fulfillmentOrderId);
+        if (order.getFulfillmentType() != FulfillmentType.HOME_DELIVERY) {
+            throw new BusinessException("Only home delivery orders can be dispatched");
+        }
+        if (order.getStatus() == FulfillmentOrderStatus.READY) {
+            transition(order, FulfillmentOrderStatus.FULFILLING, FulfillmentSubStatus.NONE, actorId, "Dispatching delivery");
+        } else if (order.getStatus() != FulfillmentOrderStatus.FULFILLING) {
+            throw new BusinessException("Delivery order is not ready to dispatch");
+        }
         FulfillmentContext ctx = buildContext(order, actorId);
         erpDocuments.postAtMilestone(
                 order.getFulfillmentType(),
@@ -374,9 +381,7 @@ public class FulfillmentOrchestrator {
     }
 
     private void releaseReservations(FulfillmentOrder order) {
-        CommerceOrder commerceOrder = requireCommerceOrder(order.getCommerceOrderId());
-        checkoutSessions.findById(commerceOrder.getCheckoutSessionId()).ifPresent(session -> carts.findById(session.getCartId())
-                .ifPresent(cart -> reservations.releaseForCart(order.getOrganizationId(), cart.getId())));
+        reservations.releaseForOrder(order.getOrganizationId(), order.getCommerceOrderId());
     }
 
     private void syncCommerceOrder(FulfillmentOrder fulfillment, CommerceOrderStatus status) {
@@ -399,6 +404,27 @@ public class FulfillmentOrchestrator {
 
     private FulfillmentOrder requireFulfillment(UUID id) {
         return fulfillmentOrders.findById(id).orElseThrow(() -> new ResourceNotFoundException("Fulfillment order not found"));
+    }
+
+    private void requirePickupFulfillment(FulfillmentOrder order) {
+        if (order.getFulfillmentType() == FulfillmentType.HOME_DELIVERY) {
+            throw new BusinessException("Home delivery orders are completed from the Delivery queue");
+        }
+        if (order.getFulfillmentType() != FulfillmentType.STORE_PICKUP
+                && order.getFulfillmentType() != FulfillmentType.CLICK_AND_COLLECT) {
+            throw new BusinessException("Order is not eligible for store pickup verification");
+        }
+    }
+
+    private PickupSession ensurePickupSession(FulfillmentOrder order) {
+        return pickupSessions.findByFulfillmentOrderId(order.getId()).orElseGet(() -> {
+            PickupSession session = new PickupSession();
+            session.setFulfillmentOrderId(order.getId());
+            session.setCustomerId(order.getCustomerId());
+            session.setStoreId(order.getStoreId());
+            session.setStatus(PickupSessionStatus.WAITING);
+            return pickupSessions.save(session);
+        });
     }
 
     private CommerceOrder requireCommerceOrder(UUID id) {

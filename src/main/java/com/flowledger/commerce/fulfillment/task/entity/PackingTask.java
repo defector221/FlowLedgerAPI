@@ -12,6 +12,8 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "commerce_packing_tasks")
@@ -35,6 +37,7 @@ public class PackingTask extends CommerceGlobalEntity {
     @Column(nullable = false)
     private TaskStatus status = TaskStatus.PENDING;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "line_items", nullable = false, columnDefinition = "jsonb")
     private String lineItems = "[]";
 

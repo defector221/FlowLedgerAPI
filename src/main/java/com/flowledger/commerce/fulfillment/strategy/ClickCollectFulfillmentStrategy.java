@@ -40,7 +40,7 @@ public class ClickCollectFulfillmentStrategy implements FulfillmentStrategy {
     @Override
     public void onReady(FulfillmentContext ctx) {
         pickupStrategy.onReady(ctx);
-        qrTokens.issueCollectToken(ctx.fulfillmentOrder().getId());
+        qrTokens.getOrIssueCollectCode(ctx.fulfillmentOrder().getId());
         ctx.fulfillmentOrder().setSubStatus(FulfillmentSubStatus.QR_GENERATED);
     }
 

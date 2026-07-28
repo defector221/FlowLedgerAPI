@@ -8,8 +8,12 @@ import com.flowledger.commerce.onboarding.domain.MerchantOnboardingState;
 import com.flowledger.commerce.store.domain.MarketplaceVisibility;
 import com.flowledger.commerce.store.domain.StoreCommerceStatus;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.Valid;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -392,13 +396,70 @@ public final class CommerceDtos {
             OffsetDateTime readyAt,
             OffsetDateTime completedAt) {}
 
+    public record FulfillmentOrderDetailResponse(
+            UUID id,
+            UUID commerceOrderId,
+            String orderNumber,
+            UUID storeId,
+            UUID customerId,
+            String fulfillmentType,
+            String status,
+            String subStatus,
+            OffsetDateTime acceptedAt,
+            OffsetDateTime readyAt,
+            OffsetDateTime completedAt,
+            String currency,
+            java.math.BigDecimal grandTotal,
+            UUID erpSalesOrderId,
+            String erpSalesOrderNumber,
+            UUID erpInvoiceId,
+            String erpInvoiceNumber,
+            java.util.List<FulfillmentOrderLineResponse> lines) {}
+
+    public record FulfillmentOrderLineResponse(
+            UUID id,
+            UUID productId,
+            java.math.BigDecimal quantity,
+            java.math.BigDecimal returnableQty,
+            java.math.BigDecimal lineSubtotal,
+            java.math.BigDecimal lineTax,
+            java.math.BigDecimal lineTotal,
+            String name,
+            String sku) {}
+
+    public record CreateCommerceReturnRequest(
+            LocalDate returnDate,
+            String notes,
+            @NotEmpty @Valid java.util.List<CommerceReturnLineRequest> lines) {}
+
+    public record CommerceReturnLineRequest(
+            @NotNull UUID orderLineId, @NotNull @Positive java.math.BigDecimal quantity) {}
+
+    public record CommerceOrderReturnResponse(
+            UUID id,
+            UUID commerceOrderId,
+            UUID fulfillmentOrderId,
+            UUID erpSalesReturnId,
+            String returnNumber,
+            String status,
+            java.util.List<CommerceReturnLineResponse> lines,
+            OffsetDateTime createdAt) {}
+
+    public record CommerceReturnLineResponse(
+            UUID orderLineId,
+            UUID productId,
+            java.math.BigDecimal quantity,
+            java.math.BigDecimal rate,
+            java.math.BigDecimal lineTotal) {}
+
     public record FulfillmentDashboardResponse(
             long pendingAcceptance,
             long picking,
             long packing,
             long ready,
             long delivery,
-            long pickup) {}
+            long pickup,
+            long completed) {}
 
     public record TrackingMilestoneResponse(String label, boolean reached, OffsetDateTime reachedAt) {}
 
@@ -409,7 +470,7 @@ public final class CommerceDtos {
             String subStatus,
             java.util.List<TrackingMilestoneResponse> timeline) {}
 
-    public record PickupQrResponse(UUID orderId, UUID fulfillmentOrderId, String qrToken) {}
+    public record PickupQrResponse(UUID orderId, UUID fulfillmentOrderId, String collectCode) {}
 
     public record FulfillmentSlotResponse(
             UUID id,

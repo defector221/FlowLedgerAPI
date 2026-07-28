@@ -3,7 +3,9 @@ package com.flowledger.commerce.order.erp;
 import com.flowledger.commerce.cart.entity.CommerceCartItem;
 import com.flowledger.commerce.cart.repository.CommerceCartItemRepository;
 import com.flowledger.commerce.checkout.entity.CommerceCheckoutSession;
+import com.flowledger.commerce.common.CommerceOrganizations;
 import com.flowledger.commerce.common.CommerceTenantScope;
+import com.flowledger.commerce.marketplace.CommerceMarketplaceInventorySyncService;
 import com.flowledger.commerce.order.CommerceOrderBuilder;
 import com.flowledger.commerce.order.entity.CommerceOrder;
 import com.flowledger.commerce.order.repository.CommerceOrderRepository;
@@ -28,6 +30,7 @@ public class DeliveryErpDocumentStrategy implements ErpDocumentStrategy {
     private final SalesInvoiceService salesInvoiceService;
     private final RetailStoreRepository stores;
     private final CommerceOrderRepository orders;
+    private final CommerceMarketplaceInventorySyncService marketplaceInventorySync;
 
     public DeliveryErpDocumentStrategy(
             CommerceCartItemRepository cartItems,
@@ -35,23 +38,26 @@ public class DeliveryErpDocumentStrategy implements ErpDocumentStrategy {
             SalesDocumentService salesDocuments,
             SalesInvoiceService salesInvoiceService,
             RetailStoreRepository stores,
-            CommerceOrderRepository orders) {
+            CommerceOrderRepository orders,
+            CommerceMarketplaceInventorySyncService marketplaceInventorySync) {
         this.cartItems = cartItems;
         this.orderBuilder = orderBuilder;
         this.salesDocuments = salesDocuments;
         this.salesInvoiceService = salesInvoiceService;
         this.stores = stores;
         this.orders = orders;
+        this.marketplaceInventorySync = marketplaceInventorySync;
     }
 
     @Override
     public ErpDocumentResult fulfillAtMilestone(
             CommerceCheckoutSession session, CommerceOrder order, UUID erpCustomerId, ErpMilestone milestone) {
-        return CommerceTenantScope.run(session.getOrganizationId(), () -> {
+        UUID organizationId = CommerceOrganizations.resolve(order, session);
+        return CommerceTenantScope.run(organizationId, () -> {
             if (milestone == ErpMilestone.ACCEPTED && order.getErpSalesOrderId() == null) {
                 List<CommerceCartItem> items = cartItems.findByCartIdOrderByCreatedAtAsc(session.getCartId());
                 RetailStore store = stores
-                        .findByIdAndOrganizationIdAndDeletedFalse(session.getStoreId(), session.getOrganizationId())
+                        .findByIdAndOrganizationIdAndDeletedFalse(session.getStoreId(), organizationId)
                         .orElseThrow();
                 SalesDtos.OrderRequest orderRequest = new SalesDtos.OrderRequest(
                         erpCustomerId,
@@ -63,7 +69,7 @@ public class DeliveryErpDocumentStrategy implements ErpDocumentStrategy {
                         store.getState(),
                         "Commerce delivery " + order.getOrderNumber(),
                         null,
-                        orderBuilder.buildInvoiceItems(session.getOrganizationId(), items));
+                        orderBuilder.buildInvoiceItems(organizationId, items));
                 SalesOrder salesOrder = salesDocuments.createOrder(orderRequest);
                 salesDocuments.confirmOrder(salesOrder.getId(), new ConfirmOrderRequest(store.getWarehouseId()));
                 order.setErpSalesOrderId(salesOrder.getId());
@@ -72,14 +78,18 @@ public class DeliveryErpDocumentStrategy implements ErpDocumentStrategy {
             }
             if (milestone == ErpMilestone.OUT_FOR_DELIVERY && order.getErpInvoiceId() == null) {
                 RetailStore store = stores
-                        .findByIdAndOrganizationIdAndDeletedFalse(session.getStoreId(), session.getOrganizationId())
+                        .findByIdAndOrganizationIdAndDeletedFalse(session.getStoreId(), organizationId)
                         .orElseThrow();
                 SalesInvoice invoice =
                         salesDocuments.convertOrderToInvoice(order.getErpSalesOrderId(), store.getWarehouseId());
                 salesInvoiceService.confirmConverted(invoice.getId());
                 order.setErpInvoiceId(invoice.getId());
                 orders.save(order);
+                marketplaceInventorySync.syncOrder(order, null);
                 return new ErpDocumentResult(order.getErpSalesOrderId(), invoice.getId());
+            }
+            if (milestone == ErpMilestone.OUT_FOR_DELIVERY) {
+                marketplaceInventorySync.syncOrder(order, null);
             }
             return new ErpDocumentResult(order.getErpSalesOrderId(), order.getErpInvoiceId());
         });

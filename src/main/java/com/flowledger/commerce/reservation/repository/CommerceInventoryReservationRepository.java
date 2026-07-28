@@ -13,6 +13,10 @@ public interface CommerceInventoryReservationRepository extends JpaRepository<Co
 
     List<CommerceInventoryReservation> findByCartIdAndStatus(UUID cartId, CommerceReservationStatus status);
 
-    List<CommerceInventoryReservation> findByStatusAndExpiresAtBefore(
+    List<CommerceInventoryReservation> findByOrderIdAndStatus(UUID orderId, CommerceReservationStatus status);
+
+    List<CommerceInventoryReservation> findByScanSessionIdAndStatus(UUID scanSessionId, CommerceReservationStatus status);
+
+    List<CommerceInventoryReservation> findByStatusAndExpiresAtBeforeAndOrderIdIsNull(
             CommerceReservationStatus status, OffsetDateTime expiresAt);
 }

@@ -16,5 +16,8 @@ public interface FulfillmentOrderRepository extends JpaRepository<FulfillmentOrd
 
     List<FulfillmentOrder> findByStoreIdOrderByCreatedAtDesc(UUID storeId);
 
+    List<FulfillmentOrder> findByStoreIdAndStatusOrderByCompletedAtDesc(
+            UUID storeId, FulfillmentOrderStatus status);
+
     long countByStoreIdAndStatus(UUID storeId, FulfillmentOrderStatus status);
 }

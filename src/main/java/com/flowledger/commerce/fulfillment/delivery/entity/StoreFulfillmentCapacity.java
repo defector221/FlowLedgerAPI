@@ -8,6 +8,8 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "commerce_store_fulfillment_capacity")
@@ -27,6 +29,7 @@ public class StoreFulfillmentCapacity extends CommerceGlobalEntity {
     @Column(name = "default_prep_minutes", nullable = false)
     private int defaultPrepMinutes = 30;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "holiday_dates", nullable = false, columnDefinition = "jsonb")
     private String holidayDates = "[]";
 }

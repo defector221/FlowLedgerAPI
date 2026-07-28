@@ -4,7 +4,9 @@ import com.flowledger.commerce.cart.entity.CommerceCartItem;
 import com.flowledger.commerce.cart.repository.CommerceCartItemRepository;
 import com.flowledger.commerce.checkout.entity.CommerceCheckoutSession;
 import com.flowledger.commerce.checkout.repository.CommerceCheckoutSessionRepository;
+import com.flowledger.commerce.common.CommerceOrganizations;
 import com.flowledger.commerce.common.CommerceTenantScope;
+import com.flowledger.commerce.marketplace.CommerceMarketplaceInventorySyncService;
 import com.flowledger.commerce.order.CommerceOrderBuilder;
 import com.flowledger.commerce.order.entity.CommerceOrder;
 import com.flowledger.commerce.order.repository.CommerceOrderRepository;
@@ -27,6 +29,7 @@ public class PickupErpDocumentStrategy implements ErpDocumentStrategy {
     private final InventoryService inventoryService;
     private final RetailStoreRepository stores;
     private final CommerceOrderRepository orders;
+    private final CommerceMarketplaceInventorySyncService marketplaceInventorySync;
 
     public PickupErpDocumentStrategy(
             CommerceCheckoutSessionRepository checkoutSessions,
@@ -35,7 +38,8 @@ public class PickupErpDocumentStrategy implements ErpDocumentStrategy {
             SalesInvoiceService salesInvoiceService,
             InventoryService inventoryService,
             RetailStoreRepository stores,
-            CommerceOrderRepository orders) {
+            CommerceOrderRepository orders,
+            CommerceMarketplaceInventorySyncService marketplaceInventorySync) {
         this.checkoutSessions = checkoutSessions;
         this.cartItems = cartItems;
         this.orderBuilder = orderBuilder;
@@ -43,6 +47,7 @@ public class PickupErpDocumentStrategy implements ErpDocumentStrategy {
         this.inventoryService = inventoryService;
         this.stores = stores;
         this.orders = orders;
+        this.marketplaceInventorySync = marketplaceInventorySync;
     }
 
     @Override
@@ -54,12 +59,14 @@ public class PickupErpDocumentStrategy implements ErpDocumentStrategy {
             return new ErpDocumentResult(order.getErpSalesOrderId(), order.getErpInvoiceId());
         }
         if (order.getErpInvoiceId() != null) {
+            marketplaceInventorySync.syncOrder(order, null);
             return new ErpDocumentResult(null, order.getErpInvoiceId());
         }
-        return CommerceTenantScope.run(session.getOrganizationId(), () -> {
+        UUID organizationId = CommerceOrganizations.resolve(order, session);
+        return CommerceTenantScope.run(organizationId, () -> {
             List<CommerceCartItem> items = cartItems.findByCartIdOrderByCreatedAtAsc(session.getCartId());
             RetailStore store = stores
-                    .findByIdAndOrganizationIdAndDeletedFalse(session.getStoreId(), session.getOrganizationId())
+                    .findByIdAndOrganizationIdAndDeletedFalse(session.getStoreId(), organizationId)
                     .orElseThrow();
 
             SalesDtos.Invoice invoice = new SalesDtos.Invoice(
@@ -79,7 +86,7 @@ public class PickupErpDocumentStrategy implements ErpDocumentStrategy {
                     "Commerce order " + order.getOrderNumber(),
                     null,
                     null,
-                    orderBuilder.buildInvoiceItems(session.getOrganizationId(), items));
+                    orderBuilder.buildInvoiceItems(organizationId, items));
 
             SalesDtos.InvoiceDetail draft = salesInvoiceService.createDraft(invoice);
             SalesDtos.InvoiceDetail confirmed = salesInvoiceService.confirmConvertedForPos(draft.id());
@@ -98,6 +105,7 @@ public class PickupErpDocumentStrategy implements ErpDocumentStrategy {
             salesInvoiceService.markInventoryPosted(confirmed.id());
             order.setErpInvoiceId(confirmed.id());
             orders.save(order);
+            marketplaceInventorySync.syncOrder(order, null);
             return new ErpDocumentResult(null, confirmed.id());
         });
     }

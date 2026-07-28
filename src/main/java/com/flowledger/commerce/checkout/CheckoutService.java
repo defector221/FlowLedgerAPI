@@ -27,6 +27,7 @@ import com.flowledger.commerce.events.CommerceOrderPlacedEvent;
 import com.flowledger.platform.event.DomainEventPublisher;
 import com.flowledger.platform.event.bus.CommercePlatformEventBridge;
 import com.flowledger.commerce.pricing.CommercePricingService;
+import com.flowledger.commerce.reservation.CommerceInventoryReservationService;
 import com.flowledger.commerce.store.entity.StoreCommerceProfile;
 import com.flowledger.commerce.store.repository.StoreCommerceProfileRepository;
 import com.flowledger.commerce.validation.CartValidationService;
@@ -59,6 +60,7 @@ public class CheckoutService {
     private final OrderMapper orderMapper;
     private final DomainEventPublisher events;
     private final CommercePlatformEventBridge platformEvents;
+    private final CommerceInventoryReservationService reservations;
 
     public CheckoutService(
             CommerceCartRepository carts,
@@ -75,7 +77,8 @@ public class CheckoutService {
             OrderOrchestrator orderOrchestrator,
             OrderMapper orderMapper,
             DomainEventPublisher events,
-            CommercePlatformEventBridge platformEvents) {
+            CommercePlatformEventBridge platformEvents,
+            CommerceInventoryReservationService reservations) {
         this.carts = carts;
         this.cartItems = cartItems;
         this.sessions = sessions;
@@ -91,6 +94,7 @@ public class CheckoutService {
         this.orderMapper = orderMapper;
         this.events = events;
         this.platformEvents = platformEvents;
+        this.reservations = reservations;
     }
 
     public CommerceDtos.CheckoutSessionResponse startCheckout(CommerceDtos.StartCheckoutRequest request) {
@@ -106,6 +110,7 @@ public class CheckoutService {
         if (!result.valid()) {
             throw new BusinessException(String.join("; ", result.errors()));
         }
+        reservations.assertCartItemsReserved(cart.getId(), items);
 
         StoreCommerceProfile profile = storeProfiles
                 .findByStoreId(cart.getStoreId())

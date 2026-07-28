@@ -128,6 +128,19 @@ public class StockReservationService {
     }
 
     @Transactional
+    public void commitToOrder(UUID reservationId, UUID orderId, UUID orderLineId) {
+        StockReservation reservation = load(reservationId);
+        if (reservation.getStatus() != Status.ACTIVE) {
+            throw new BusinessException("Only ACTIVE reservations can be committed to an order");
+        }
+        reservation.setReferenceType("COMMERCE_ORDER");
+        reservation.setReferenceId(orderId);
+        reservation.setLineReferenceId(orderLineId);
+        reservation.setExpiresAt(null);
+        reservations.save(reservation);
+    }
+
+    @Transactional
     public void consumeByReference(String referenceType, UUID referenceId) {
         UUID org = TenantContext.getOrganizationId();
         List<StockReservation> active = reservations.findByOrganizationIdAndReferenceTypeAndReferenceIdAndStatus(

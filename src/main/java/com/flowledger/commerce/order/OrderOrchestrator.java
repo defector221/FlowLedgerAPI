@@ -14,8 +14,11 @@ import com.flowledger.commerce.order.repository.CommerceOrderLineRepository;
 import com.flowledger.commerce.order.repository.CommerceOrderRepository;
 import com.flowledger.commerce.cart.entity.CommerceCartItem;
 import com.flowledger.commerce.cart.repository.CommerceCartItemRepository;
+import com.flowledger.commerce.reservation.CommerceInventoryReservationService;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +33,7 @@ public class OrderOrchestrator {
     private final CommerceCustomerBridgeService customerBridge;
     private final FulfillmentOrchestrator fulfillmentOrchestrator;
     private final CommerceCouponRedemptionRepository couponRedemptions;
+    private final CommerceInventoryReservationService reservations;
 
     public OrderOrchestrator(
             CommerceOrderRepository orders,
@@ -38,7 +42,8 @@ public class OrderOrchestrator {
             CommerceCartItemRepository cartItems,
             CommerceCustomerBridgeService customerBridge,
             FulfillmentOrchestrator fulfillmentOrchestrator,
-            CommerceCouponRedemptionRepository couponRedemptions) {
+            CommerceCouponRedemptionRepository couponRedemptions,
+            CommerceInventoryReservationService reservations) {
         this.orders = orders;
         this.orderLines = orderLines;
         this.carts = carts;
@@ -46,6 +51,7 @@ public class OrderOrchestrator {
         this.customerBridge = customerBridge;
         this.fulfillmentOrchestrator = fulfillmentOrchestrator;
         this.couponRedemptions = couponRedemptions;
+        this.reservations = reservations;
     }
 
     public CommerceOrder placeOrder(CommerceCheckoutSession session) {
@@ -75,6 +81,7 @@ public class OrderOrchestrator {
         order = orders.save(order);
 
         List<CommerceCartItem> items = cartItems.findByCartIdOrderByCreatedAtAsc(session.getCartId());
+        Map<UUID, UUID> cartItemToOrderLine = new HashMap<>();
         for (CommerceCartItem item : items) {
             CommerceOrderLine line = new CommerceOrderLine();
             line.setOrderId(order.getId());
@@ -88,8 +95,11 @@ public class OrderOrchestrator {
             line.setPriceSnapshot(item.getPriceSnapshot());
             line.setTaxSnapshot(item.getTaxSnapshot());
             line.setPromotionSnapshot(item.getPromotionSnapshot());
-            orderLines.save(line);
+            line = orderLines.save(line);
+            cartItemToOrderLine.put(item.getId(), line.getId());
         }
+
+        reservations.commitCartToOrder(session.getOrganizationId(), session.getCartId(), order.getId(), cartItemToOrderLine);
 
         if (session.getCouponCode() != null && !session.getCouponCode().isBlank()) {
             CommerceCouponRedemption redemption = new CommerceCouponRedemption();

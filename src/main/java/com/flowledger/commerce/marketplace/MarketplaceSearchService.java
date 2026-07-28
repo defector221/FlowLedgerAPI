@@ -1,5 +1,6 @@
 package com.flowledger.commerce.marketplace;
 
+import com.flowledger.commerce.inventory.CommerceSellableInventoryService;
 import com.flowledger.commerce.config.CommerceProperties;
 import com.flowledger.commerce.marketplace.domain.MarketplaceBrand;
 import com.flowledger.commerce.marketplace.domain.MarketplaceCategory;
@@ -22,6 +23,7 @@ import com.flowledger.commerce.publisher.repository.MarketplaceProductIndexRepos
 import com.flowledger.commerce.publisher.repository.MarketplaceStoreIndexRepository;
 import com.flowledger.common.dto.PageResponse;
 import com.flowledger.common.exception.ResourceNotFoundException;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +43,7 @@ public class MarketplaceSearchService {
     private final MarketplaceCategoryIndexRepository categoryIndexRepository;
     private final MarketplaceBrandIndexRepository brandIndexRepository;
     private final MarketplaceIndexMapper mapper;
+    private final CommerceSellableInventoryService sellableInventory;
 
     public MarketplaceSearchService(
             CommerceProperties properties,
@@ -50,7 +53,8 @@ public class MarketplaceSearchService {
             MarketplaceProductIndexRepository productIndexRepository,
             MarketplaceCategoryIndexRepository categoryIndexRepository,
             MarketplaceBrandIndexRepository brandIndexRepository,
-            MarketplaceIndexMapper mapper) {
+            MarketplaceIndexMapper mapper,
+            CommerceSellableInventoryService sellableInventory) {
         this.properties = properties;
         if ("opensearch".equalsIgnoreCase(properties.getMarketplace().getSearch().getBackend())
                 && openSearchBackend.getIfAvailable() != null) {
@@ -63,6 +67,7 @@ public class MarketplaceSearchService {
         this.categoryIndexRepository = categoryIndexRepository;
         this.brandIndexRepository = brandIndexRepository;
         this.mapper = mapper;
+        this.sellableInventory = sellableInventory;
     }
 
     public PageResponse<MarketplaceStore> searchStores(StoreSearchCriteria criteria, Pageable pageable) {
@@ -79,21 +84,21 @@ public class MarketplaceSearchService {
 
     public PageResponse<MarketplaceProduct> searchProducts(ProductSearchCriteria criteria, Pageable pageable) {
         Page<MarketplaceProduct> page = backend.searchProducts(applyProductSearchConfig(criteria), pageable);
-        return PageResponse.from(page);
+        return PageResponse.from(page.map(this::overlaySellableInventory));
     }
 
     public MarketplaceProduct getProduct(UUID id) {
         MarketplaceProductIndex index = productIndexRepository
                 .findByIdAndPublishedTrue(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
-        return mapper.toProduct(index);
+        return overlaySellableInventory(mapper.toProduct(index), index.getOrganizationId());
     }
 
     public Optional<MarketplaceProduct> getProductByStoreAndProduct(UUID storeId, UUID productId) {
         return productIndexRepository
                 .findByStoreIdAndProductId(storeId, productId)
                 .filter(MarketplaceProductIndex::isPublished)
-                .map(mapper::toProduct);
+                .map(index -> overlaySellableInventory(mapper.toProduct(index), index.getOrganizationId()));
     }
 
     public List<MarketplaceCategory> listCategories() {
@@ -105,7 +110,7 @@ public class MarketplaceSearchService {
     }
 
     public Optional<MarketplaceProduct> findByBarcode(String barcode) {
-        return backend.findByBarcode(barcode);
+        return backend.findByBarcode(barcode).map(this::overlaySellableInventory);
     }
 
     public List<MarketplaceStore> findStoresNearProduct(UUID productId, GeoCriteria geo) {
@@ -153,5 +158,36 @@ public class MarketplaceSearchService {
             return geo;
         }
         return new GeoCriteria(null, null, null);
+    }
+
+    private MarketplaceProduct overlaySellableInventory(MarketplaceProduct product) {
+        return productIndexRepository
+                .findByStoreIdAndProductId(product.storeId(), product.productId())
+                .map(index -> overlaySellableInventory(product, index.getOrganizationId()))
+                .orElse(product);
+    }
+
+    private MarketplaceProduct overlaySellableInventory(MarketplaceProduct product, UUID organizationId) {
+        BigDecimal sellable = sellableInventory.sellableQty(organizationId, product.storeId(), product.productId());
+        if (sellable == null || sellable.compareTo(product.inventoryQty()) == 0) {
+            return product;
+        }
+        return new MarketplaceProduct(
+                product.id(),
+                product.storeId(),
+                product.productId(),
+                product.sku(),
+                product.barcode(),
+                product.gtin(),
+                product.name(),
+                product.description(),
+                product.brand(),
+                product.categoryId(),
+                product.categoryName(),
+                product.price(),
+                product.currency(),
+                sellable,
+                product.imageUrls(),
+                product.extras());
     }
 }

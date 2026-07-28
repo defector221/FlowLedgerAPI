@@ -9,6 +9,8 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "commerce_scan_session_items")
@@ -34,9 +36,11 @@ public class ScanSessionItem extends CommerceGlobalEntity {
     @Column(name = "line_total", nullable = false)
     private BigDecimal lineTotal = BigDecimal.ZERO;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "product_snapshot", nullable = false, columnDefinition = "jsonb")
     private String productSnapshot = "{}";
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "price_snapshot", nullable = false, columnDefinition = "jsonb")
     private String priceSnapshot = "{}";
 }

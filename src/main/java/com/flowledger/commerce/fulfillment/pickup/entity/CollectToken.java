@@ -29,6 +29,9 @@ public class CollectToken {
     @Column(name = "token_hash", nullable = false, unique = true)
     private String tokenHash;
 
+    @Column(name = "collect_code", length = 6)
+    private String collectCode;
+
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiresAt;
 

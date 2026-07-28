@@ -61,9 +61,17 @@ public class TaskManagementService {
         return pickingTasks.save(task);
     }
 
-    public PickingTask completePicking(UUID fulfillmentOrderId) {
+    public PickingTask completePicking(UUID fulfillmentOrderId, UUID actorId) {
         PickingTask task = requirePickingTask(fulfillmentOrderId);
-        if (task.getStatus() != TaskStatus.IN_PROGRESS) {
+        if (task.getStatus() == TaskStatus.PENDING) {
+            task.setPickerId(actorId);
+            task.setStatus(TaskStatus.IN_PROGRESS);
+            task.setStartedAt(OffsetDateTime.now());
+            FulfillmentOrder order = requireOrder(fulfillmentOrderId);
+            order.setAssignedPickerId(actorId);
+            fulfillmentOrders.save(order);
+            pickingTasks.save(task);
+        } else if (task.getStatus() != TaskStatus.IN_PROGRESS) {
             throw new BusinessException("Picking task is not in progress");
         }
         task.setStatus(TaskStatus.COMPLETED);
@@ -91,9 +99,14 @@ public class TaskManagementService {
         return packingTasks.save(task);
     }
 
-    public PackingTask completePacking(UUID fulfillmentOrderId) {
+    public PackingTask completePacking(UUID fulfillmentOrderId, UUID actorId) {
         PackingTask task = requirePackingTask(fulfillmentOrderId);
-        if (task.getStatus() != TaskStatus.IN_PROGRESS) {
+        if (task.getStatus() == TaskStatus.PENDING) {
+            task.setPackerId(actorId);
+            task.setStatus(TaskStatus.IN_PROGRESS);
+            task.setStartedAt(OffsetDateTime.now());
+            packingTasks.save(task);
+        } else if (task.getStatus() != TaskStatus.IN_PROGRESS) {
             throw new BusinessException("Packing task is not in progress");
         }
         task.setStatus(TaskStatus.COMPLETED);

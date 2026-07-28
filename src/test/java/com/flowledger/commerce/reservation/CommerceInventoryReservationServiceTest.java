@@ -34,6 +34,8 @@ class CommerceInventoryReservationServiceTest {
     private StockReservationService stockReservations;
     @Mock
     private DomainEventPublisher events;
+    @Mock
+    private com.flowledger.commerce.fulfillment.scan_go.repository.ScanSessionRepository scanSessions;
 
     private CommerceInventoryReservationService service;
 
@@ -41,7 +43,7 @@ class CommerceInventoryReservationServiceTest {
     void setUp() {
         CommerceProperties properties = new CommerceProperties();
         service = new CommerceInventoryReservationService(
-                reservations, carts, stockReservations, properties, events);
+                reservations, carts, scanSessions, stockReservations, properties, events);
     }
 
     @Test
@@ -61,7 +63,7 @@ class CommerceInventoryReservationServiceTest {
         cart.setId(cartId);
         cart.setOrganizationId(orgId);
 
-        when(reservations.findByStatusAndExpiresAtBefore(any(), any())).thenReturn(List.of(reservation));
+        when(reservations.findByStatusAndExpiresAtBeforeAndOrderIdIsNull(any(), any())).thenReturn(List.of(reservation));
         when(carts.findById(cartId)).thenReturn(Optional.of(cart));
         when(reservations.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -80,7 +82,7 @@ class CommerceInventoryReservationServiceTest {
         reservation.setStatus(CommerceReservationStatus.ACTIVE);
         reservation.setExpiresAt(OffsetDateTime.now().minusMinutes(1));
 
-        when(reservations.findByStatusAndExpiresAtBefore(any(), any())).thenReturn(List.of(reservation));
+        when(reservations.findByStatusAndExpiresAtBeforeAndOrderIdIsNull(any(), any())).thenReturn(List.of(reservation));
         when(carts.findById(any())).thenReturn(Optional.empty());
         when(reservations.save(any())).thenAnswer(inv -> inv.getArgument(0));
 

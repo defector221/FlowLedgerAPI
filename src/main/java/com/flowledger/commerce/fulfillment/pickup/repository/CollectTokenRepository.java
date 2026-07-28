@@ -8,5 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface CollectTokenRepository extends JpaRepository<CollectToken, UUID> {
     Optional<CollectToken> findByTokenHash(String tokenHash);
 
-    Optional<CollectToken> findByFulfillmentOrderIdAndVerifiedAtIsNull(UUID fulfillmentOrderId);
+    Optional<CollectToken> findByCollectCodeAndVerifiedAtIsNull(String collectCode);
+
+    Optional<CollectToken> findFirstByFulfillmentOrderIdAndVerifiedAtIsNullOrderByCreatedAtDesc(
+            UUID fulfillmentOrderId);
 }

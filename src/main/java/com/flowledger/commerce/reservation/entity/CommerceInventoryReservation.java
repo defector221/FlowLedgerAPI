@@ -47,4 +47,10 @@ public class CommerceInventoryReservation extends CommerceGlobalEntity {
 
     @Column(name = "renewed_at")
     private OffsetDateTime renewedAt;
+
+    @Column(name = "order_id")
+    private UUID orderId;
+
+    @Column(name = "scan_session_id")
+    private UUID scanSessionId;
 }
