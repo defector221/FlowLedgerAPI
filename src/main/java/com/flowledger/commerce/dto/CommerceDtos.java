@@ -250,4 +250,102 @@ public final class CommerceDtos {
 
     public record MarketplaceBarcodeLookupResponse(
             MarketplaceProductResponse product, java.util.List<MarketplaceStoreAvailability> stores) {}
+
+    // Cart & Checkout (Epic 3)
+    public record CreateCartRequest(@NotNull UUID storeId) {}
+
+    public record AddCartItemRequest(@NotNull UUID productIndexId, java.math.BigDecimal quantity) {}
+
+    public record UpdateCartItemRequest(@NotNull java.math.BigDecimal quantity) {}
+
+    public record CartItemResponse(
+            UUID id,
+            UUID productId,
+            UUID variantId,
+            java.math.BigDecimal quantity,
+            java.math.BigDecimal lineSubtotal,
+            java.math.BigDecimal lineTax,
+            java.math.BigDecimal lineTotal,
+            String name,
+            String sku,
+            String barcode,
+            java.util.List<String> imageUrls) {}
+
+    public record CartResponse(
+            UUID id,
+            UUID storeId,
+            UUID organizationId,
+            String status,
+            String currency,
+            java.math.BigDecimal subtotal,
+            java.math.BigDecimal discountTotal,
+            java.math.BigDecimal taxTotal,
+            java.math.BigDecimal grandTotal,
+            int itemCount,
+            java.util.List<CartItemResponse> items) {}
+
+    public record StartCheckoutRequest(
+            @NotNull UUID cartId,
+            @NotNull com.flowledger.commerce.fulfillment.FulfillmentType fulfillmentType,
+            UUID addressId,
+            String couponCode) {}
+
+    public record CheckoutSessionResponse(
+            UUID id,
+            UUID cartId,
+            UUID storeId,
+            String status,
+            String fulfillmentType,
+            UUID addressId,
+            String couponCode,
+            String currency,
+            java.math.BigDecimal subtotal,
+            java.math.BigDecimal discountTotal,
+            java.math.BigDecimal taxTotal,
+            java.math.BigDecimal shippingTotal,
+            java.math.BigDecimal grandTotal,
+            OffsetDateTime expiresAt,
+            java.util.List<CartItemResponse> items) {}
+
+    public record ApplyCheckoutCouponRequest(@NotBlank String couponCode) {}
+
+    public record InitiatePaymentRequest(
+            @NotNull com.flowledger.commerce.payment.domain.CommercePaymentProvider provider) {}
+
+    public record PaymentSessionResponse(
+            UUID id,
+            UUID checkoutSessionId,
+            String provider,
+            String status,
+            java.math.BigDecimal amount,
+            String currency,
+            String gatewayOrderId) {}
+
+    public record ConfirmCheckoutRequest(String gatewayPaymentId, String gatewaySignature) {}
+
+    public record CommerceOrderResponse(
+            UUID id,
+            String orderNumber,
+            UUID storeId,
+            String status,
+            String fulfillmentType,
+            String currency,
+            java.math.BigDecimal subtotal,
+            java.math.BigDecimal discountTotal,
+            java.math.BigDecimal taxTotal,
+            java.math.BigDecimal shippingTotal,
+            java.math.BigDecimal grandTotal,
+            OffsetDateTime placedAt,
+            OffsetDateTime confirmedAt,
+            java.util.List<CommerceOrderLineResponse> lines) {}
+
+    public record CommerceOrderLineResponse(
+            UUID id,
+            UUID productId,
+            java.math.BigDecimal quantity,
+            java.math.BigDecimal lineSubtotal,
+            java.math.BigDecimal lineTax,
+            java.math.BigDecimal lineTotal,
+            String name,
+            String sku) {}
 }

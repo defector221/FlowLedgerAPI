@@ -51,15 +51,17 @@ public class CommerceJwtService {
 
     private String create(CommercePrincipal principal, Duration duration, String type) {
         Instant now = Instant.now();
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(principal.getCustomerId().toString())
                 .claim("typ", TYP_COMMERCE)
                 .claim("type", type)
                 .claim("mobile", principal.getMobile())
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(duration)))
-                .signWith(key())
-                .compact();
+                .expiration(Date.from(now.plus(duration)));
+        if ("refresh".equals(type)) {
+            builder.id(UUID.randomUUID().toString());
+        }
+        return builder.signWith(key()).compact();
     }
 
     public Claims parse(String token) {

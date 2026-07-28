@@ -12,6 +12,16 @@ public class CommerceProperties {
     private Otp otp = new Otp();
     private long healthCheckIntervalMs = 300_000L;
     private Marketplace marketplace = new Marketplace();
+    private Cart cart = new Cart();
+
+    @Getter
+    @Setter
+    public static class Cart {
+        private int reservationTtlMinutes = 15;
+        private int renewalExtensionMinutes = 15;
+        private int checkoutTtlMinutes = 30;
+        private int maxItemQty = 99;
+    }
 
     @Getter
     @Setter

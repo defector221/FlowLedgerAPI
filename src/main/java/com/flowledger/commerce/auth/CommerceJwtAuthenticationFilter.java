@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.UUID;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -27,16 +28,13 @@ public class CommerceJwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        if (path == null) return true;
-        if (path.startsWith("/api/v1/commerce/auth/request-otp")
-                || path.startsWith("/api/v1/commerce/auth/verify-otp")) {
+        if (path == null || !path.startsWith("/api/v1/commerce/")) {
             return true;
         }
-        if ("POST".equalsIgnoreCase(request.getMethod()) && "/api/v1/commerce/customers".equals(path)) {
+        if (isPublicCommercePath(path, request.getMethod())) {
             return true;
         }
-        return !path.startsWith("/api/v1/commerce/customers/")
-                && !path.equals("/api/v1/commerce/auth/refresh");
+        return !isCustomerCommercePath(path);
     }
 
     @Override
@@ -48,8 +46,7 @@ public class CommerceJwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
         String token = authorizationHeader.substring(7).trim();
-        boolean refresh = request.getRequestURI().equals("/api/v1/commerce/auth/refresh");
-        if (refresh ? !jwt.isValidRefresh(token) : !jwt.isValidAccess(token)) {
+        if (!jwt.isValidAccess(token)) {
             writeUnauthorized(response, "Commerce token expired or invalid");
             return;
         }
@@ -63,6 +60,37 @@ public class CommerceJwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (Exception ex) {
             writeUnauthorized(response, "Commerce authentication failed");
         }
+    }
+
+    static boolean isPublicCommercePath(String path, String method) {
+        if (path.startsWith("/api/v1/commerce/auth/request-otp")
+                || path.startsWith("/api/v1/commerce/auth/verify-otp")
+                || path.equals("/api/v1/commerce/auth/refresh")) {
+            return true;
+        }
+        if (HttpMethod.POST.matches(method) && "/api/v1/commerce/customers".equals(path)) {
+            return true;
+        }
+        if (path.startsWith("/api/v1/commerce/marketplace/")) {
+            return true;
+        }
+        return path.startsWith("/api/v1/commerce/payments/webhooks/");
+    }
+
+    static boolean isCustomerCommercePath(String path) {
+        if (path.startsWith("/api/v1/commerce/carts")) {
+            return true;
+        }
+        if (path.startsWith("/api/v1/commerce/checkout")) {
+            return true;
+        }
+        if (path.startsWith("/api/v1/commerce/orders")) {
+            return true;
+        }
+        if (path.equals("/api/v1/commerce/customers/me")) {
+            return true;
+        }
+        return path.startsWith("/api/v1/commerce/customers/address");
     }
 
     private static void writeUnauthorized(HttpServletResponse response, String detail) throws IOException {

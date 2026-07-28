@@ -40,6 +40,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private static boolean isCommerceCustomerPath(String path) {
+        if (path.startsWith("/api/v1/commerce/carts")
+                || path.startsWith("/api/v1/commerce/checkout")
+                || path.startsWith("/api/v1/commerce/orders")) {
+            return true;
+        }
         if (path.startsWith("/api/v1/commerce/auth/")) {
             return !path.equals("/api/v1/commerce/auth/refresh");
         }

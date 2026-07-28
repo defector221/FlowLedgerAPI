@@ -49,6 +49,9 @@ public class JwtService {
                 .claim("type", type)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(duration)));
+        if ("refresh".equals(type)) {
+            builder.id(UUID.randomUUID().toString());
+        }
         if (branchId != null) builder.claim("branchId", branchId.toString());
         if (storeId != null) builder.claim("storeId", storeId.toString());
         if (warehouseId != null) builder.claim("warehouseId", warehouseId.toString());

@@ -87,6 +87,13 @@ public class MarketplaceSearchService {
         return mapper.toProduct(index);
     }
 
+    public Optional<MarketplaceProduct> getProductByStoreAndProduct(UUID storeId, UUID productId) {
+        return productIndexRepository
+                .findByStoreIdAndProductId(storeId, productId)
+                .filter(MarketplaceProductIndex::isPublished)
+                .map(mapper::toProduct);
+    }
+
     public List<MarketplaceCategory> listCategories() {
         return categoryIndexRepository.findAllPublished().stream().map(mapper::toCategory).toList();
     }

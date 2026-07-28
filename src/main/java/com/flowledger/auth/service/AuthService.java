@@ -102,6 +102,7 @@ public class AuthService {
                 .filter(existing -> existing.getExpiresAt().isAfter(Instant.now()))
                 .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
         token.setRevoked(true);
+        refreshTokens.saveAndFlush(token);
         User user = users.findByIdAndActiveTrue(token.getUserId())
                 .orElseThrow(() -> new UnauthorizedException("User unavailable"));
         UUID organizationId = jwt.organizationId(request.refreshToken());

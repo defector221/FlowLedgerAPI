@@ -59,7 +59,7 @@ flowledger:
     access-token-expiry-minutes: 30
     refresh-token-expiry-days: 14
   cors:
-    allowed-origins: http://localhost:5173,http://localhost:5174,http://localhost:3000,https://flowledger.valiantxgroup.com,https://apiflowledger.valiantxgroup.com
+    allowed-origins: http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000,https://flowledger.valiantxgroup.com,https://apiflowledger.valiantxgroup.com
   storage:
     local:
       base-path: ${FLOWLEDGER_LOCAL_STORAGE_PATH:${user.home}/.flowledger/storage}
@@ -142,6 +142,13 @@ flowledger:
         max-retries: 5
         batch-size: 100
         poll-interval-ms: 60000
+    cart:
+      reservation-ttl-minutes: 15
+      renewal-extension-minutes: 15
+      checkout-ttl-minutes: 30
+      max-item-qty: 99
+      reservation-poll-ms: 60000
+      checkout-expiry-poll-ms: 120000
   ai:
     # Set FLOWLEDGER_AI_ENABLED=false to disable (ERP unchanged; AI beans/routes off).
     enabled: ${FLOWLEDGER_AI_ENABLED:true}
