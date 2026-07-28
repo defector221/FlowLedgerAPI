@@ -217,10 +217,6 @@ public class CheckoutService {
         }
 
         CommerceOrder order = orderOrchestrator.placeOrder(session);
-        if (order.getErpInvoiceId() != null) {
-            paymentOrchestrator.recordErpReceipt(
-                    session.getOrganizationId(), order.getErpCustomerId(), order.getErpInvoiceId(), payment);
-        }
 
         session.setStatus(CheckoutSessionStatus.COMPLETED);
         session.setCompletedAt(OffsetDateTime.now());

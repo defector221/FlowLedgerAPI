@@ -87,6 +87,9 @@ public class CommerceJwtAuthenticationFilter extends OncePerRequestFilter {
         if (path.startsWith("/api/v1/commerce/orders")) {
             return true;
         }
+        if (path.startsWith("/api/v1/commerce/scan")) {
+            return true;
+        }
         if (path.equals("/api/v1/commerce/customers/me")) {
             return true;
         }

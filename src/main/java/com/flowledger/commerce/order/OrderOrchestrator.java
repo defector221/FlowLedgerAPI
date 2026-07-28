@@ -6,16 +6,12 @@ import com.flowledger.commerce.checkout.entity.CommerceCheckoutSession;
 import com.flowledger.commerce.checkout.entity.CommerceCouponRedemption;
 import com.flowledger.commerce.checkout.repository.CommerceCouponRedemptionRepository;
 import com.flowledger.commerce.customer.bridge.CommerceCustomerBridgeService;
-import com.flowledger.commerce.fulfillment.FulfillmentType;
+import com.flowledger.commerce.fulfillment.engine.FulfillmentOrchestrator;
 import com.flowledger.commerce.order.domain.CommerceOrderStatus;
 import com.flowledger.commerce.order.entity.CommerceOrder;
 import com.flowledger.commerce.order.entity.CommerceOrderLine;
-import com.flowledger.commerce.order.fulfillment.DeliveryFulfillmentStrategy;
-import com.flowledger.commerce.order.fulfillment.FulfillmentStrategy;
-import com.flowledger.commerce.order.fulfillment.PickupFulfillmentStrategy;
 import com.flowledger.commerce.order.repository.CommerceOrderLineRepository;
 import com.flowledger.commerce.order.repository.CommerceOrderRepository;
-import com.flowledger.commerce.reservation.CommerceInventoryReservationService;
 import com.flowledger.commerce.cart.entity.CommerceCartItem;
 import com.flowledger.commerce.cart.repository.CommerceCartItemRepository;
 import java.time.OffsetDateTime;
@@ -32,9 +28,7 @@ public class OrderOrchestrator {
     private final CommerceCartRepository carts;
     private final CommerceCartItemRepository cartItems;
     private final CommerceCustomerBridgeService customerBridge;
-    private final PickupFulfillmentStrategy pickupStrategy;
-    private final DeliveryFulfillmentStrategy deliveryStrategy;
-    private final CommerceInventoryReservationService reservations;
+    private final FulfillmentOrchestrator fulfillmentOrchestrator;
     private final CommerceCouponRedemptionRepository couponRedemptions;
 
     public OrderOrchestrator(
@@ -43,18 +37,14 @@ public class OrderOrchestrator {
             CommerceCartRepository carts,
             CommerceCartItemRepository cartItems,
             CommerceCustomerBridgeService customerBridge,
-            PickupFulfillmentStrategy pickupStrategy,
-            DeliveryFulfillmentStrategy deliveryStrategy,
-            CommerceInventoryReservationService reservations,
+            FulfillmentOrchestrator fulfillmentOrchestrator,
             CommerceCouponRedemptionRepository couponRedemptions) {
         this.orders = orders;
         this.orderLines = orderLines;
         this.carts = carts;
         this.cartItems = cartItems;
         this.customerBridge = customerBridge;
-        this.pickupStrategy = pickupStrategy;
-        this.deliveryStrategy = deliveryStrategy;
-        this.reservations = reservations;
+        this.fulfillmentOrchestrator = fulfillmentOrchestrator;
         this.couponRedemptions = couponRedemptions;
     }
 
@@ -81,6 +71,7 @@ public class OrderOrchestrator {
         order.setGrandTotal(session.getGrandTotal());
         order.setOrderNumber(generateOrderNumber(session.getOrganizationId()));
         order.setStatus(CommerceOrderStatus.PLACED);
+        order.setConfirmedAt(OffsetDateTime.now());
         order = orders.save(order);
 
         List<CommerceCartItem> items = cartItems.findByCartIdOrderByCreatedAtAsc(session.getCartId());
@@ -100,13 +91,6 @@ public class OrderOrchestrator {
             orderLines.save(line);
         }
 
-        FulfillmentStrategy strategy = resolveStrategy(session.getFulfillmentType());
-        FulfillmentStrategy.FulfillmentResult erp = strategy.fulfill(session, order, erpCustomerId);
-        order.setErpSalesOrderId(erp.erpSalesOrderId());
-        order.setErpInvoiceId(erp.erpInvoiceId());
-        order.setStatus(CommerceOrderStatus.CONFIRMED);
-        order.setConfirmedAt(OffsetDateTime.now());
-
         if (session.getCouponCode() != null && !session.getCouponCode().isBlank()) {
             CommerceCouponRedemption redemption = new CommerceCouponRedemption();
             redemption.setCheckoutSessionId(session.getId());
@@ -119,21 +103,14 @@ public class OrderOrchestrator {
         carts.findById(session.getCartId()).ifPresent(cart -> {
             cart.setStatus(CartStatus.CHECKED_OUT);
             carts.save(cart);
-            reservations.releaseForCart(session.getOrganizationId(), cart.getId());
         });
 
+        fulfillmentOrchestrator.createFromOrder(order, session.getCustomerId());
         return orders.save(order);
     }
 
     public java.util.Optional<CommerceOrder> findByCheckoutSession(UUID checkoutSessionId) {
         return orders.findByCheckoutSessionId(checkoutSessionId);
-    }
-
-    private FulfillmentStrategy resolveStrategy(FulfillmentType type) {
-        return switch (type) {
-            case HOME_DELIVERY -> deliveryStrategy;
-            case STORE_PICKUP, CLICK_AND_COLLECT, SCAN_AND_GO -> pickupStrategy;
-        };
     }
 
     private String generateOrderNumber(UUID organizationId) {

@@ -348,4 +348,82 @@ public final class CommerceDtos {
             java.math.BigDecimal lineTotal,
             String name,
             String sku) {}
+
+    // Fulfillment (Epic 4)
+    public record AcceptFulfillmentRequest(@NotNull UUID fulfillmentOrderId) {}
+
+    public record FulfillmentTaskRequest(@NotNull UUID fulfillmentOrderId, UUID staffId) {}
+
+    public record AssignDriverRequest(@NotNull UUID fulfillmentOrderId, @NotNull UUID driverId) {}
+
+    public record VerifyCollectRequest(@NotBlank String token) {}
+
+    public record FulfillmentOrderResponse(
+            UUID id,
+            UUID commerceOrderId,
+            String orderNumber,
+            UUID storeId,
+            UUID customerId,
+            String fulfillmentType,
+            String status,
+            String subStatus,
+            OffsetDateTime acceptedAt,
+            OffsetDateTime readyAt,
+            OffsetDateTime completedAt) {}
+
+    public record FulfillmentDashboardResponse(
+            long pendingAcceptance,
+            long picking,
+            long packing,
+            long ready,
+            long delivery,
+            long pickup) {}
+
+    public record TrackingMilestoneResponse(String label, boolean reached, OffsetDateTime reachedAt) {}
+
+    public record OrderTrackingResponse(
+            UUID orderId,
+            UUID fulfillmentOrderId,
+            String status,
+            String subStatus,
+            java.util.List<TrackingMilestoneResponse> timeline) {}
+
+    public record PickupQrResponse(UUID orderId, UUID fulfillmentOrderId, String qrToken) {}
+
+    public record FulfillmentSlotResponse(
+            UUID id,
+            UUID storeId,
+            String slotType,
+            java.time.LocalDate slotDate,
+            String startTime,
+            String endTime,
+            int capacity,
+            int booked) {}
+
+    public record BookSlotRequest(@NotNull UUID slotId, @NotNull UUID checkoutSessionId) {}
+
+    public record ScanSessionResponse(
+            UUID id,
+            UUID storeId,
+            String status,
+            String currency,
+            java.math.BigDecimal subtotal,
+            java.math.BigDecimal taxTotal,
+            java.math.BigDecimal grandTotal,
+            int itemCount,
+            java.util.List<ScanSessionItemResponse> items) {}
+
+    public record ScanSessionItemResponse(
+            UUID id,
+            UUID productId,
+            java.math.BigDecimal quantity,
+            java.math.BigDecimal lineTotal,
+            String name,
+            String barcode) {}
+
+    public record OpenScanSessionRequest(@NotNull UUID storeId) {}
+
+    public record ScanItemRequest(@NotBlank String barcode, java.math.BigDecimal quantity) {}
+
+    public record ScanExitResponse(UUID sessionId, String exitToken) {}
 }
