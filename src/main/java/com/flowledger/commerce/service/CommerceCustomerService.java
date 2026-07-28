@@ -13,6 +13,7 @@ import com.flowledger.commerce.dto.CommerceDtos;
 import com.flowledger.commerce.events.CustomerRegisteredEvent;
 import com.flowledger.commerce.mapper.CommerceMapper;
 import com.flowledger.commerce.config.CommerceModuleGuard;
+import com.flowledger.commerce.referral.ReferralService;
 import com.flowledger.common.exception.BusinessException;
 import com.flowledger.common.exception.ResourceNotFoundException;
 import com.flowledger.platform.event.DomainEventPublisher;
@@ -33,6 +34,7 @@ public class CommerceCustomerService {
     private final CommerceModuleGuard guard;
     private final CommerceMapper mapper;
     private final DomainEventPublisher events;
+    private final ReferralService referralService;
 
     public CommerceCustomerService(
             CommerceCustomerRepository customers,
@@ -41,7 +43,8 @@ public class CommerceCustomerService {
             CommerceCustomerMembershipRepository memberships,
             CommerceModuleGuard guard,
             CommerceMapper mapper,
-            DomainEventPublisher events) {
+            DomainEventPublisher events,
+            ReferralService referralService) {
         this.customers = customers;
         this.addresses = addresses;
         this.preferencesRepository = preferencesRepository;
@@ -49,6 +52,7 @@ public class CommerceCustomerService {
         this.guard = guard;
         this.mapper = mapper;
         this.events = events;
+        this.referralService = referralService;
     }
 
     public CommerceDtos.CustomerResponse register(CommerceDtos.RegisterCustomerRequest request) {
@@ -67,6 +71,9 @@ public class CommerceCustomerService {
         events.publish(new CustomerRegisteredEvent(this, customer.getId()));
         if (request.organizationId() != null) {
             ensureMembership(customer.getId(), request.organizationId());
+            if (request.referralCode() != null && !request.referralCode().isBlank()) {
+                referralService.registerReferee(request.organizationId(), customer.getId(), request.referralCode());
+            }
         }
         return mapper.toCustomerResponse(customer);
     }

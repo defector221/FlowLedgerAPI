@@ -27,15 +27,15 @@ public class CommerceMerchantController {
     }
 
     @PutMapping("/integration")
-    @PreAuthorize("hasAuthority('COMMERCE_CONFIG_WRITE')")
+    @PreAuthorize("hasAnyAuthority('COMMERCE_CONFIG_WRITE', 'COMMERCE_ADMIN')")
     public ApiResponse<CommerceDtos.IntegrationProfileResponse> updateIntegration(
             @Valid @RequestBody CommerceDtos.UpdateIntegrationRequest request) {
         return ApiResponse.of(merchantService.updateIntegration(request));
     }
 
     @PutMapping("/capabilities")
-    @PreAuthorize("hasAuthority('COMMERCE_CONFIG_WRITE')")
-    public ApiResponse<CommerceDtos.CapabilityProfileResponse> updateCapabilities(
+    @PreAuthorize("hasAnyAuthority('COMMERCE_CONFIG_WRITE', 'COMMERCE_ADMIN')")
+    public ApiResponse<CommerceDtos.CapabilityUpdateResponse> updateCapabilities(
             @Valid @RequestBody CommerceDtos.UpdateCapabilitiesRequest request) {
         return ApiResponse.of(merchantService.updateCapabilities(request));
     }

@@ -8,8 +8,8 @@ import com.flowledger.commerce.events.StoreUnpublishedEvent;
 import com.flowledger.commerce.integration.entity.MerchantIntegrationProfile;
 import com.flowledger.commerce.integration.repository.MerchantIntegrationProfileRepository;
 import com.flowledger.commerce.marketplace.util.MarketplaceContentHash;
+import com.flowledger.commerce.onboarding.MerchantOnboardingService;
 import com.flowledger.commerce.onboarding.entity.MerchantOnboarding;
-import com.flowledger.commerce.onboarding.repository.MerchantOnboardingRepository;
 import com.flowledger.commerce.publisher.entity.MarketplaceInventoryIndex;
 import com.flowledger.commerce.publisher.entity.MarketplaceProductIndex;
 import com.flowledger.commerce.publisher.model.BrandPublishedSnapshot;
@@ -45,7 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class CommercePublisher {
     private final MerchantIntegrationProfileRepository integrationProfiles;
-    private final MerchantOnboardingRepository onboardingRepository;
+    private final MerchantOnboardingService onboardingService;
     private final MarketplaceProductIndexRepository productIndexRepository;
     private final MarketplaceInventoryIndexRepository inventoryIndexRepository;
     private final MarketplaceIndexPublishSink indexSink;
@@ -58,7 +58,7 @@ public class CommercePublisher {
 
     public CommercePublisher(
             MerchantIntegrationProfileRepository integrationProfiles,
-            MerchantOnboardingRepository onboardingRepository,
+            MerchantOnboardingService onboardingService,
             MarketplaceProductIndexRepository productIndexRepository,
             MarketplaceInventoryIndexRepository inventoryIndexRepository,
             MarketplaceIndexPublishSink indexSink,
@@ -69,7 +69,7 @@ public class CommercePublisher {
             ObjectMapper objectMapper,
             DomainEventPublisher events) {
         this.integrationProfiles = integrationProfiles;
-        this.onboardingRepository = onboardingRepository;
+        this.onboardingService = onboardingService;
         this.productIndexRepository = productIndexRepository;
         this.inventoryIndexRepository = inventoryIndexRepository;
         this.indexSink = indexSink;
@@ -83,9 +83,7 @@ public class CommercePublisher {
 
     public int publishStore(StoreCommerceProfile profile, UUID actorId) {
         UUID orgId = profile.getOrganizationId();
-        MerchantOnboarding onboarding = onboardingRepository
-                .findByOrganizationId(orgId)
-                .orElseThrow(() -> new BusinessException("Merchant onboarding not found"));
+        MerchantOnboarding onboarding = onboardingService.ensureOnboarding(orgId);
         if (!onboarding.isLive()) {
             throw new BusinessException("Merchant must be LIVE to publish stores");
         }

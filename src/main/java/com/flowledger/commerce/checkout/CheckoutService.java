@@ -25,6 +25,7 @@ import com.flowledger.commerce.payment.entity.CommercePaymentSession;
 import com.flowledger.commerce.payment.repository.CommercePaymentSessionRepository;
 import com.flowledger.commerce.events.CommerceOrderPlacedEvent;
 import com.flowledger.platform.event.DomainEventPublisher;
+import com.flowledger.platform.event.bus.CommercePlatformEventBridge;
 import com.flowledger.commerce.pricing.CommercePricingService;
 import com.flowledger.commerce.store.entity.StoreCommerceProfile;
 import com.flowledger.commerce.store.repository.StoreCommerceProfileRepository;
@@ -57,6 +58,7 @@ public class CheckoutService {
     private final OrderOrchestrator orderOrchestrator;
     private final OrderMapper orderMapper;
     private final DomainEventPublisher events;
+    private final CommercePlatformEventBridge platformEvents;
 
     public CheckoutService(
             CommerceCartRepository carts,
@@ -72,7 +74,8 @@ public class CheckoutService {
             CommercePaymentSessionRepository paymentSessions,
             OrderOrchestrator orderOrchestrator,
             OrderMapper orderMapper,
-            DomainEventPublisher events) {
+            DomainEventPublisher events,
+            CommercePlatformEventBridge platformEvents) {
         this.carts = carts;
         this.cartItems = cartItems;
         this.sessions = sessions;
@@ -87,6 +90,7 @@ public class CheckoutService {
         this.orderOrchestrator = orderOrchestrator;
         this.orderMapper = orderMapper;
         this.events = events;
+        this.platformEvents = platformEvents;
     }
 
     public CommerceDtos.CheckoutSessionResponse startCheckout(CommerceDtos.StartCheckoutRequest request) {
@@ -215,6 +219,12 @@ public class CheckoutService {
         if (payment.getStatus() != PaymentSessionStatus.PAID) {
             throw new BusinessException("Payment not completed");
         }
+
+        platformEvents.publishPaymentSucceeded(
+                session.getOrganizationId(),
+                session.getId(),
+                session.getCustomerId(),
+                payment.getAmount());
 
         CommerceOrder order = orderOrchestrator.placeOrder(session);
 

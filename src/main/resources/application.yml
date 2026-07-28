@@ -137,11 +137,13 @@ flowledger:
       search:
         backend: opensearch
         index: flowledger-marketplace-search-v1
+        geo-filter-enabled: false
+        public-visibility-required: false
       image-url-ttl-minutes: 1440
       sync:
         max-retries: 5
         batch-size: 100
-        poll-interval-ms: 60000
+        poll-interval-ms: 5000
     cart:
       reservation-ttl-minutes: 15
       renewal-extension-minutes: 15
@@ -179,6 +181,14 @@ flowledger:
       enabled: ${FLOWLEDGER_WHATSAPP_ENABLED:false}
       # mock today; future: meta | twilio
       provider: ${FLOWLEDGER_WHATSAPP_PROVIDER:mock}
+
+platform:
+  event-bus:
+    poll-ms: ${PLATFORM_EVENT_BUS_POLL_MS:2000}
+
+commerce:
+  connector:
+    poll-ms: ${COMMERCE_CONNECTOR_POLL_MS:5000}
 
 logging:
   level:

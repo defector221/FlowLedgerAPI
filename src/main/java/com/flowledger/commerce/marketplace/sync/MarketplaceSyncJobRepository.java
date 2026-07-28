@@ -10,6 +10,10 @@ import org.springframework.data.jpa.repository.Query;
 public interface MarketplaceSyncJobRepository extends JpaRepository<MarketplaceSyncJob, UUID> {
     Optional<MarketplaceSyncJob> findByIdempotencyKey(String idempotencyKey);
 
+    Optional<MarketplaceSyncJob> findByIdAndOrganizationId(UUID id, UUID organizationId);
+
+    List<MarketplaceSyncJob> findTop10ByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
+
     @Query(
             """
             SELECT j FROM MarketplaceSyncJob j

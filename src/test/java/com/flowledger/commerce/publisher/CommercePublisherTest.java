@@ -10,8 +10,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowledger.commerce.integration.entity.MerchantIntegrationProfile;
 import com.flowledger.commerce.integration.repository.MerchantIntegrationProfileRepository;
 import com.flowledger.commerce.merchant.domain.MerchantType;
+import com.flowledger.commerce.onboarding.MerchantOnboardingService;
 import com.flowledger.commerce.onboarding.entity.MerchantOnboarding;
-import com.flowledger.commerce.onboarding.repository.MerchantOnboardingRepository;
 import com.flowledger.commerce.publisher.entity.MarketplaceProductIndex;
 import com.flowledger.commerce.publisher.model.ProductPublishedSnapshot;
 import com.flowledger.commerce.publisher.repository.MarketplaceInventoryIndexRepository;
@@ -39,7 +39,7 @@ class CommercePublisherTest {
     @Mock
     private MerchantIntegrationProfileRepository integrationProfiles;
     @Mock
-    private MerchantOnboardingRepository onboardingRepository;
+    private MerchantOnboardingService onboardingService;
     @Mock
     private MarketplaceProductIndexRepository productIndexRepository;
     @Mock
@@ -66,7 +66,7 @@ class CommercePublisherTest {
     void setUp() {
         publisher = new CommercePublisher(
                 integrationProfiles,
-                onboardingRepository,
+                onboardingService,
                 productIndexRepository,
                 inventoryIndexRepository,
                 indexSink,
@@ -147,7 +147,7 @@ class CommercePublisherTest {
         MerchantOnboarding onboarding = new MerchantOnboarding();
         onboarding.setOrganizationId(orgId);
         onboarding.advanceTo(com.flowledger.commerce.onboarding.domain.MerchantOnboardingState.LIVE);
-        when(onboardingRepository.findByOrganizationId(orgId)).thenReturn(Optional.of(onboarding));
+        when(onboardingService.ensureOnboarding(orgId)).thenReturn(onboarding);
 
         MerchantIntegrationProfile integration = new MerchantIntegrationProfile();
         integration.setMerchantType(MerchantType.FLOWLEDGER);

@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class MarketplaceSearchService {
     private final MarketplaceSearchBackend backend;
+    private final CommerceProperties properties;
     private final MarketplaceStoreIndexRepository storeIndexRepository;
     private final MarketplaceProductIndexRepository productIndexRepository;
     private final MarketplaceCategoryIndexRepository categoryIndexRepository;
@@ -50,6 +51,7 @@ public class MarketplaceSearchService {
             MarketplaceCategoryIndexRepository categoryIndexRepository,
             MarketplaceBrandIndexRepository brandIndexRepository,
             MarketplaceIndexMapper mapper) {
+        this.properties = properties;
         if ("opensearch".equalsIgnoreCase(properties.getMarketplace().getSearch().getBackend())
                 && openSearchBackend.getIfAvailable() != null) {
             this.backend = openSearchBackend.getObject();
@@ -64,7 +66,7 @@ public class MarketplaceSearchService {
     }
 
     public PageResponse<MarketplaceStore> searchStores(StoreSearchCriteria criteria, Pageable pageable) {
-        Page<MarketplaceStore> page = backend.searchStores(criteria, pageable);
+        Page<MarketplaceStore> page = backend.searchStores(applySearchConfig(criteria), pageable);
         return PageResponse.from(page);
     }
 
@@ -76,7 +78,7 @@ public class MarketplaceSearchService {
     }
 
     public PageResponse<MarketplaceProduct> searchProducts(ProductSearchCriteria criteria, Pageable pageable) {
-        Page<MarketplaceProduct> page = backend.searchProducts(criteria, pageable);
+        Page<MarketplaceProduct> page = backend.searchProducts(applyProductSearchConfig(criteria), pageable);
         return PageResponse.from(page);
     }
 
@@ -107,6 +109,49 @@ public class MarketplaceSearchService {
     }
 
     public List<MarketplaceStore> findStoresNearProduct(UUID productId, GeoCriteria geo) {
-        return backend.findStoresNearProduct(productId, geo);
+        return backend.findStoresNearProduct(productId, applyGeoConfig(geo));
+    }
+
+    private StoreSearchCriteria applySearchConfig(StoreSearchCriteria criteria) {
+        CommerceProperties.Marketplace.Search search = properties.getMarketplace().getSearch();
+        StoreSearchCriteria effective = criteria;
+        if (!search.isGeoFilterEnabled()) {
+            effective = new StoreSearchCriteria(
+                    criteria.q(),
+                    criteria.city(),
+                    criteria.pincode(),
+                    null,
+                    null,
+                    null,
+                    criteria.supportsDelivery(),
+                    criteria.supportsPickup(),
+                    criteria.supportsClickCollect());
+        }
+        return effective;
+    }
+
+    private ProductSearchCriteria applyProductSearchConfig(ProductSearchCriteria criteria) {
+        if (properties.getMarketplace().getSearch().isGeoFilterEnabled()) {
+            return criteria;
+        }
+        return new ProductSearchCriteria(
+                criteria.q(),
+                criteria.barcode(),
+                criteria.sku(),
+                criteria.gtin(),
+                criteria.productCode(),
+                criteria.brand(),
+                criteria.categoryId(),
+                criteria.storeId(),
+                null,
+                null,
+                null);
+    }
+
+    private GeoCriteria applyGeoConfig(GeoCriteria geo) {
+        if (geo == null || properties.getMarketplace().getSearch().isGeoFilterEnabled()) {
+            return geo;
+        }
+        return new GeoCriteria(null, null, null);
     }
 }

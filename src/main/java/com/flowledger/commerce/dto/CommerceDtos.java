@@ -30,7 +30,7 @@ public final class CommerceDtos {
 
     // Customer
     public record RegisterCustomerRequest(
-            @NotBlank String mobile, String email, String firstName, String lastName, UUID organizationId) {}
+            @NotBlank String mobile, String email, String firstName, String lastName, UUID organizationId, String referralCode) {}
 
     public record UpdateCustomerRequest(
             String email, String firstName, String lastName, String displayName, String preferredLanguage,
@@ -150,6 +150,8 @@ public final class CommerceDtos {
             BigDecimal discoveryRadius,
             StoreCommerceStatus status) {}
 
+    public record StoreCommerceUpdateResponse(StoreCommerceResponse profile, UUID syncJobId) {}
+
     public record UpdateStoreCommerceRequest(
             Boolean commerceEnabled,
             Boolean acceptOnlineOrders,
@@ -165,7 +167,26 @@ public final class CommerceDtos {
             BigDecimal discoveryRadius,
             StoreCommerceStatus status) {}
 
-    public record PublishResultResponse(UUID storeId, int productsPublished, boolean storePublished) {}
+    public record PublishResultResponse(
+            UUID storeId, Integer productsPublished, Boolean storePublished, UUID jobId, String status) {}
+
+    public record CommerceJobResponse(
+            UUID id,
+            String jobType,
+            String entityType,
+            UUID organizationId,
+            UUID storeId,
+            UUID entityId,
+            String status,
+            String syncMode,
+            String lastError,
+            String resultDetail,
+            int attempts,
+            OffsetDateTime scheduledAt,
+            OffsetDateTime completedAt,
+            OffsetDateTime createdAt) {}
+
+    public record CapabilityUpdateResponse(CapabilityProfileResponse capabilities, UUID syncJobId) {}
 
     // Ops
     public record OpsOnboardMerchantRequest(

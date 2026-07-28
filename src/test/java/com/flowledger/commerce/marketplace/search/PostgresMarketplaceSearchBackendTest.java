@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
+import com.flowledger.commerce.config.CommerceProperties;
 import com.flowledger.commerce.marketplace.mapper.MarketplaceIndexMapper;
 import com.flowledger.commerce.publisher.entity.MarketplaceProductIndex;
 import com.flowledger.commerce.publisher.entity.MarketplaceStoreIndex;
@@ -34,11 +35,13 @@ class PostgresMarketplaceSearchBackendTest {
 
     @BeforeEach
     void setUp() {
+        CommerceProperties properties = new CommerceProperties();
         backend = new PostgresMarketplaceSearchBackend(
                 storeIndexRepository,
                 productIndexRepository,
                 inventoryIndexRepository,
-                new MarketplaceIndexMapper(new ObjectMapper()));
+                new MarketplaceIndexMapper(new ObjectMapper()),
+                properties);
     }
 
     @Test

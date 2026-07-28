@@ -14,6 +14,8 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "commerce_checkout_sessions")
@@ -65,6 +67,7 @@ public class CommerceCheckoutSession extends CommerceGlobalEntity {
     @Column(name = "grand_total", nullable = false)
     private BigDecimal grandTotal = BigDecimal.ZERO;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "pricing_snapshot", nullable = false, columnDefinition = "jsonb")
     private String pricingSnapshot = "{}";
 

@@ -35,6 +35,10 @@ public class CommerceProperties {
         public static class Search {
             private String backend = "opensearch";
             private String index = "flowledger-marketplace-search-v1";
+            /** When false, lat/lng/radiusKm are ignored (useful for local/testing). */
+            private boolean geoFilterEnabled = true;
+            /** When false, published stores with PRIVATE visibility still appear in search (testing only). */
+            private boolean publicVisibilityRequired = true;
         }
 
         @Getter

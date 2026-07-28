@@ -11,26 +11,34 @@ import com.flowledger.common.exception.ResourceNotFoundException;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
 public class MarketplaceSyncService {
+    public static final String JOB_STORE_PUBLISH = "STORE_PUBLISH";
+    public static final String JOB_STORE_UNPUBLISH = "STORE_UNPUBLISH";
+    public static final String JOB_CAPABILITIES_SYNC = "CAPABILITIES_SYNC";
+
     private final StoreCommerceProfileRepository storeProfiles;
     private final CommercePublisher publisher;
     private final MarketplaceSyncJobRepository jobs;
     private final CommerceProperties properties;
+    private final MarketplaceSyncTrigger syncTrigger;
 
     public MarketplaceSyncService(
             StoreCommerceProfileRepository storeProfiles,
             CommercePublisher publisher,
             MarketplaceSyncJobRepository jobs,
-            CommerceProperties properties) {
+            CommerceProperties properties,
+            @Lazy MarketplaceSyncTrigger syncTrigger) {
         this.storeProfiles = storeProfiles;
         this.publisher = publisher;
         this.jobs = jobs;
         this.properties = properties;
+        this.syncTrigger = syncTrigger;
     }
 
     public int syncStore(UUID storeId, SyncMode mode, UUID actorId) {
@@ -68,11 +76,37 @@ public class MarketplaceSyncService {
         }
     }
 
+    public UUID enqueueStorePublish(UUID orgId, UUID storeId) {
+        return enqueueAdminJob(JOB_STORE_PUBLISH, "STORE", orgId, storeId, storeId, SyncMode.FULL);
+    }
+
+    public UUID enqueueStoreUnpublish(UUID orgId, UUID storeId) {
+        return enqueueAdminJob(JOB_STORE_UNPUBLISH, "STORE", orgId, storeId, storeId, SyncMode.FULL);
+    }
+
+    public UUID enqueueCapabilitiesSync(UUID orgId) {
+        return enqueueAdminJob(JOB_CAPABILITIES_SYNC, "ORG", orgId, orgId, null, SyncMode.FULL);
+    }
+
     public void enqueue(String jobType, String entityType, UUID orgId, UUID entityId, UUID storeId, SyncMode mode) {
         String key = jobType + ":" + entityType + ":" + entityId + ":" + storeId + ":" + mode.name();
         if (jobs.findByIdempotencyKey(key).isPresent()) {
             return;
         }
+        saveJob(jobType, entityType, orgId, entityId, storeId, mode, key);
+    }
+
+    public UUID enqueueAdminJob(
+            String jobType, String entityType, UUID orgId, UUID entityId, UUID storeId, SyncMode mode) {
+        String key = jobType + ":" + entityType + ":" + entityId + ":" + storeId + ":" + mode.name() + ":"
+                + UUID.randomUUID();
+        UUID jobId = saveJob(jobType, entityType, orgId, entityId, storeId, mode, key);
+        syncTrigger.drainSoon();
+        return jobId;
+    }
+
+    private UUID saveJob(
+            String jobType, String entityType, UUID orgId, UUID entityId, UUID storeId, SyncMode mode, String key) {
         MarketplaceSyncJob job = new MarketplaceSyncJob();
         job.setJobType(jobType);
         job.setEntityType(entityType);
@@ -83,7 +117,7 @@ public class MarketplaceSyncService {
         job.setStatus("PENDING");
         job.setMaxAttempts(properties.getMarketplace().getSync().getMaxRetries());
         job.setIdempotencyKey(key);
-        jobs.save(job);
+        return jobs.save(job).getId();
     }
 
     public void processPendingJobs() {
@@ -109,6 +143,33 @@ public class MarketplaceSyncService {
     private void execute(MarketplaceSyncJob job) {
         SyncMode mode = SyncMode.valueOf(job.getSyncMode());
         UUID actorId = null;
+        if (JOB_CAPABILITIES_SYNC.equals(job.getJobType()) && job.getOrganizationId() != null) {
+            for (StoreCommerceProfile profile :
+                    storeProfiles.findByOrganizationIdAndPublishedToMarketplaceTrue(job.getOrganizationId())) {
+                syncStore(profile.getStoreId(), SyncMode.FULL, actorId);
+            }
+            job.setResultDetail("Capabilities propagated to published stores");
+            return;
+        }
+        if (JOB_STORE_PUBLISH.equals(job.getJobType()) && job.getStoreId() != null) {
+            StoreCommerceProfile profile = storeProfiles
+                    .findByStoreId(job.getStoreId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Store commerce profile not found"));
+            profile.publishStoreToMarketplace();
+            storeProfiles.save(profile);
+            int count = publisher.publishStore(profile, actorId);
+            job.setResultDetail(String.valueOf(count));
+            return;
+        }
+        if (JOB_STORE_UNPUBLISH.equals(job.getJobType()) && job.getStoreId() != null) {
+            StoreCommerceProfile profile = storeProfiles
+                    .findByStoreId(job.getStoreId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Store commerce profile not found"));
+            publisher.unpublishStore(profile, actorId);
+            storeProfiles.save(profile);
+            job.setResultDetail("Store unpublished");
+            return;
+        }
         if ("ORG".equals(job.getEntityType()) && job.getOrganizationId() != null) {
             for (StoreCommerceProfile profile :
                     storeProfiles.findByOrganizationIdAndPublishedToMarketplaceTrue(job.getOrganizationId())) {

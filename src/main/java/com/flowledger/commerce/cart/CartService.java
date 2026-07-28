@@ -94,9 +94,7 @@ public class CartService {
             throw new BusinessException("Product belongs to a different store");
         }
 
-        BigDecimal qty = request.quantity() != null ? request.quantity() : BigDecimal.ONE;
-        CommerceLinePricing linePricing = pricing.priceLine(
-                cart.getOrganizationId(), cart.getStoreId(), product.productId(), null, qty, null);
+        BigDecimal qtyToAdd = request.quantity() != null ? request.quantity() : BigDecimal.ONE;
 
         CommerceCartItem item = items.findByCartIdAndProductId(cart.getId(), product.productId())
                 .orElseGet(() -> {
@@ -106,8 +104,13 @@ public class CartService {
                     return newItem;
                 });
 
-        CartItemSnapshotBuilder.Snapshots snaps = snapshotBuilder.build(product, linePricing, qty);
-        item.setQuantity(qty);
+        BigDecimal newQty = item.getId() != null ? item.getQuantity().add(qtyToAdd) : qtyToAdd;
+
+        CommerceLinePricing linePricing = pricing.priceLine(
+                cart.getOrganizationId(), cart.getStoreId(), product.productId(), null, newQty, null);
+
+        CartItemSnapshotBuilder.Snapshots snaps = snapshotBuilder.build(product, linePricing, newQty);
+        item.setQuantity(newQty);
         item.setVariantId(null);
         item.setProductSnapshot(snaps.productSnapshot());
         item.setPriceSnapshot(snaps.priceSnapshot());
@@ -122,7 +125,7 @@ public class CartService {
 
         if (linePricing.warehouseId() != null) {
             reservations.reserveForItem(
-                    cart.getOrganizationId(), cart.getId(), item, linePricing.warehouseId(), qty);
+                    cart.getOrganizationId(), cart.getId(), item, linePricing.warehouseId(), newQty);
         }
 
         recalculateTotals(cart);
@@ -224,7 +227,7 @@ public class CartService {
         cart.setSubtotal(subtotal);
         cart.setTaxTotal(tax);
         cart.setGrandTotal(grand);
-        cart.setItemCount(cartItems.size());
+        cart.setItemCount(cartItems.stream().mapToInt(i -> i.getQuantity().intValue()).sum());
     }
 
     private CommerceDtos.CartResponse toResponse(CommerceCart cart) {

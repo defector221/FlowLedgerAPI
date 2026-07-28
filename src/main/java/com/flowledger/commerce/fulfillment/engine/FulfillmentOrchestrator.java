@@ -66,6 +66,7 @@ public class FulfillmentOrchestrator {
     private final QrTokenService qrTokens;
     private final CommerceInventoryReservationService reservations;
     private final FulfillmentNotificationHooks notifications;
+    private final com.flowledger.platform.event.bus.CommercePlatformEventBridge platformEvents;
 
     public FulfillmentOrchestrator(
             FulfillmentOrderRepository fulfillmentOrders,
@@ -82,7 +83,8 @@ public class FulfillmentOrchestrator {
             PickupSessionRepository pickupSessions,
             QrTokenService qrTokens,
             CommerceInventoryReservationService reservations,
-            FulfillmentNotificationHooks notifications) {
+            FulfillmentNotificationHooks notifications,
+            com.flowledger.platform.event.bus.CommercePlatformEventBridge platformEvents) {
         this.fulfillmentOrders = fulfillmentOrders;
         this.statusHistory = statusHistory;
         this.commerceOrders = commerceOrders;
@@ -98,6 +100,7 @@ public class FulfillmentOrchestrator {
         this.qrTokens = qrTokens;
         this.reservations = reservations;
         this.notifications = notifications;
+        this.platformEvents = platformEvents;
     }
 
     public FulfillmentOrder createFromOrder(CommerceOrder order, UUID actorId) {
@@ -365,6 +368,9 @@ public class FulfillmentOrchestrator {
         fulfillmentOrders.save(order);
         syncCommerceOrder(order, CommerceOrderStatus.COMPLETED);
         releaseReservations(order);
+        CommerceOrder commerceOrder = requireCommerceOrder(order.getCommerceOrderId());
+        platformEvents.publishOrderCompleted(
+                order.getOrganizationId(), commerceOrder.getId(), commerceOrder.getCustomerId());
     }
 
     private void releaseReservations(FulfillmentOrder order) {

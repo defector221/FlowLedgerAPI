@@ -45,7 +45,11 @@ public class CartItemSnapshotBuilder {
         taxSnap.put("taxRate", pricing.taxRate());
         taxSnap.put("taxType", pricing.taxType());
 
-        Map<String, Object> invSnap = Map.of("quantity", quantity, "warehouseId", pricing.warehouseId());
+        Map<String, Object> invSnap = new HashMap<>();
+        invSnap.put("quantity", quantity);
+        if (pricing.warehouseId() != null) {
+            invSnap.put("warehouseId", pricing.warehouseId());
+        }
 
         return new Snapshots(
                 toJson(productSnap),

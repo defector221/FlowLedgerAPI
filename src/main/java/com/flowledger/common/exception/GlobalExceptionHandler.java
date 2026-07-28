@@ -153,7 +153,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail dataIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
-        log.warn("Data integrity violation. method={}, uri={}", request.getMethod(), request.getRequestURI());
+        log.warn(
+                "Data integrity violation. method={}, uri={}, cause={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                ex.getMostSpecificCause().getMessage());
         return problem(HttpStatus.BAD_REQUEST, "Invalid data submitted", request, null);
     }
 

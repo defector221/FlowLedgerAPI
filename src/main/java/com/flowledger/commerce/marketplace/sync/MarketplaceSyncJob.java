@@ -59,6 +59,9 @@ public class MarketplaceSyncJob {
     @Column(name = "last_error")
     private String lastError;
 
+    @Column(name = "result_detail")
+    private String resultDetail;
+
     @Column(name = "scheduled_at", nullable = false)
     private OffsetDateTime scheduledAt = OffsetDateTime.now();
 

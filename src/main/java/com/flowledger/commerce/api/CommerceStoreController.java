@@ -31,7 +31,7 @@ public class CommerceStoreController {
 
     @PutMapping("/{storeId}/commerce")
     @PreAuthorize("hasAuthority('COMMERCE_STORE_MANAGE')")
-    public ApiResponse<CommerceDtos.StoreCommerceResponse> update(
+    public ApiResponse<CommerceDtos.StoreCommerceUpdateResponse> update(
             @PathVariable UUID storeId, @Valid @RequestBody CommerceDtos.UpdateStoreCommerceRequest request) {
         return ApiResponse.of(storeCommerceService.update(storeId, request));
     }

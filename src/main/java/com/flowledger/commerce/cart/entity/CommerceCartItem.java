@@ -9,6 +9,8 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "commerce_cart_items")
@@ -37,21 +39,27 @@ public class CommerceCartItem extends CommerceGlobalEntity {
     @Column(name = "line_total", nullable = false)
     private BigDecimal lineTotal = BigDecimal.ZERO;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "product_snapshot", nullable = false, columnDefinition = "jsonb")
     private String productSnapshot = "{}";
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "price_snapshot", nullable = false, columnDefinition = "jsonb")
     private String priceSnapshot = "{}";
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "tax_snapshot", nullable = false, columnDefinition = "jsonb")
     private String taxSnapshot = "{}";
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "promotion_snapshot", nullable = false, columnDefinition = "jsonb")
     private String promotionSnapshot = "{}";
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "inventory_snapshot", nullable = false, columnDefinition = "jsonb")
     private String inventorySnapshot = "{}";
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "image_snapshot", nullable = false, columnDefinition = "jsonb")
     private String imageSnapshot = "[]";
 }

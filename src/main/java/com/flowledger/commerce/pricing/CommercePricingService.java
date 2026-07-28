@@ -3,6 +3,11 @@ package com.flowledger.commerce.pricing;
 import com.flowledger.commerce.common.CommerceTenantScope;
 import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
+import com.flowledger.commerce.rules.context.PromotionContext;
+import com.flowledger.commerce.rules.context.PromotionResult;
+import com.flowledger.commerce.rules.domain.SalesChannel;
+import com.flowledger.commerce.rules.engine.CouponEngine;
+import com.flowledger.commerce.rules.engine.PromotionEngine;
 import com.flowledger.retail.dto.RetailDtos.ApplyCouponRequest;
 import com.flowledger.retail.dto.RetailDtos.ApplyCouponResponse;
 import com.flowledger.retail.dto.RetailDtos.ResolvePriceResponse;
@@ -16,6 +21,7 @@ import com.flowledger.tax.service.TaxLineCalculator.DocumentLineInput;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -27,16 +33,22 @@ public class CommercePricingService {
     private final TaxLineCalculator taxLineCalculator;
     private final RetailStoreRepository stores;
     private final OrganizationRepository organizations;
+    private final PromotionEngine promotionEngine;
+    private final CouponEngine couponEngine;
 
     public CommercePricingService(
             RetailPricingService retailPricing,
             TaxLineCalculator taxLineCalculator,
             RetailStoreRepository stores,
-            OrganizationRepository organizations) {
+            OrganizationRepository organizations,
+            PromotionEngine promotionEngine,
+            CouponEngine couponEngine) {
         this.retailPricing = retailPricing;
         this.taxLineCalculator = taxLineCalculator;
         this.stores = stores;
         this.organizations = organizations;
+        this.promotionEngine = promotionEngine;
+        this.couponEngine = couponEngine;
     }
 
     public CommerceLinePricing priceLine(
@@ -103,8 +115,22 @@ public class CommercePricingService {
     }
 
     public ApplyCouponResponse applyCoupon(UUID organizationId, String couponCode, BigDecimal billAmount) {
-        return CommerceTenantScope.run(
-                organizationId, () -> retailPricing.applyCoupon(new ApplyCouponRequest(couponCode, billAmount)));
+        return CommerceTenantScope.run(organizationId, () -> {
+            var rule = couponEngine.validate(organizationId, couponCode);
+            if (rule.isPresent()) {
+                BigDecimal discount = couponEngine.previewDiscount(rule.get(), billAmount);
+                BigDecimal net = billAmount.subtract(discount);
+                return new ApplyCouponResponse(couponCode, true, discount, net, rule.get().getName());
+            }
+            PromotionContext ctx = PromotionContext.forCheckout(
+                    organizationId, null, null, SalesChannel.COMMERCE, billAmount, couponCode, false, List.of());
+            PromotionResult result = promotionEngine.evaluate(ctx);
+            if (result.applied()) {
+                BigDecimal net = billAmount.subtract(result.discountTotal());
+                return new ApplyCouponResponse(couponCode, true, result.discountTotal(), net, "Promotion applied");
+            }
+            return retailPricing.applyCoupon(new ApplyCouponRequest(couponCode, billAmount));
+        });
     }
 
     private static BigDecimal extractTaxRate(TaxResult tax) {

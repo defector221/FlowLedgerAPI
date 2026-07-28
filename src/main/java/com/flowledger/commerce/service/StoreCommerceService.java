@@ -7,8 +7,6 @@ import com.flowledger.commerce.events.StoreCommerceEnabledEvent;
 import com.flowledger.commerce.mapper.CommerceMapper;
 import com.flowledger.commerce.onboarding.MerchantOnboardingService;
 import com.flowledger.commerce.marketplace.MarketplaceSyncService;
-import com.flowledger.commerce.marketplace.domain.SyncMode;
-import com.flowledger.commerce.publisher.CommercePublishingService;
 import com.flowledger.commerce.store.entity.StoreCommerceProfile;
 import com.flowledger.commerce.store.repository.StoreCommerceProfileRepository;
 import com.flowledger.common.exception.ResourceNotFoundException;
@@ -26,7 +24,6 @@ public class StoreCommerceService {
     private final CommerceModuleGuard guard;
     private final StoreCommerceProfileRepository profiles;
     private final RetailStoreRepository retailStores;
-    private final CommercePublishingService publishingService;
     private final MarketplaceSyncService marketplaceSync;
     private final MerchantOnboardingService onboardingService;
     private final CommerceAuditService audit;
@@ -37,7 +34,6 @@ public class StoreCommerceService {
             CommerceModuleGuard guard,
             StoreCommerceProfileRepository profiles,
             RetailStoreRepository retailStores,
-            CommercePublishingService publishingService,
             MarketplaceSyncService marketplaceSync,
             MerchantOnboardingService onboardingService,
             CommerceAuditService audit,
@@ -46,7 +42,6 @@ public class StoreCommerceService {
         this.guard = guard;
         this.profiles = profiles;
         this.retailStores = retailStores;
-        this.publishingService = publishingService;
         this.marketplaceSync = marketplaceSync;
         this.onboardingService = onboardingService;
         this.audit = audit;
@@ -61,7 +56,7 @@ public class StoreCommerceService {
         return mapper.toStoreCommerceResponse(getOrCreateProfile(storeId, orgId));
     }
 
-    public CommerceDtos.StoreCommerceResponse update(UUID storeId, CommerceDtos.UpdateStoreCommerceRequest request) {
+    public CommerceDtos.StoreCommerceUpdateResponse update(UUID storeId, CommerceDtos.UpdateStoreCommerceRequest request) {
         UUID orgId = guard.ensureEnabled();
         UUID actorId = TenantContext.userId().orElse(null);
         assertStoreOwnership(storeId, orgId);
@@ -73,35 +68,36 @@ public class StoreCommerceService {
         if (profile.isCommerceEnabled() && !wasEnabled) {
             events.publish(new StoreCommerceEnabledEvent(this, orgId, actorId, storeId));
         }
+        UUID syncJobId = null;
         if (profile.isCommerceEnabled()
                 && profile.isPublishedToMarketplace()
                 && (!wasPublished || publishFlagsChanged(request))) {
-            marketplaceSync.syncStore(storeId, SyncMode.FULL, actorId);
+            syncJobId = marketplaceSync.enqueueStorePublish(orgId, storeId);
         }
-        onboardingService.maybeAutoAdvance(orgId, onboardingService.required(orgId));
+        onboardingService.ensureOnboarding(orgId);
         audit.log(orgId, "StoreCommerceProfile", profile.getId(), "UPDATE", null, null);
-        return mapper.toStoreCommerceResponse(profile);
+        return new CommerceDtos.StoreCommerceUpdateResponse(mapper.toStoreCommerceResponse(profile), syncJobId);
     }
 
     public CommerceDtos.PublishResultResponse publish(UUID storeId) {
         UUID orgId = guard.ensureEnabled();
-        UUID actorId = TenantContext.userId().orElse(null);
         assertStoreOwnership(storeId, orgId);
         StoreCommerceProfile profile = getOrCreateProfile(storeId, orgId);
         profile.publishStoreToMarketplace();
         profiles.save(profile);
-        int count = publishingService.publishStore(profile, actorId);
-        return new CommerceDtos.PublishResultResponse(storeId, count, true);
+        onboardingService.ensureOnboarding(orgId);
+        UUID jobId = marketplaceSync.enqueueStorePublish(orgId, storeId);
+        audit.log(orgId, "StoreCommerceProfile", profile.getId(), "PUBLISH_QUEUED", null, jobId.toString());
+        return new CommerceDtos.PublishResultResponse(storeId, null, true, jobId, "QUEUED");
     }
 
     public CommerceDtos.PublishResultResponse unpublish(UUID storeId) {
         UUID orgId = guard.ensureEnabled();
-        UUID actorId = TenantContext.userId().orElse(null);
         assertStoreOwnership(storeId, orgId);
         StoreCommerceProfile profile = getOrCreateProfile(storeId, orgId);
-        publishingService.unpublishStore(profile, actorId);
-        profiles.save(profile);
-        return new CommerceDtos.PublishResultResponse(storeId, 0, false);
+        UUID jobId = marketplaceSync.enqueueStoreUnpublish(orgId, storeId);
+        audit.log(orgId, "StoreCommerceProfile", profile.getId(), "UNPUBLISH_QUEUED", null, jobId.toString());
+        return new CommerceDtos.PublishResultResponse(storeId, null, false, jobId, "QUEUED");
     }
 
     private StoreCommerceProfile getOrCreateProfile(UUID storeId, UUID orgId) {

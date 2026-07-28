@@ -1,9 +1,11 @@
 package com.flowledger.commerce.marketplace.search;
 
+import com.flowledger.commerce.config.CommerceProperties;
 import com.flowledger.commerce.marketplace.domain.MarketplaceProduct;
 import com.flowledger.commerce.marketplace.domain.MarketplaceStore;
 import com.flowledger.commerce.marketplace.search.MarketplaceOpenSearchIndexService.MarketplaceSearchQuery;
 import com.flowledger.commerce.marketplace.search.MarketplaceOpenSearchIndexService.MarketplaceSearchResult;
+import com.flowledger.search.exception.SearchUnavailableException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,6 +17,7 @@ import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
@@ -23,11 +26,15 @@ import org.springframework.stereotype.Component;
 public class OpenSearchMarketplaceSearchBackend implements MarketplaceSearchBackend {
     private final MarketplaceOpenSearchIndexService searchIndex;
     private final PostgresMarketplaceSearchBackend fallback;
+    private final CommerceProperties properties;
 
     public OpenSearchMarketplaceSearchBackend(
-            MarketplaceOpenSearchIndexService searchIndex, PostgresMarketplaceSearchBackend fallback) {
+            MarketplaceOpenSearchIndexService searchIndex,
+            PostgresMarketplaceSearchBackend fallback,
+            CommerceProperties properties) {
         this.searchIndex = searchIndex;
         this.fallback = fallback;
+        this.properties = properties;
     }
 
     @Override
@@ -35,31 +42,50 @@ public class OpenSearchMarketplaceSearchBackend implements MarketplaceSearchBack
         if (!searchIndex.isAvailable()) {
             return fallback.searchStores(criteria, pageable);
         }
-        MarketplaceSearchQuery query = new MarketplaceSearchQuery(
-                MarketplaceSearchDocument.TYPE_STORE,
-                criteria.q(),
-                criteria.city(),
-                criteria.pincode(),
-                null,
-                null,
-                null,
-                null,
-                null,
-                toDouble(criteria.lat()),
-                toDouble(criteria.lng()),
-                toDouble(criteria.radiusKm()),
-                (int) pageable.getOffset(),
-                pageable.getPageSize());
-        MarketplaceSearchResult result = searchIndex.search(query);
-        List<MarketplaceStore> stores = new ArrayList<>();
-        for (MarketplaceSearchDocument doc : result.documents()) {
-            if (!"PUBLIC".equals(doc.getVisibility())) {
-                continue;
+        try {
+            MarketplaceSearchQuery query = new MarketplaceSearchQuery(
+                    MarketplaceSearchDocument.TYPE_STORE,
+                    criteria.q(),
+                    criteria.city(),
+                    criteria.pincode(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    toDouble(criteria.lat()),
+                    toDouble(criteria.lng()),
+                    toDouble(criteria.radiusKm()),
+                    (int) pageable.getOffset(),
+                    pageable.getPageSize());
+            MarketplaceSearchResult result = searchIndex.search(query);
+            List<MarketplaceStore> stores = new ArrayList<>();
+            for (MarketplaceSearchDocument doc : result.documents()) {
+                if (!isVisibleInSearch(doc.getVisibility())) {
+                    continue;
+                }
+                stores.add(toStore(doc));
             }
-            stores.add(toStore(doc));
+            if (stores.isEmpty() && hasAnyPublishedStores(criteria)) {
+                return fallback.searchStores(criteria, pageable);
+            }
+            stores.sort(Comparator.comparing(s -> s.distanceKm() != null ? s.distanceKm() : Double.MAX_VALUE));
+            return new PageImpl<>(stores, pageable, result.total());
+        } catch (SearchUnavailableException ex) {
+            return fallback.searchStores(criteria, pageable);
         }
-        stores.sort(Comparator.comparing(s -> s.distanceKm() != null ? s.distanceKm() : Double.MAX_VALUE));
-        return new PageImpl<>(stores, pageable, result.total());
+    }
+
+    private boolean hasAnyPublishedStores(StoreSearchCriteria criteria) {
+        Page<MarketplaceStore> pg = fallback.searchStores(criteria, PageRequest.of(0, 1));
+        return !pg.isEmpty();
+    }
+
+    private boolean isVisibleInSearch(String visibility) {
+        if (!properties.getMarketplace().getSearch().isPublicVisibilityRequired()) {
+            return true;
+        }
+        return "PUBLIC".equals(visibility);
     }
 
     @Override
@@ -67,25 +93,37 @@ public class OpenSearchMarketplaceSearchBackend implements MarketplaceSearchBack
         if (!searchIndex.isAvailable()) {
             return fallback.searchProducts(criteria, pageable);
         }
-        MarketplaceSearchQuery query = new MarketplaceSearchQuery(
-                MarketplaceSearchDocument.TYPE_PRODUCT,
-                criteria.q(),
-                null,
-                null,
-                criteria.barcode(),
-                criteria.sku(),
-                criteria.brand(),
-                criteria.categoryId() != null ? criteria.categoryId().toString() : null,
-                criteria.storeId() != null ? criteria.storeId().toString() : null,
-                toDouble(criteria.nearLat()),
-                toDouble(criteria.nearLng()),
-                toDouble(criteria.radiusKm()),
-                (int) pageable.getOffset(),
-                pageable.getPageSize());
-        MarketplaceSearchResult result = searchIndex.search(query);
-        List<MarketplaceProduct> products =
-                result.documents().stream().map(this::toProduct).toList();
-        return new PageImpl<>(products, pageable, result.total());
+        try {
+            MarketplaceSearchQuery query = new MarketplaceSearchQuery(
+                    MarketplaceSearchDocument.TYPE_PRODUCT,
+                    criteria.q(),
+                    null,
+                    null,
+                    criteria.barcode(),
+                    criteria.sku(),
+                    criteria.brand(),
+                    criteria.categoryId() != null ? criteria.categoryId().toString() : null,
+                    criteria.storeId() != null ? criteria.storeId().toString() : null,
+                    toDouble(criteria.nearLat()),
+                    toDouble(criteria.nearLng()),
+                    toDouble(criteria.radiusKm()),
+                    (int) pageable.getOffset(),
+                    pageable.getPageSize());
+            MarketplaceSearchResult result = searchIndex.search(query);
+            List<MarketplaceProduct> products =
+                    result.documents().stream().map(this::toProduct).toList();
+            if (products.isEmpty() && hasAnyPublishedProducts(criteria)) {
+                return fallback.searchProducts(criteria, pageable);
+            }
+            return new PageImpl<>(products, pageable, result.total());
+        } catch (SearchUnavailableException ex) {
+            return fallback.searchProducts(criteria, pageable);
+        }
+    }
+
+    private boolean hasAnyPublishedProducts(ProductSearchCriteria criteria) {
+        Page<MarketplaceProduct> pg = fallback.searchProducts(criteria, PageRequest.of(0, 1));
+        return !pg.isEmpty();
     }
 
     @Override

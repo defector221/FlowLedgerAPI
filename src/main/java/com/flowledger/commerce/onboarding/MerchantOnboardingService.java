@@ -19,6 +19,7 @@ import com.flowledger.common.exception.ResourceNotFoundException;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.platform.domain.ModuleCodes;
 import com.flowledger.platform.event.DomainEventPublisher;
+import com.flowledger.platform.service.FeatureService;
 import com.flowledger.platform.service.OrganizationModuleService;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,7 @@ public class MerchantOnboardingService {
     private final StoreCommerceProfileRepository storeProfiles;
     private final OrganizationRepository organizations;
     private final OrganizationModuleService moduleService;
+    private final FeatureService featureService;
     private final DomainEventPublisher events;
 
     public MerchantOnboardingService(
@@ -42,6 +44,7 @@ public class MerchantOnboardingService {
             StoreCommerceProfileRepository storeProfiles,
             OrganizationRepository organizations,
             OrganizationModuleService moduleService,
+            FeatureService featureService,
             DomainEventPublisher events) {
         this.onboardingRepository = onboardingRepository;
         this.integrationProfiles = integrationProfiles;
@@ -49,6 +52,7 @@ public class MerchantOnboardingService {
         this.storeProfiles = storeProfiles;
         this.organizations = organizations;
         this.moduleService = moduleService;
+        this.featureService = featureService;
         this.events = events;
     }
 
@@ -143,5 +147,44 @@ public class MerchantOnboardingService {
         return onboardingRepository
                 .findByOrganizationId(organizationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Merchant onboarding not found"));
+    }
+
+    /**
+     * Ensures merchant onboarding exists for orgs provisioned via Commerce module backfill (native FlowLedger).
+     * Creates integration + capability profiles when missing and advances native merchants to LIVE.
+     */
+    public MerchantOnboarding ensureOnboarding(UUID organizationId) {
+        MerchantOnboarding onboarding = onboardingRepository
+                .findByOrganizationId(organizationId)
+                .orElseGet(() -> {
+                    MerchantOnboarding created = new MerchantOnboarding();
+                    created.setOrganizationId(organizationId);
+                    return onboardingRepository.save(created);
+                });
+
+        integrationProfiles.findByOrganizationId(organizationId).orElseGet(() -> {
+            MerchantIntegrationProfile integration = new MerchantIntegrationProfile();
+            integration.setOrganizationId(organizationId);
+            integration.setStatus("ACTIVE");
+            integration.setHealthStatus("HEALTHY");
+            return integrationProfiles.save(integration);
+        });
+
+        capabilityProfiles.findByOrganizationId(organizationId).orElseGet(() -> {
+            MerchantCapabilityProfile capabilities = new MerchantCapabilityProfile();
+            capabilities.setOrganizationId(organizationId);
+            return capabilityProfiles.save(capabilities);
+        });
+
+        maybeAutoAdvance(organizationId, onboarding);
+
+        MerchantOnboarding current = onboardingRepository
+                .findByOrganizationId(organizationId)
+                .orElse(onboarding);
+        if (!current.isLive() && featureService.hasModule(organizationId, ModuleCodes.COMMERCE)) {
+            current.advanceTo(MerchantOnboardingState.LIVE);
+            current = onboardingRepository.save(current);
+        }
+        return current;
     }
 }

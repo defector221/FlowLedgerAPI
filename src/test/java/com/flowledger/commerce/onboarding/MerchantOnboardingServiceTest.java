@@ -22,6 +22,7 @@ import com.flowledger.organization.entity.Organization;
 import com.flowledger.organization.repository.OrganizationRepository;
 import com.flowledger.platform.domain.ModuleCodes;
 import com.flowledger.platform.event.DomainEventPublisher;
+import com.flowledger.platform.service.FeatureService;
 import com.flowledger.platform.service.OrganizationModuleService;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,6 +48,8 @@ class MerchantOnboardingServiceTest {
     @Mock
     private OrganizationModuleService moduleService;
     @Mock
+    private FeatureService featureService;
+    @Mock
     private DomainEventPublisher events;
 
     private MerchantOnboardingService service;
@@ -61,6 +64,7 @@ class MerchantOnboardingServiceTest {
                 storeProfiles,
                 organizations,
                 moduleService,
+                featureService,
                 events);
         orgId = UUID.randomUUID();
     }

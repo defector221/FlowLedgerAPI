@@ -11,8 +11,8 @@ import com.flowledger.commerce.integration.entity.MerchantIntegrationProfile;
 import com.flowledger.commerce.integration.repository.MerchantIntegrationProfileRepository;
 import com.flowledger.commerce.mapper.CommerceMapper;
 import com.flowledger.commerce.onboarding.MerchantOnboardingService;
+import com.flowledger.commerce.marketplace.MarketplaceSyncService;
 import com.flowledger.commerce.onboarding.entity.MerchantOnboarding;
-import com.flowledger.commerce.onboarding.repository.MerchantOnboardingRepository;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.platform.event.DomainEventPublisher;
 import java.util.UUID;
@@ -23,57 +23,42 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class MerchantProfileService {
     private final CommerceModuleGuard guard;
-    private final MerchantOnboardingRepository onboardingRepository;
     private final MerchantIntegrationProfileRepository integrationProfiles;
     private final MerchantCapabilityProfileRepository capabilityProfiles;
     private final MerchantOnboardingService onboardingService;
+    private final MarketplaceSyncService marketplaceSync;
     private final CommerceAuditService audit;
     private final CommerceMapper mapper;
     private final DomainEventPublisher events;
 
     public MerchantProfileService(
             CommerceModuleGuard guard,
-            MerchantOnboardingRepository onboardingRepository,
             MerchantIntegrationProfileRepository integrationProfiles,
             MerchantCapabilityProfileRepository capabilityProfiles,
             MerchantOnboardingService onboardingService,
+            MarketplaceSyncService marketplaceSync,
             CommerceAuditService audit,
             CommerceMapper mapper,
             DomainEventPublisher events) {
         this.guard = guard;
-        this.onboardingRepository = onboardingRepository;
         this.integrationProfiles = integrationProfiles;
         this.capabilityProfiles = capabilityProfiles;
         this.onboardingService = onboardingService;
+        this.marketplaceSync = marketplaceSync;
         this.audit = audit;
         this.mapper = mapper;
         this.events = events;
     }
 
-    @Transactional(readOnly = true)
     public CommerceDtos.MerchantProfileResponse getProfile() {
         UUID orgId = guard.ensureEnabled();
-        MerchantOnboarding onboarding = onboardingRepository
-                .findByOrganizationId(orgId)
-                .orElseGet(() -> {
-                    MerchantOnboarding created = new MerchantOnboarding();
-                    created.setOrganizationId(orgId);
-                    return onboardingRepository.save(created);
-                });
+        MerchantOnboarding onboarding = onboardingService.ensureOnboarding(orgId);
         MerchantIntegrationProfile integration = integrationProfiles
                 .findByOrganizationId(orgId)
-                .orElseGet(() -> {
-                    MerchantIntegrationProfile created = new MerchantIntegrationProfile();
-                    created.setOrganizationId(orgId);
-                    return integrationProfiles.save(created);
-                });
+                .orElseThrow();
         MerchantCapabilityProfile capabilities = capabilityProfiles
                 .findByOrganizationId(orgId)
-                .orElseGet(() -> {
-                    MerchantCapabilityProfile created = new MerchantCapabilityProfile();
-                    created.setOrganizationId(orgId);
-                    return capabilityProfiles.save(created);
-                });
+                .orElseThrow();
         return new CommerceDtos.MerchantProfileResponse(
                 orgId,
                 onboarding.getState(),
@@ -96,13 +81,13 @@ public class MerchantProfileService {
         if (request.status() != null) profile.setStatus(request.status());
         if (request.configurationJson() != null) profile.setConfigurationJson(request.configurationJson());
         integrationProfiles.save(profile);
-        onboardingService.maybeAutoAdvance(orgId, onboardingService.required(orgId));
+        onboardingService.ensureOnboarding(orgId);
         audit.log(orgId, "MerchantIntegrationProfile", profile.getId(), "UPDATE", null, request.configurationJson());
         events.publish(new MerchantIntegrationConfiguredEvent(this, orgId, actorId, profile.getId()));
         return mapper.toIntegrationResponse(profile);
     }
 
-    public CommerceDtos.CapabilityProfileResponse updateCapabilities(CommerceDtos.UpdateCapabilitiesRequest request) {
+    public CommerceDtos.CapabilityUpdateResponse updateCapabilities(CommerceDtos.UpdateCapabilitiesRequest request) {
         UUID orgId = guard.ensureEnabled();
         UUID actorId = TenantContext.userId().orElse(null);
         MerchantCapabilityProfile profile = capabilityProfiles
@@ -129,9 +114,10 @@ public class MerchantProfileService {
         if (request.supportsReturns() != null) profile.setSupportsReturns(request.supportsReturns());
         if (request.supportsGiftCards() != null) profile.setSupportsGiftCards(request.supportsGiftCards());
         capabilityProfiles.save(profile);
-        onboardingService.maybeAutoAdvance(orgId, onboardingService.required(orgId));
+        onboardingService.ensureOnboarding(orgId);
+        UUID syncJobId = marketplaceSync.enqueueCapabilitiesSync(orgId);
         audit.log(orgId, "MerchantCapabilityProfile", profile.getId(), "UPDATE", null, null);
         events.publish(new MerchantCapabilityChangedEvent(this, orgId, actorId, profile.getId()));
-        return mapper.toCapabilityResponse(profile);
+        return new CommerceDtos.CapabilityUpdateResponse(mapper.toCapabilityResponse(profile), syncJobId);
     }
 }

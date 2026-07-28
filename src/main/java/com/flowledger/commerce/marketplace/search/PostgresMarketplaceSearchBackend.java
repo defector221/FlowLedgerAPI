@@ -1,5 +1,6 @@
 package com.flowledger.commerce.marketplace.search;
 
+import com.flowledger.commerce.config.CommerceProperties;
 import com.flowledger.commerce.marketplace.domain.MarketplaceProduct;
 import com.flowledger.commerce.marketplace.domain.MarketplaceStore;
 import com.flowledger.commerce.marketplace.mapper.MarketplaceIndexMapper;
@@ -27,23 +28,26 @@ public class PostgresMarketplaceSearchBackend implements MarketplaceSearchBacken
     private final MarketplaceProductIndexRepository productIndexRepository;
     private final MarketplaceInventoryIndexRepository inventoryIndexRepository;
     private final MarketplaceIndexMapper mapper;
+    private final CommerceProperties properties;
 
     public PostgresMarketplaceSearchBackend(
             MarketplaceStoreIndexRepository storeIndexRepository,
             MarketplaceProductIndexRepository productIndexRepository,
             MarketplaceInventoryIndexRepository inventoryIndexRepository,
-            MarketplaceIndexMapper mapper) {
+            MarketplaceIndexMapper mapper,
+            CommerceProperties properties) {
         this.storeIndexRepository = storeIndexRepository;
         this.productIndexRepository = productIndexRepository;
         this.inventoryIndexRepository = inventoryIndexRepository;
         this.mapper = mapper;
+        this.properties = properties;
     }
 
     @Override
     public Page<MarketplaceStore> searchStores(StoreSearchCriteria criteria, Pageable pageable) {
         List<MarketplaceStoreIndex> all = storeIndexRepository.findAll().stream()
                 .filter(MarketplaceStoreIndex::isPublished)
-                .filter(s -> "PUBLIC".equals(s.getVisibility()))
+                .filter(this::isVisibleInSearch)
                 .filter(s -> matchesStore(criteria, s))
                 .toList();
 
@@ -103,6 +107,13 @@ public class PostgresMarketplaceSearchBackend implements MarketplaceSearchBacken
         return stores;
     }
 
+    private boolean isVisibleInSearch(MarketplaceStoreIndex store) {
+        if (!properties.getMarketplace().getSearch().isPublicVisibilityRequired()) {
+            return true;
+        }
+        return "PUBLIC".equals(store.getVisibility());
+    }
+
     private static boolean matchesStore(StoreSearchCriteria c, MarketplaceStoreIndex s) {
         if (c.city() != null && !c.city().equalsIgnoreCase(s.getCity())) {
             return false;
@@ -138,10 +149,19 @@ public class PostgresMarketplaceSearchBackend implements MarketplaceSearchBacken
         if (c.categoryId() != null && !c.categoryId().equals(p.getCategoryId())) {
             return false;
         }
-        if (c.q() != null && !contains(p.getSearchText(), c.q()) && !contains(p.getName(), c.q())) {
+        if (c.q() != null && !matchesProductText(c.q(), p)) {
             return false;
         }
         return true;
+    }
+
+    private static boolean matchesProductText(String q, MarketplaceProductIndex p) {
+        return contains(p.getSearchText(), q)
+                || contains(p.getName(), q)
+                || contains(p.getBrand(), q)
+                || contains(p.getCategoryName(), q)
+                || contains(p.getSku(), q)
+                || contains(p.getBarcode(), q);
     }
 
     private static boolean contains(String haystack, String needle) {

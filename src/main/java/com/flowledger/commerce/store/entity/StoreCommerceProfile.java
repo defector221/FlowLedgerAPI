@@ -68,6 +68,7 @@ public class StoreCommerceProfile extends AuditedEntity {
 
     public void enableCommerce() {
         this.commerceEnabled = true;
+        this.acceptOnlineOrders = true;
         if (status == StoreCommerceStatus.DRAFT) {
             status = StoreCommerceStatus.ACTIVE;
         }
@@ -79,6 +80,8 @@ public class StoreCommerceProfile extends AuditedEntity {
 
     public void publishStoreToMarketplace() {
         this.publishedToMarketplace = true;
+        this.visibility = MarketplaceVisibility.PUBLIC;
+        this.acceptOnlineOrders = true;
     }
 
     public void unpublishStoreFromMarketplace() {
