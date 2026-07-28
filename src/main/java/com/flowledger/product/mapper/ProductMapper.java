@@ -30,6 +30,7 @@ public interface ProductMapper {
     @Mapping(target = "taxType", ignore = true)
     @Mapping(target = "supplierCount", ignore = true)
     @Mapping(target = "preferredSupplierName", ignore = true)
+    @Mapping(target = "imageUrl", ignore = true)
     Response toResponse(Product e);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)

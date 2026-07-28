@@ -9,14 +9,19 @@ import com.flowledger.demo.generator.LoyaltyPromotionGenerator;
 import com.flowledger.demo.generator.OrgBootstrapGenerator;
 import com.flowledger.demo.generator.PartyGenerator;
 import com.flowledger.demo.generator.PosSalesHistoryGenerator;
+import com.flowledger.demo.generator.ProductImageSeeder;
 import com.flowledger.demo.generator.PurchaseHistoryGenerator;
+import com.flowledger.demo.generator.SupplierCatalogGenerator;
 import com.flowledger.demo.generator.TransferScenarioGenerator;
 import com.flowledger.demo.scenario.DemoBlueprint;
 import com.flowledger.demo.scenario.DemoScenario;
 import com.flowledger.demo.scenario.DemoScenarioRegistry;
 import com.flowledger.demo.util.ProgressLogger;
 import com.flowledger.demo.verify.ScenarioVerifier;
+import com.flowledger.demo.job.DemoSeedProgressSink;
 import com.flowledger.organization.repository.OrganizationRepository;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -34,7 +39,9 @@ public class DemoDataOrchestrator {
     private final OrgBootstrapGenerator orgBootstrap;
     private final LocationGenerator locations;
     private final CatalogGenerator catalog;
+    private final ProductImageSeeder productImages;
     private final PartyGenerator parties;
+    private final SupplierCatalogGenerator supplierCatalog;
     private final InventoryGenerator inventory;
     private final PurchaseHistoryGenerator purchases;
     private final PosSalesHistoryGenerator sales;
@@ -49,7 +56,9 @@ public class DemoDataOrchestrator {
             OrgBootstrapGenerator orgBootstrap,
             LocationGenerator locations,
             CatalogGenerator catalog,
+            ProductImageSeeder productImages,
             PartyGenerator parties,
+            SupplierCatalogGenerator supplierCatalog,
             InventoryGenerator inventory,
             PurchaseHistoryGenerator purchases,
             PosSalesHistoryGenerator sales,
@@ -62,7 +71,9 @@ public class DemoDataOrchestrator {
         this.orgBootstrap = orgBootstrap;
         this.locations = locations;
         this.catalog = catalog;
+        this.productImages = productImages;
         this.parties = parties;
+        this.supplierCatalog = supplierCatalog;
         this.inventory = inventory;
         this.purchases = purchases;
         this.sales = sales;
@@ -71,7 +82,20 @@ public class DemoDataOrchestrator {
         this.verifier = verifier;
     }
 
+    /**
+     * Runs the seed pipeline. Each generator commits in its own transaction. On failure the job
+     * service purges any leftover organization — do not wrap this in one mega-TX (optional steps
+     * that catch exceptions would mark a shared TX rollback-only).
+     */
     public DemoSeedResult seed(DemoSeedRequest request) {
+        return doSeed(request, null);
+    }
+
+    public DemoSeedResult seed(DemoSeedRequest request, DemoSeedProgressSink sink) {
+        return doSeed(request, sink);
+    }
+
+    private DemoSeedResult doSeed(DemoSeedRequest request, DemoSeedProgressSink sink) {
         if (!props.isEnabled()) {
             throw new DemoDisabledException();
         }
@@ -108,7 +132,7 @@ public class DemoDataOrchestrator {
         String mode = request != null && request.mode() != null ? request.mode().toUpperCase() : "SKIP";
         var existing = organizations.findByNameIgnoreCase(orgName);
         if (existing.isPresent() && "SKIP".equals(mode)) {
-            return new DemoSeedResult(
+            DemoSeedResult skipped = new DemoSeedResult(
                     scenario.command(),
                     "SKIPPED",
                     existing.get().getId(),
@@ -119,13 +143,42 @@ public class DemoDataOrchestrator {
                     0,
                     Map.of(),
                     Map.of("organization_exists", true));
+            if (sink != null) {
+                sink.onStage("Skipped — organization already exists");
+            }
+            return skipped;
         }
-        if (existing.isPresent() && "RESET".equals(mode) && !props.isAllowReset()) {
-            throw new IllegalStateException("RESET refused — set flowledger.demo.allow-reset=true");
+        if (existing.isPresent() && "RESET".equals(mode)) {
+            if (!props.isAllowReset()) {
+                throw new IllegalStateException(
+                        "RESET refused — set flowledger.demo.allow-reset=true, or use a new organizationName");
+            }
+            // Destructive wipe is not implemented; seed a fresh sibling tenant instead.
+            String resetName = orgName + " · reset "
+                    + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            orgName = resetName;
+            blueprint = new DemoBlueprint(
+                    blueprint.scenario(),
+                    orgName,
+                    blueprint.branchCount(),
+                    blueprint.storeCount(),
+                    blueprint.warehousesPerBranch(),
+                    blueprint.terminalsPerStore(),
+                    blueprint.productCount(),
+                    blueprint.customerCount(),
+                    blueprint.supplierCount(),
+                    blueprint.salesCount(),
+                    blueprint.purchaseCount(),
+                    blueprint.catalogStrategy(),
+                    blueprint.workflow(),
+                    blueprint.estimatedMinutes());
+            if (sink != null) {
+                sink.onStage("Reset → seeding fresh copy: " + orgName);
+            }
         }
 
         long start = System.currentTimeMillis();
-        ProgressLogger progress = new ProgressLogger(log, scenario.command());
+        ProgressLogger progress = new ProgressLogger(log, scenario.command(), sink, 12);
         DemoSeedContext ctx = new DemoSeedContext();
         ctx.setScenario(scenario);
         ctx.setBlueprint(blueprint);
@@ -135,13 +188,18 @@ public class DemoDataOrchestrator {
             orgBootstrap.generate(ctx, progress);
             locations.generate(ctx, progress);
             catalog.generate(ctx, progress);
+            productImages.generate(ctx, progress);
             parties.generate(ctx, progress);
+            supplierCatalog.generate(ctx, progress);
             inventory.generate(ctx, progress);
             purchases.generate(ctx, progress);
             sales.generate(ctx, progress);
             loyalty.generate(ctx, progress);
             transfers.generate(ctx, progress);
             verifier.verify(ctx, progress);
+        } catch (RuntimeException ex) {
+            log.error("Demo seed failed for scenario {}", scenario.command(), ex);
+            throw ex;
         } finally {
             TenantContext.clear();
         }
@@ -154,6 +212,9 @@ public class DemoDataOrchestrator {
         counts.put("products", ctx.getProductIds().size());
         counts.put("customers", ctx.getCustomerIds().size());
         counts.put("suppliers", ctx.getSupplierIds().size());
+        counts.put("supplierCatalogLinks", ctx.getMeta().getOrDefault("supplierCatalogLinks", 0));
+        counts.put("imagesUploaded", ctx.getMeta().getOrDefault("imagesUploaded", 0));
+        counts.put("imagesReused", ctx.getMeta().getOrDefault("imagesReused", 0));
 
         return new DemoSeedResult(
                 scenario.command(),

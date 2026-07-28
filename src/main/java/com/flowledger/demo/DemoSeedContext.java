@@ -22,6 +22,8 @@ public class DemoSeedContext {
     private final List<UUID> supplierIds = new ArrayList<>();
     private final List<UUID> unitIds = new ArrayList<>();
     private final List<UUID> taxRateIds = new ArrayList<>();
+    /** storeId → linked store warehouseId */
+    private final Map<UUID, UUID> storeWarehouseIds = new HashMap<>();
     private final Map<String, Object> meta = new HashMap<>();
     private final Map<String, Boolean> checks = new HashMap<>();
 
@@ -91,6 +93,10 @@ public class DemoSeedContext {
 
     public List<UUID> getTaxRateIds() {
         return taxRateIds;
+    }
+
+    public Map<UUID, UUID> getStoreWarehouseIds() {
+        return storeWarehouseIds;
     }
 
     public Map<String, Object> getMeta() {

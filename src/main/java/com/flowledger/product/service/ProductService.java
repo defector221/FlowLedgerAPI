@@ -10,16 +10,19 @@ import com.flowledger.product.entity.Product;
 import com.flowledger.product.entity.Unit;
 import com.flowledger.product.mapper.ProductMapper;
 import com.flowledger.product.repository.CategoryRepository;
+import com.flowledger.product.repository.ProductImageRepository;
 import com.flowledger.product.repository.ProductRepository;
 import com.flowledger.product.repository.SupplierCatalogItemRepository;
 import com.flowledger.product.repository.TaxRateRepository;
 import com.flowledger.product.repository.UnitRepository;
 import com.flowledger.search.event.SearchIndexEventPublisher;
 import com.flowledger.search.model.SearchEntityType;
+import com.flowledger.storage.StorageService;
 import com.flowledger.supplier.repository.SupplierRepository;
 import com.flowledger.warehouse.entity.Warehouse;
 import com.flowledger.warehouse.repository.WarehouseRepository;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -45,6 +48,8 @@ public class ProductService extends OrganizationScopedService {
     private final SupplierCatalogService supplierCatalog;
     private final SupplierCatalogItemRepository catalogItems;
     private final SupplierRepository suppliers;
+    private final ProductImageRepository productImages;
+    private final StorageService storage;
 
     public ProductService(
             ProductRepository repo,
@@ -58,7 +63,9 @@ public class ProductService extends OrganizationScopedService {
             SearchIndexEventPublisher searchEvents,
             SupplierCatalogService supplierCatalog,
             SupplierCatalogItemRepository catalogItems,
-            SupplierRepository suppliers) {
+            SupplierRepository suppliers,
+            ProductImageRepository productImages,
+            StorageService storage) {
         this.repo = repo;
         this.mapper = mapper;
         this.categories = categories;
@@ -71,6 +78,8 @@ public class ProductService extends OrganizationScopedService {
         this.supplierCatalog = supplierCatalog;
         this.catalogItems = catalogItems;
         this.suppliers = suppliers;
+        this.productImages = productImages;
+        this.storage = storage;
     }
 
     public Response create(Create dto) {
@@ -308,6 +317,20 @@ public class ProductService extends OrganizationScopedService {
                                 org, product.getId())
                         .flatMap(item -> suppliers.findByIdAndOrganizationId(item.getSupplierId(), org))
                         .map(s -> s.getSupplierName())
-                        .orElse(null));
+                        .orElse(null),
+                primaryImageUrl(product.getId()));
+    }
+
+    private String primaryImageUrl(UUID productId) {
+        return productImages
+                .findFirstByProductIdAndPrimaryTrueOrderBySortOrderAsc(productId)
+                .or(() -> productImages.findByOrganizationIdAndProductIdOrderBySortOrderAsc(orgId(), productId)
+                        .stream()
+                        .findFirst())
+                .map(img -> {
+                    String key = img.getThumbnailKey() != null ? img.getThumbnailKey() : img.getObjectKey();
+                    return storage.getPresignedUrl(key, Duration.ofHours(1));
+                })
+                .orElse(null);
     }
 }

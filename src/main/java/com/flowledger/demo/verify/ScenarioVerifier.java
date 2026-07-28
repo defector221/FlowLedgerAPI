@@ -31,6 +31,11 @@ public class ScenarioVerifier {
         ctx.check("products", !ctx.getProductIds().isEmpty());
         ctx.check("customers", !ctx.getCustomerIds().isEmpty());
         ctx.check("suppliers", !ctx.getSupplierIds().isEmpty());
+        Object uploaded = ctx.getMeta().get("imagesUploaded");
+        Object reused = ctx.getMeta().get("imagesReused");
+        int imgUp = uploaded instanceof Number n ? n.intValue() : 0;
+        int imgRe = reused instanceof Number n ? n.intValue() : 0;
+        ctx.check("product_images", imgUp + imgRe > 0 || ctx.getProductIds().isEmpty());
 
         if (bp.workflow().batchExpiryHeavy()) {
             Object batches = ctx.getMeta().get("batchOpeningPostings");

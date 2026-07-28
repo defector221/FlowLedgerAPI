@@ -3,6 +3,7 @@ package com.flowledger.demo.generator;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.demo.DemoSeedContext;
 import com.flowledger.demo.scenario.DemoBlueprint;
+import com.flowledger.demo.util.DemoIsolatedWork;
 import com.flowledger.demo.util.ProgressLogger;
 import com.flowledger.product.repository.ProductRepository;
 import com.flowledger.purchase.dto.PurchaseDtos.InvoiceRequest;
@@ -17,7 +18,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class PurchaseHistoryGenerator {
@@ -25,13 +25,16 @@ public class PurchaseHistoryGenerator {
 
     private final PurchaseInvoiceService purchaseInvoiceService;
     private final ProductRepository products;
+    private final DemoIsolatedWork isolated;
 
-    public PurchaseHistoryGenerator(PurchaseInvoiceService purchaseInvoiceService, ProductRepository products) {
+    public PurchaseHistoryGenerator(
+            PurchaseInvoiceService purchaseInvoiceService, ProductRepository products, DemoIsolatedWork isolated) {
         this.purchaseInvoiceService = purchaseInvoiceService;
         this.products = products;
+        this.isolated = isolated;
     }
 
-    @Transactional
+    /** Each invoice runs in REQUIRES_NEW — do not wrap this method in @Transactional. */
     public void generate(DemoSeedContext ctx, ProgressLogger progress) {
         DemoBlueprint blueprint = ctx.getBlueprint();
         TenantContext.set(ctx.getOrganizationId(), ctx.getAdminUserId());
@@ -46,35 +49,37 @@ public class PurchaseHistoryGenerator {
         int created = 0;
         int failures = 0;
         for (int i = 1; i <= target; i++) {
+            final int index = i;
             try {
-                UUID supplierId = ctx.getSupplierIds().get(ThreadLocalRandom.current().nextInt(ctx.getSupplierIds().size()));
-                UUID warehouseId =
-                        ctx.getWarehouseIds().get(ThreadLocalRandom.current().nextInt(ctx.getWarehouseIds().size()));
-                LocalDate invoiceDate = LocalDate.now().minusDays(ThreadLocalRandom.current().nextInt(365));
-                int lineCount = 1 + ThreadLocalRandom.current().nextInt(5);
-                List<Line> lines = buildLines(ctx, lineCount, blueprint.workflow().largePurchaseOrders());
+                isolated.run(() -> {
+                    TenantContext.set(ctx.getOrganizationId(), ctx.getAdminUserId());
+                    UUID supplierId =
+                            ctx.getSupplierIds().get(ThreadLocalRandom.current().nextInt(ctx.getSupplierIds().size()));
+                    UUID warehouseId = ctx.getWarehouseIds()
+                            .get(ThreadLocalRandom.current().nextInt(ctx.getWarehouseIds().size()));
+                    LocalDate invoiceDate = LocalDate.now().minusDays(ThreadLocalRandom.current().nextInt(365));
+                    int lineCount = 1 + ThreadLocalRandom.current().nextInt(5);
+                    List<Line> lines = buildLines(ctx, lineCount, blueprint.workflow().largePurchaseOrders());
 
-                var invoice = purchaseInvoiceService.createStandalone(
-                        supplierId,
-                        warehouseId,
-                        new InvoiceRequest(
-                                "SUP-INV-" + String.format("%06d", i),
-                                invoiceDate,
-                                invoiceDate.plusDays(30),
-                                "Karnataka",
-                                false,
-                                "Demo purchase",
-                                lines));
-                try {
+                    var invoice = purchaseInvoiceService.createStandalone(
+                            supplierId,
+                            warehouseId,
+                            new InvoiceRequest(
+                                    "SUP-INV-" + String.format("%06d", index),
+                                    invoiceDate,
+                                    invoiceDate.plusDays(30),
+                                    "Karnataka",
+                                    false,
+                                    "Demo purchase",
+                                    lines));
                     purchaseInvoiceService.confirm(invoice.getId());
-                } catch (Exception confirmEx) {
-                    log.debug("Purchase confirm skipped for {}: {}", invoice.getId(), confirmEx.getMessage());
-                }
+                });
                 created++;
-            } catch (Exception ex) {
+            } catch (RuntimeException ex) {
                 failures++;
                 log.warn("[{}] Purchase invoice {} failed: {}", ctx.getScenario().slug(), i, ex.getMessage());
             }
+            TenantContext.set(ctx.getOrganizationId(), ctx.getAdminUserId());
             if (i % Math.max(1, target / 10) == 0 || i == target) {
                 progress.progress("Purchases", i, target);
             }

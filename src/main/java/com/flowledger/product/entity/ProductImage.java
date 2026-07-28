@@ -48,6 +48,18 @@ public class ProductImage {
     @Column(name = "size_bytes")
     private Long sizeBytes;
 
+    @Column(length = 64)
+    private String checksum;
+
+    private Integer width;
+    private Integer height;
+
+    @Column(name = "original_filename", length = 255)
+    private String originalFilename;
+
+    @Column(name = "image_role", nullable = false, length = 32)
+    private String imageRole = "MAIN";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

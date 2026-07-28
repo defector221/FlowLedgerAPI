@@ -3,114 +3,74 @@ package com.flowledger.demo.generator;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.demo.DemoSeedContext;
 import com.flowledger.demo.scenario.DemoBlueprint;
+import com.flowledger.demo.util.DemoIsolatedWork;
 import com.flowledger.demo.util.ProgressLogger;
 import com.flowledger.inventory.dto.InventoryDtos.Adjustment;
-import com.flowledger.inventory.dto.InventoryDtos.PostTransaction;
-import com.flowledger.inventory.entity.InventoryTransaction.Type;
 import com.flowledger.inventory.service.InventoryService;
+import com.flowledger.organization.repository.OrganizationSettingsRepository;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class InventoryGenerator {
-    private final InventoryService inventoryService;
+    private static final Logger log = LoggerFactory.getLogger(InventoryGenerator.class);
 
-    public InventoryGenerator(InventoryService inventoryService) {
+    private final InventoryService inventoryService;
+    private final OrganizationSettingsRepository settings;
+    private final DemoIsolatedWork isolated;
+
+    public InventoryGenerator(
+            InventoryService inventoryService,
+            OrganizationSettingsRepository settings,
+            DemoIsolatedWork isolated) {
         this.inventoryService = inventoryService;
+        this.settings = settings;
+        this.isolated = isolated;
     }
 
-    @Transactional
+    /** Each posting runs in REQUIRES_NEW — do not wrap this method in @Transactional. */
     public void generate(DemoSeedContext ctx, ProgressLogger progress) {
         DemoBlueprint blueprint = ctx.getBlueprint();
         TenantContext.set(ctx.getOrganizationId(), ctx.getAdminUserId());
         progress.stage("Posting opening stock");
 
         List<UUID> products = selectProducts(ctx, blueprint.productCount());
-        List<UUID> warehouses = ctx.getWarehouseIds();
-        if (products.isEmpty() || warehouses.isEmpty()) {
+        List<UUID> targetWarehouses = storeFirstWarehouses(ctx);
+        if (products.isEmpty() || targetWarehouses.isEmpty()) {
             progress.done("Opening stock skipped (no products/warehouses)");
             return;
         }
 
-        boolean batchHeavy = blueprint.workflow().batchExpiryHeavy();
-        boolean serialHeavy = blueprint.workflow().serialTrackingHeavy();
-        int batchPostings = 0;
-        int serialPostings = 0;
+        UUID defaultWh = targetWarehouses.get(0);
+        settings.findByOrganizationId(ctx.getOrganizationId()).ifPresent(s -> {
+            s.setDefaultWarehouseId(defaultWh);
+            settings.save(s);
+        });
 
-        int total = products.size() * Math.min(3, warehouses.size());
+        int failures = 0;
+        int posted = 0;
+        int total = products.size() * targetWarehouses.size();
         int done = 0;
+
         for (UUID productId : products) {
-            boolean zeroStock = ThreadLocalRandom.current().nextInt(100) < 10;
-            int whSample = Math.min(3, warehouses.size());
-            for (int w = 0; w < whSample; w++) {
-                UUID warehouseId = warehouses.get(Math.floorMod(productId.hashCode() + w, warehouses.size()));
-                BigDecimal qty = zeroStock
-                        ? BigDecimal.ZERO
-                        : BigDecimal.valueOf(ThreadLocalRandom.current().nextInt(101));
-                if (qty.signum() == 0) {
-                    continue;
-                }
-                try {
-                    if (batchHeavy && ThreadLocalRandom.current().nextInt(100) < 70) {
-                        LocalDate expiry = LocalDate.now()
-                                .plusDays(ThreadLocalRandom.current().nextBoolean()
-                                        ? ThreadLocalRandom.current().nextInt(5, 30)
-                                        : ThreadLocalRandom.current().nextInt(60, 400));
-                        String batch = "LOT-" + productId.toString().substring(0, 8).toUpperCase() + "-" + (w + 1);
-                        inventoryService.postTransaction(new PostTransaction(
-                                Type.OPENING_STOCK,
-                                productId,
-                                warehouseId,
-                                qty,
-                                BigDecimal.ZERO,
-                                "OPENING_STOCK",
-                                null,
-                                null,
-                                UUID.randomUUID().toString(),
-                                batch,
-                                null,
-                                expiry,
-                                null,
-                                "Demo opening batch stock",
-                                LocalDate.now()));
-                        batchPostings++;
-                    } else if (serialHeavy && qty.compareTo(BigDecimal.TEN) <= 0) {
-                        int serialCount = Math.min(qty.intValue(), 5);
-                        for (int s = 0; s < serialCount; s++) {
-                            String serial = "SN-"
-                                    + productId.toString().substring(0, 8).toUpperCase()
-                                    + "-"
-                                    + String.format("%03d", s + 1);
-                            inventoryService.postTransaction(new PostTransaction(
-                                    Type.OPENING_STOCK,
-                                    productId,
-                                    warehouseId,
-                                    BigDecimal.ONE,
-                                    BigDecimal.ZERO,
-                                    "OPENING_STOCK",
-                                    null,
-                                    null,
-                                    UUID.randomUUID().toString(),
-                                    null,
-                                    serial,
-                                    null,
-                                    null,
-                                    "Demo serialized opening stock",
-                                    LocalDate.now()));
-                            serialPostings++;
-                        }
-                    } else {
-                        inventoryService.openingStock(new Adjustment(productId, warehouseId, qty, "Demo opening stock"));
-                    }
-                } catch (Exception ex) {
-                    // continue seeding other lines
+            for (UUID warehouseId : targetWarehouses) {
+                // Solid POS-ready stock on every store warehouse (not random / not zero).
+                BigDecimal qty = BigDecimal.valueOf(100 + ThreadLocalRandom.current().nextInt(101));
+                boolean ok = tryPost(ctx, () -> inventoryService.openingStock(
+                        new Adjustment(productId, warehouseId, qty, "Demo opening stock")));
+                if (ok) {
+                    posted++;
+                } else {
+                    failures++;
                 }
                 done++;
                 if (done % Math.max(1, total / 10) == 0 || done == total) {
@@ -119,10 +79,35 @@ public class InventoryGenerator {
             }
         }
 
-        ctx.getMeta().put("batchOpeningPostings", batchPostings);
-        ctx.getMeta().put("serialOpeningPostings", serialPostings);
-        progress.done("Opening stock (" + done + " postings, batches=" + batchPostings + ", serials=" + serialPostings
-                + ")");
+        ctx.getMeta().put("openingStockPosted", posted);
+        ctx.getMeta().put("openingStockFailures", failures);
+        ctx.getMeta().put("openingStockWarehouses", targetWarehouses.size());
+        progress.done("Opening stock (posted=" + posted + ", warehouses=" + targetWarehouses.size()
+                + ", failures=" + failures + ")");
+    }
+
+    private static List<UUID> storeFirstWarehouses(DemoSeedContext ctx) {
+        Set<UUID> ids = new LinkedHashSet<>(ctx.getStoreWarehouseIds().values());
+        if (ids.isEmpty()) {
+            // Fallback: first warehouse per org (usually branch MAIN)
+            if (!ctx.getWarehouseIds().isEmpty()) {
+                ids.add(ctx.getWarehouseIds().get(0));
+            }
+        }
+        return new ArrayList<>(ids);
+    }
+
+    private boolean tryPost(DemoSeedContext ctx, Runnable action) {
+        try {
+            isolated.run(() -> {
+                TenantContext.set(ctx.getOrganizationId(), ctx.getAdminUserId());
+                action.run();
+            });
+            return true;
+        } catch (RuntimeException ex) {
+            log.warn("Opening stock posting failed (isolated): {}", ex.getMessage());
+            return false;
+        }
     }
 
     private static List<UUID> selectProducts(DemoSeedContext ctx, int productCount) {

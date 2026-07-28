@@ -6,7 +6,10 @@ import com.flowledger.barcode.service.ProductBarcodeManagementService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -61,9 +64,18 @@ public class ProductBarcodeController {
     }
 
     @PostMapping("/barcodes/bulk-generate")
-    @ResponseStatus(HttpStatus.ACCEPTED)
     @PreAuthorize("hasAuthority('BARCODE_WRITE') or hasAuthority('PRODUCT_WRITE')")
-    public BulkGenerateJobResponse bulkGenerate(@RequestBody(required = false) BulkGenerateRequest request) {
+    public BulkGenerateResultResponse bulkGenerate(@RequestBody(required = false) BulkGenerateRequest request) {
         return service.bulkGenerate(request == null ? new BulkGenerateRequest(List.of()) : request);
+    }
+
+    @PostMapping("/barcodes/sheet")
+    @PreAuthorize("hasAuthority('BARCODE_READ') or hasAuthority('PRODUCT_READ')")
+    public ResponseEntity<byte[]> downloadSheet(@RequestBody(required = false) BulkGenerateRequest request) {
+        byte[] pdf = service.downloadSheet(request == null ? new BulkGenerateRequest(List.of()) : request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"product-barcodes.pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 }

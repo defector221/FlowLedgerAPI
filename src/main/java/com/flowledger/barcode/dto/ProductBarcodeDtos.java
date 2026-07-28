@@ -44,5 +44,12 @@ public final class ProductBarcodeDtos {
             UUID createdBy,
             OffsetDateTime createdAt) {}
 
+    /** @deprecated Prefer {@link BulkGenerateResultResponse}; kept for older clients. */
     public record BulkGenerateJobResponse(UUID jobId, String status) {}
+
+    public record BulkGenerateResultResponse(
+            int requested, int generated, int skipped, int failed, List<String> errors) {}
+
+    public record BarcodeSheetItem(
+            UUID productId, String sku, String name, String barcode, String barcodeType) {}
 }

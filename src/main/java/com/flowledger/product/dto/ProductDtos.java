@@ -83,7 +83,8 @@ public final class ProductDtos {
             BigDecimal reorderLevel,
             boolean active,
             long supplierCount,
-            String preferredSupplierName) {}
+            String preferredSupplierName,
+            String imageUrl) {}
 
     public record Search(String search, Boolean active) {}
 }

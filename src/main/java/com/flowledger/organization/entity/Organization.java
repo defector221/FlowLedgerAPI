@@ -58,6 +58,10 @@ public class Organization extends AuditableEntity {
 
     private boolean active = true;
 
+    /** Ops lifecycle: ACTIVE, SUSPENDED, ARCHIVED */
+    @Column(name = "lifecycle_status", nullable = false, length = 32)
+    private String lifecycleStatus = "ACTIVE";
+
     @Column(nullable = false)
     private boolean onboardingCompleted;
 

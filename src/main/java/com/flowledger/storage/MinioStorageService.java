@@ -46,12 +46,20 @@ public class MinioStorageService implements StorageService {
     @SneakyThrows
     public String store(String key, MultipartFile file) {
         try (InputStream in = file.getInputStream()) {
-            client.putObject(
-                    PutObjectArgs.builder().bucket(properties.getBucket()).object(key).stream(in, file.getSize(), -1)
-                            .contentType(file.getContentType())
-                            .build());
-            return key;
+            return store(key, in, file.getContentType(), file.getSize());
         }
+    }
+
+    @SneakyThrows
+    @Override
+    public String store(String key, InputStream inputStream, String contentType, long size) {
+        client.putObject(PutObjectArgs.builder()
+                .bucket(properties.getBucket())
+                .object(key)
+                .stream(inputStream, size, -1)
+                .contentType(contentType != null ? contentType : "application/octet-stream")
+                .build());
+        return key;
     }
 
     @SneakyThrows

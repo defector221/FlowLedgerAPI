@@ -8,6 +8,7 @@ import com.flowledger.demo.catalog.CatalogStrategy;
 import com.flowledger.demo.catalog.CatalogStrategyRegistry;
 import com.flowledger.demo.scenario.DemoBlueprint;
 import com.flowledger.demo.util.DemoFaker;
+import com.flowledger.demo.util.DemoIsolatedWork;
 import com.flowledger.demo.util.ProgressLogger;
 import com.flowledger.product.dto.CategoryDtos;
 import com.flowledger.product.dto.ProductDtos.Create;
@@ -51,6 +52,7 @@ public class CatalogGenerator {
     private final ProductBarcodeManagementService barcodeManagement;
     private final RetailCatalogService retailCatalogService;
     private final DemoFaker faker;
+    private final DemoIsolatedWork isolated;
 
     public CatalogGenerator(
             UnitService unitService,
@@ -60,7 +62,8 @@ public class CatalogGenerator {
             CatalogStrategyRegistry catalogStrategies,
             ProductBarcodeManagementService barcodeManagement,
             RetailCatalogService retailCatalogService,
-            DemoFaker faker) {
+            DemoFaker faker,
+            DemoIsolatedWork isolated) {
         this.unitService = unitService;
         this.taxRateService = taxRateService;
         this.categoryService = categoryService;
@@ -69,6 +72,7 @@ public class CatalogGenerator {
         this.barcodeManagement = barcodeManagement;
         this.retailCatalogService = retailCatalogService;
         this.faker = faker;
+        this.isolated = isolated;
     }
 
     @Transactional
@@ -107,7 +111,7 @@ public class CatalogGenerator {
                     faker.sku(skuPrefix, i),
                     seed + " " + brand + " " + i,
                     unitId,
-                    "GOODS",
+                    "PRODUCT",
                     barcode,
                     "Demo catalog item",
                     categoryId,
@@ -119,19 +123,21 @@ public class CatalogGenerator {
                     taxRateId,
                     null,
                     null,
-                    new BigDecimal("5"),
-                    null,
+                    // Keep thresholds well below seeded store opening stock (100+).
                     new BigDecimal("10"),
-                    strategy.preferBatchExpiry() || blueprint.workflow().batchExpiryHeavy(),
+                    null,
+                    new BigDecimal("25"),
+                    false,
                     strategy.preferSerial() || blueprint.workflow().serialTrackingHeavy(),
-                    strategy.preferBatchExpiry() || blueprint.workflow().batchExpiryHeavy(),
+                    false,
                     null));
             ctx.getProductIds().add(created.id());
 
             try {
-                barcodeManagement.create(created.id(), new CreateBarcodeRequest(barcode, "EAN13", true, null));
-            } catch (Exception ex) {
-                // optional
+                isolated.run(() -> barcodeManagement.create(
+                        created.id(), new CreateBarcodeRequest(barcode, "EAN13", true, null)));
+            } catch (RuntimeException ex) {
+                log.debug("Optional barcode skipped for {}: {}", created.id(), ex.getMessage());
             }
 
             if (i % BATCH_SIZE == 0 || i == target) {
@@ -199,8 +205,8 @@ public class CatalogGenerator {
 
     private void seedFashionVariants(DemoSeedContext ctx, CatalogStrategy strategy, List<String> brands, String skuPrefix) {
         try {
-            retailCatalogService.createBrand(new BrandRequest("DEMO", "Demo Brand"));
-        } catch (Exception ex) {
+            isolated.run(() -> retailCatalogService.createBrand(new BrandRequest("DEMO", "Demo Brand")));
+        } catch (RuntimeException ex) {
             log.debug("Brand seed skipped: {}", ex.getMessage());
         }
         String[] sizes = {"S", "M", "L", "XL"};
@@ -208,21 +214,22 @@ public class CatalogGenerator {
         int limit = Math.min(20, ctx.getProductIds().size());
         for (int i = 0; i < limit; i++) {
             UUID productId = ctx.getProductIds().get(i);
+            final int idx = i;
             try {
-                retailCatalogService.createVariant(new VariantRequest(
+                isolated.run(() -> retailCatalogService.createVariant(new VariantRequest(
                         productId,
-                        faker.sku(skuPrefix + "V", i + 1),
+                        faker.sku(skuPrefix + "V", idx + 1),
                         faker.ean13(),
-                        colors[i % colors.length],
-                        sizes[i % sizes.length],
+                        colors[idx % colors.length],
+                        sizes[idx % sizes.length],
                         null,
                         null,
                         null,
-                        brands.get(i % brands.size()),
+                        brands.get(idx % brands.size()),
                         new BigDecimal("999"),
                         new BigDecimal("1299"),
-                        true));
-            } catch (Exception ex) {
+                        true)));
+            } catch (RuntimeException ex) {
                 log.debug("Variant seed skipped for {}: {}", productId, ex.getMessage());
             }
         }

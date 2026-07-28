@@ -3,6 +3,7 @@ package com.flowledger.demo.generator;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.demo.DemoSeedContext;
 import com.flowledger.demo.scenario.DemoBlueprint;
+import com.flowledger.demo.util.DemoIsolatedWork;
 import com.flowledger.demo.util.ProgressLogger;
 import com.flowledger.inventory.dto.InventoryDtos.Transfer;
 import com.flowledger.inventory.service.InventoryService;
@@ -14,7 +15,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class TransferScenarioGenerator {
@@ -22,12 +22,13 @@ public class TransferScenarioGenerator {
     private static final int TRANSFER_COUNT = 5;
 
     private final InventoryService inventoryService;
+    private final DemoIsolatedWork isolated;
 
-    public TransferScenarioGenerator(InventoryService inventoryService) {
+    public TransferScenarioGenerator(InventoryService inventoryService, DemoIsolatedWork isolated) {
         this.inventoryService = inventoryService;
+        this.isolated = isolated;
     }
 
-    @Transactional
     public void generate(DemoSeedContext ctx, ProgressLogger progress) {
         DemoBlueprint blueprint = ctx.getBlueprint();
         if (!blueprint.workflow().interStoreTransfers()) {
@@ -55,14 +56,14 @@ public class TransferScenarioGenerator {
             UUID productId = products.get(ThreadLocalRandom.current().nextInt(products.size()));
             String name = "Transfer " + (i + 1) + ": WH→WH restock";
             try {
-                inventoryService.transferStock(new Transfer(
+                isolated.run(() -> inventoryService.transferStock(new Transfer(
                         productId,
                         from,
                         to,
                         BigDecimal.valueOf(1 + ThreadLocalRandom.current().nextInt(10)),
-                        "Demo " + name));
+                        "Demo " + name)));
                 vignettes.add(name);
-            } catch (Exception ex) {
+            } catch (RuntimeException ex) {
                 log.debug("Transfer vignette failed: {}", ex.getMessage());
                 vignettes.add(name + " (failed)");
             }

@@ -10,6 +10,7 @@ import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.demo.DemoSeedContext;
 import com.flowledger.demo.scenario.DemoBlueprint;
 import com.flowledger.demo.util.DemoFaker;
+import com.flowledger.demo.util.DemoIsolatedWork;
 import com.flowledger.demo.util.ProgressLogger;
 import com.flowledger.location.service.CashDrawerService;
 import com.flowledger.organization.dto.BranchDtos.BranchRequest;
@@ -41,18 +42,21 @@ public class LocationGenerator {
     private final RetailStoreService retailStoreService;
     private final CashDrawerService cashDrawerService;
     private final DemoFaker faker;
+    private final DemoIsolatedWork isolated;
 
     public LocationGenerator(
             BranchService branchService,
             WarehouseService warehouseService,
             RetailStoreService retailStoreService,
             CashDrawerService cashDrawerService,
-            DemoFaker faker) {
+            DemoFaker faker,
+            DemoIsolatedWork isolated) {
         this.branchService = branchService;
         this.warehouseService = warehouseService;
         this.retailStoreService = retailStoreService;
         this.cashDrawerService = cashDrawerService;
         this.faker = faker;
+        this.isolated = isolated;
     }
 
     @Transactional
@@ -85,7 +89,7 @@ public class LocationGenerator {
                     headOffice));
             ctx.getBranchIds().add(branch.id());
 
-            UUID branchMainWhId = createBranchWarehouses(ctx, branch.id(), city, headOffice, b == 0);
+            UUID branchMainWhId = createBranchWarehouses(ctx, branch.id(), city, headOffice, b);
 
             for (int s = 0; s < storesPerBranch[b]; s++) {
                 globalStoreIndex++;
@@ -105,10 +109,12 @@ public class LocationGenerator {
     }
 
     private UUID createBranchWarehouses(
-            DemoSeedContext ctx, UUID branchId, String city, boolean headOffice, boolean firstBranch) {
+            DemoSeedContext ctx, UUID branchId, String city, boolean headOffice, int branchIndex) {
+        String prefix = "WH-BR" + String.format("%03d", branchIndex + 1);
+        boolean firstBranch = branchIndex == 0;
         UUID mainId = warehouseService
                 .create(new Create(
-                        "WH-" + city.substring(0, 3).toUpperCase() + "-MAIN",
+                        prefix + "-MAIN",
                         city + " Main Warehouse",
                         city + " industrial area",
                         "Store Manager",
@@ -123,7 +129,7 @@ public class LocationGenerator {
         for (String suffix : List.of("RET", "DMG", "TRN")) {
             WarehouseType type = "TRN".equals(suffix) ? WarehouseType.TRANSIT : WarehouseType.BRANCH;
             Response wh = warehouseService.create(new Create(
-                    "WH-" + city.substring(0, 3).toUpperCase() + "-" + suffix,
+                    prefix + "-" + suffix,
                     city + " " + warehouseLabel(suffix),
                     null,
                     null,
@@ -185,6 +191,7 @@ public class LocationGenerator {
                 branch.id(),
                 store.id()));
         ctx.getWarehouseIds().add(storeWh.id());
+        ctx.getStoreWarehouseIds().put(store.id(), storeWh.id());
 
         retailStoreService.updateStore(
                 store.id(),
@@ -228,8 +235,9 @@ public class LocationGenerator {
             ctx.getTerminalIds().add(terminal.id());
             if (t == 1) {
                 try {
-                    cashDrawerService.create(new CashDrawerRequest(terminal.id(), "DR1", "Main Drawer", "ACTIVE"));
-                } catch (Exception ex) {
+                    isolated.run(() -> cashDrawerService.create(
+                            new CashDrawerRequest(terminal.id(), "DR1", "Main Drawer", "ACTIVE")));
+                } catch (RuntimeException ex) {
                     // optional retail setup
                 }
             }

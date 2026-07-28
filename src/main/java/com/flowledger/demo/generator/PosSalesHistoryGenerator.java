@@ -9,6 +9,7 @@ import static com.flowledger.retail.dto.RetailDtos.PosSaleRequest;
 import com.flowledger.common.tenant.TenantContext;
 import com.flowledger.demo.DemoSeedContext;
 import com.flowledger.demo.scenario.DemoBlueprint;
+import com.flowledger.demo.util.DemoIsolatedWork;
 import com.flowledger.demo.util.ProgressLogger;
 import com.flowledger.product.repository.ProductRepository;
 import com.flowledger.retail.domain.RetailEnums.PaymentMode;
@@ -29,7 +30,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class PosSalesHistoryGenerator {
@@ -43,24 +43,27 @@ public class PosSalesHistoryGenerator {
     private final RetailStoreService retailStoreService;
     private final SalesInvoiceService salesInvoiceService;
     private final ProductRepository products;
+    private final DemoIsolatedWork isolated;
 
     public PosSalesHistoryGenerator(
             PosSaleService posSaleService,
             RetailShiftService retailShiftService,
             RetailStoreService retailStoreService,
             SalesInvoiceService salesInvoiceService,
-            ProductRepository products) {
+            ProductRepository products,
+            DemoIsolatedWork isolated) {
         this.posSaleService = posSaleService;
         this.retailShiftService = retailShiftService;
         this.retailStoreService = retailStoreService;
         this.salesInvoiceService = salesInvoiceService;
         this.products = products;
+        this.isolated = isolated;
     }
 
-    @Transactional
+    /** Each sale runs in its own REQUIRES_NEW TX — do not wrap this method in @Transactional. */
     public void generate(DemoSeedContext ctx, ProgressLogger progress) {
         DemoBlueprint blueprint = ctx.getBlueprint();
-        TenantContext.set(ctx.getOrganizationId(), ctx.getAdminUserId());
+        bindTenant(ctx, null, null, null);
         progress.stage("Creating sales history");
 
         if (ctx.getStoreIds().isEmpty() || ctx.getProductIds().isEmpty()) {
@@ -78,10 +81,11 @@ public class PosSalesHistoryGenerator {
 
         UUID storeId = ctx.getStoreIds().get(0);
         UUID branchId = ctx.getBranchIds().isEmpty() ? null : ctx.getBranchIds().get(0);
-        UUID warehouseId = ctx.getWarehouseIds().isEmpty() ? null : ctx.getWarehouseIds().get(0);
-        TenantContext.setLocation(branchId, storeId, warehouseId);
+        UUID storeWarehouseId = ctx.getStoreWarehouseIds().getOrDefault(
+                storeId, ctx.getWarehouseIds().isEmpty() ? null : ctx.getWarehouseIds().get(0));
+        bindTenant(ctx, branchId, storeId, storeWarehouseId);
 
-        ShiftContext shift = blueprint.workflow().posHeavy() ? openShift(ctx, storeId) : null;
+        ShiftContext shift = blueprint.workflow().posHeavy() ? openShift(ctx, storeId, branchId, storeWarehouseId) : null;
 
         for (int i = 1; i <= posTarget; i++) {
             if (target > 1000 && i % CHUNK == 0 && failures > MAX_FAILURES) {
@@ -89,12 +93,24 @@ public class PosSalesHistoryGenerator {
                 break;
             }
             try {
-                createPosSale(ctx, storeId, shift);
+                isolated.run(() -> {
+                    bindTenant(ctx, branchId, storeId, storeWarehouseId);
+                    createPosSale(ctx, storeId, storeWarehouseId, shift);
+                });
                 posCreated++;
-            } catch (Exception ex) {
+            } catch (RuntimeException ex) {
                 failures++;
-                log.debug("POS sale {} failed: {}", i, ex.getMessage());
+                Throwable root = rootCause(ex);
+                if (failures <= 5 || failures % 25 == 0) {
+                    log.warn(
+                            "[{}] POS sale {} failed: {}",
+                            ctx.getScenario().slug(),
+                            i,
+                            root.getMessage() != null ? root.getMessage() : ex.getMessage());
+                }
             }
+            // AFTER_COMMIT listeners clear TenantContext — rebind for the next iteration.
+            bindTenant(ctx, branchId, storeId, storeWarehouseId);
             if (i % Math.max(1, posTarget / 10) == 0 || i == posTarget) {
                 progress.progress("POS sales", i, posTarget);
             }
@@ -105,12 +121,23 @@ public class PosSalesHistoryGenerator {
                 break;
             }
             try {
-                createCreditInvoice(ctx, warehouseId);
+                isolated.run(() -> {
+                    bindTenant(ctx, branchId, storeId, storeWarehouseId);
+                    createCreditInvoice(ctx, storeWarehouseId);
+                });
                 creditCreated++;
-            } catch (Exception ex) {
+            } catch (RuntimeException ex) {
                 failures++;
-                log.debug("Credit invoice {} failed: {}", i, ex.getMessage());
+                Throwable root = rootCause(ex);
+                if (failures <= 5 || failures % 25 == 0) {
+                    log.warn(
+                            "[{}] Credit invoice {} failed: {}",
+                            ctx.getScenario().slug(),
+                            i,
+                            root.getMessage() != null ? root.getMessage() : ex.getMessage());
+                }
             }
+            bindTenant(ctx, branchId, storeId, storeWarehouseId);
         }
 
         ctx.getMeta().put("posSalesCreated", posCreated);
@@ -119,33 +146,38 @@ public class PosSalesHistoryGenerator {
         progress.done(String.format("Sales history (%d POS, %d credit, %d failures)", posCreated, creditCreated, failures));
     }
 
-    private ShiftContext openShift(DemoSeedContext ctx, UUID storeId) {
+    private ShiftContext openShift(DemoSeedContext ctx, UUID storeId, UUID branchId, UUID warehouseId) {
         try {
-            var counters = retailStoreService.listCounters(storeId);
-            var terminals = retailStoreService.listTerminals(storeId);
-            if (counters.isEmpty() || terminals.isEmpty()) {
-                return null;
-            }
-            UUID counterId = counters.get(0).id();
-            UUID terminalId = terminals.get(0).id();
-            UUID cashierUserId = ctx.getAdminUserId();
-            UUID cashierId = retailStoreService.listCashiers(storeId).stream()
-                    .findFirst()
-                    .map(c -> c.id())
-                    .orElseGet(() -> retailStoreService
-                            .createCashier(new CashierRequest(
-                                    storeId, cashierUserId, "EMP001", "Demo Cashier", "ACTIVE"))
-                            .id());
-            ShiftResponse shift = retailShiftService.open(new OpenShiftRequest(
-                    storeId, counterId, terminalId, cashierId, new BigDecimal("5000"), "Demo shift"));
-            return new ShiftContext(counterId, terminalId, cashierId, shift.id());
-        } catch (Exception ex) {
-            log.debug("Shift open skipped: {}", ex.getMessage());
+            return isolated.call(() -> {
+                bindTenant(ctx, branchId, storeId, warehouseId);
+                var counters = retailStoreService.listCounters(storeId);
+                var terminals = retailStoreService.listTerminals(storeId);
+                if (counters.isEmpty() || terminals.isEmpty()) {
+                    return null;
+                }
+                UUID counterId = counters.get(0).id();
+                UUID terminalId = terminals.get(0).id();
+                UUID cashierUserId = ctx.getAdminUserId();
+                UUID cashierId = retailStoreService.listCashiers(storeId).stream()
+                        .findFirst()
+                        .map(c -> c.id())
+                        .orElseGet(() -> retailStoreService
+                                .createCashier(new CashierRequest(
+                                        storeId, cashierUserId, "EMP001", "Demo Cashier", "ACTIVE"))
+                                .id());
+                ShiftResponse shift = retailShiftService.open(new OpenShiftRequest(
+                        storeId, counterId, terminalId, cashierId, new BigDecimal("5000"), "Demo shift"));
+                return new ShiftContext(counterId, terminalId, cashierId, shift.id());
+            });
+        } catch (RuntimeException ex) {
+            log.warn("Shift open skipped: {}", ex.getMessage());
             return null;
+        } finally {
+            bindTenant(ctx, branchId, storeId, warehouseId);
         }
     }
 
-    private void createPosSale(DemoSeedContext ctx, UUID storeId, ShiftContext shift) {
+    private void createPosSale(DemoSeedContext ctx, UUID storeId, UUID storeWarehouseId, ShiftContext shift) {
         UUID counterId = shift != null ? shift.counterId() : null;
         UUID terminalId = shift != null ? shift.terminalId() : pickTerminal(ctx);
         UUID shiftId = shift != null ? shift.shiftId() : null;
@@ -155,7 +187,6 @@ public class PosSalesHistoryGenerator {
                 storeId, counterId, terminalId, shiftId, cashierId, randomCustomer(ctx), null));
 
         int lines = 1 + ThreadLocalRandom.current().nextInt(4);
-        UUID warehouseId = ctx.getWarehouseIds().isEmpty() ? null : ctx.getWarehouseIds().get(0);
         for (int l = 0; l < lines; l++) {
             UUID productId = ctx.getProductIds().get(ThreadLocalRandom.current().nextInt(ctx.getProductIds().size()));
             BigDecimal rate = products
@@ -173,7 +204,7 @@ public class PosSalesHistoryGenerator {
                             rate,
                             null,
                             new BigDecimal("18"),
-                            warehouseId,
+                            storeWarehouseId,
                             null,
                             null));
         }
@@ -232,6 +263,21 @@ public class PosSalesHistoryGenerator {
                 null,
                 items));
         salesInvoiceService.confirm(draft.id());
+    }
+
+    private static void bindTenant(DemoSeedContext ctx, UUID branchId, UUID storeId, UUID warehouseId) {
+        TenantContext.set(ctx.getOrganizationId(), ctx.getAdminUserId());
+        if (branchId != null || storeId != null || warehouseId != null) {
+            TenantContext.setLocation(branchId, storeId, warehouseId);
+        }
+    }
+
+    private static Throwable rootCause(Throwable ex) {
+        Throwable cur = ex;
+        while (cur.getCause() != null && cur.getCause() != cur) {
+            cur = cur.getCause();
+        }
+        return cur;
     }
 
     private static UUID randomCustomer(DemoSeedContext ctx) {

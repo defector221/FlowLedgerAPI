@@ -33,11 +33,20 @@ public class LocalFilesystemStorageService implements StorageService {
     @Override
     public String store(String objectKey, MultipartFile file) {
         try {
+            try (InputStream in = file.getInputStream()) {
+                return store(objectKey, in, file.getContentType(), file.getSize());
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to store object: " + objectKey, e);
+        }
+    }
+
+    @Override
+    public String store(String objectKey, InputStream inputStream, String contentType, long size) {
+        try {
             Path target = resolve(objectKey);
             Files.createDirectories(target.getParent());
-            try (InputStream in = file.getInputStream()) {
-                Files.copy(in, target);
-            }
+            Files.copy(inputStream, target);
             return objectKey;
         } catch (IOException e) {
             throw new IllegalStateException("Failed to store object: " + objectKey, e);

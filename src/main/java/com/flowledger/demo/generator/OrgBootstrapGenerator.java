@@ -69,6 +69,7 @@ public class OrgBootstrapGenerator {
                 .toUpperCase(Locale.ROOT));
         org.setInvoiceNumberFormat("{PREFIX}/{FY}/{SEQ:6}");
         org.setOnboardingCompleted(true);
+        org.setAllowNegativeStock(true);
         org = organizations.save(org);
 
         OrganizationSettings orgSettings = new OrganizationSettings();
@@ -89,7 +90,6 @@ public class OrgBootstrapGenerator {
         ctx.setAdminUserId(adminId);
         TenantContext.set(orgId, adminId);
 
-        organizationModuleService.setModuleEnabled(orgId, ModuleCodes.RETAIL, true, adminId);
         accounting.bootstrapOrganization(orgId, org.getFinancialYearStart());
 
         for (UserGenerator.DemoUserSpec spec : EXTRA_USERS) {
@@ -100,9 +100,10 @@ public class OrgBootstrapGenerator {
         subscriptions.ensureDefaultSubscription(adminId, "FREE");
         subscriptions.ensureOrganizationSubscription(orgId, "FREE");
 
-        organizationModuleService.setModuleEnabled(orgId, ModuleCodes.RETAIL, true, adminId);
+        // Dependencies before RETAIL (module graph: RETAIL → INVENTORY, ACCOUNTING)
         organizationModuleService.setModuleEnabled(orgId, ModuleCodes.INVENTORY, true, adminId);
         organizationModuleService.setModuleEnabled(orgId, ModuleCodes.ACCOUNTING, true, adminId);
+        organizationModuleService.setModuleEnabled(orgId, ModuleCodes.RETAIL, true, adminId);
 
         progress.done("Organization bootstrap (" + org.getName() + ")");
     }

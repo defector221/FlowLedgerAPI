@@ -45,8 +45,40 @@ public class ProductImageService extends OrganizationScopedService {
         if (file == null || file.isEmpty()) {
             throw badRequest("file is required");
         }
-        String key = "products/" + orgId() + "/" + productId + "/" + UUID.randomUUID() + suffix(file);
-        storage.store(key, file);
+        try {
+            return uploadStream(
+                    productId,
+                    file.getInputStream(),
+                    file.getOriginalFilename(),
+                    file.getContentType(),
+                    file.getSize(),
+                    primary,
+                    null,
+                    "MAIN");
+        } catch (java.io.IOException e) {
+            throw badRequest("Unable to read upload");
+        }
+    }
+
+    public ImageResponse uploadStream(
+            UUID productId,
+            java.io.InputStream inputStream,
+            String originalFilename,
+            String contentType,
+            long sizeBytes,
+            boolean primary,
+            String checksum,
+            String imageRole) {
+        requireProduct(productId);
+        if (inputStream == null) {
+            throw badRequest("file is required");
+        }
+        String suffix = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            suffix = originalFilename.substring(originalFilename.lastIndexOf('.'));
+        }
+        String key = "products/" + orgId() + "/" + productId + "/" + UUID.randomUUID() + suffix;
+        storage.store(key, inputStream, contentType, sizeBytes);
         if (primary) {
             clearPrimary(productId);
         }
@@ -57,8 +89,11 @@ public class ProductImageService extends OrganizationScopedService {
         row.setObjectKey(key);
         row.setSortOrder(sortOrder);
         row.setPrimary(primary || sortOrder == 0);
-        row.setMimeType(file.getContentType());
-        row.setSizeBytes(file.getSize());
+        row.setMimeType(contentType);
+        row.setSizeBytes(sizeBytes);
+        row.setChecksum(checksum);
+        row.setOriginalFilename(originalFilename);
+        row.setImageRole(imageRole == null || imageRole.isBlank() ? "MAIN" : imageRole);
         TenantContext.userId().ifPresent(user -> {
             row.setCreatedBy(user);
             row.setUpdatedBy(user);
@@ -107,14 +142,6 @@ public class ProductImageService extends OrganizationScopedService {
 
     private void requireProduct(UUID productId) {
         required(products.findByIdAndOrganizationId(productId, orgId()), "Product");
-    }
-
-    private String suffix(MultipartFile file) {
-        String name = file.getOriginalFilename();
-        if (name != null && name.contains(".")) {
-            return name.substring(name.lastIndexOf('.'));
-        }
-        return "";
     }
 
     private ImageResponse toResponse(ProductImage row) {

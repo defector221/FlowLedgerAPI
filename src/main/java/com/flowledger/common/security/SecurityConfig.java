@@ -1,5 +1,6 @@
 package com.flowledger.common.security;
 
+import com.flowledger.ops.security.PlatformJwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.context.annotation.*;
@@ -24,7 +25,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity h, JwtAuthenticationFilter f) throws Exception {
+    SecurityFilterChain filterChain(
+            HttpSecurity h, JwtAuthenticationFilter tenantJwt, PlatformJwtAuthenticationFilter platformJwt)
+            throws Exception {
         return h.csrf(c -> c.disable())
                 .cors(c -> {})
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -42,6 +45,7 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(
                                 "/api/v1/auth/**",
+                                "/api/v1/ops/auth/**",
                                 "/api/v1/public/**",
                                 "/api/v1/subscriptions/webhooks/**",
                                 "/swagger-ui/**",
@@ -51,9 +55,12 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/error")
                         .permitAll()
+                        .requestMatchers("/api/v1/ops/**")
+                        .authenticated()
                         .anyRequest()
                         .authenticated())
-                .addFilterBefore(f, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(platformJwt, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(tenantJwt, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 

@@ -11,6 +11,8 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "retail_stores")
@@ -71,6 +73,7 @@ public class RetailStore extends RetailAuditedEntity {
     private BigDecimal latitude;
     private BigDecimal longitude;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "opening_hours", columnDefinition = "jsonb")
     private String openingHours;
 
