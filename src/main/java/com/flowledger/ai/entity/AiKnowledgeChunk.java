@@ -14,11 +14,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "ai_embeddings")
+@Table(name = "ai_knowledge_chunks")
 @Getter
 @Setter
 @NoArgsConstructor
-public class AiEmbedding {
+public class AiKnowledgeChunk {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -26,23 +26,20 @@ public class AiEmbedding {
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;
 
-    @Column(name = "source_type", nullable = false)
-    private String sourceType;
+    @Column(name = "document_id", nullable = false)
+    private UUID documentId;
 
-    @Column(name = "source_id", nullable = false)
-    private UUID sourceId;
+    @Column(name = "chunk_index", nullable = false)
+    private int chunkIndex;
+
+    @Column(nullable = false, columnDefinition = "text")
+    private String content;
 
     @Column(name = "content_hash")
     private String contentHash;
 
-    @Column(name = "embedding_json", columnDefinition = "text")
-    private String embeddingJson;
-
-    @Column(name = "document_id")
-    private UUID documentId;
-
-    @Column(name = "chunk_index")
-    private Integer chunkIndex;
+    @Column(name = "token_estimate")
+    private Integer tokenEstimate;
 
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;

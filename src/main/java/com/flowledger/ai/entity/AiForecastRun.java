@@ -43,6 +43,12 @@ public class AiForecastRun {
     @Column(name = "result_json", columnDefinition = "jsonb")
     private Map<String, Object> resultJson;
 
+    @Column(precision = 10, scale = 4)
+    private java.math.BigDecimal mape;
+
+    @Column(length = 64)
+    private String method;
+
     @Column(columnDefinition = "text")
     private String error;
 

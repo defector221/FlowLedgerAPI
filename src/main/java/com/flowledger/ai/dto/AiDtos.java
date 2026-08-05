@@ -18,12 +18,27 @@ public final class AiDtos {
             String content,
             String model,
             long latencyMs,
-            List<String> consultedAgents) {
+            List<String> consultedAgents,
+            List<Citation> citations) {
         public ChatResponse(
                 UUID conversationId, UUID messageId, String agent, String content, String model, long latencyMs) {
-            this(conversationId, messageId, agent, content, model, latencyMs, List.of());
+            this(conversationId, messageId, agent, content, model, latencyMs, List.of(), List.of());
+        }
+
+        public ChatResponse(
+                UUID conversationId,
+                UUID messageId,
+                String agent,
+                String content,
+                String model,
+                long latencyMs,
+                List<String> consultedAgents) {
+            this(conversationId, messageId, agent, content, model, latencyMs, consultedAgents, List.of());
         }
     }
+
+    public record Citation(
+            UUID documentId, UUID chunkId, String title, String docType, String excerpt, Double score) {}
 
     public record AgentInfo(
             String code,
@@ -90,13 +105,25 @@ public final class AiDtos {
 
     public record KnowledgeCreateRequest(String title, String docType, String content) {}
 
+    public record KnowledgeUpdateRequest(String title, String docType, String content) {}
+
     public record KnowledgeResponse(
             UUID id,
             String title,
             String docType,
             String content,
+            int chunkCount,
             OffsetDateTime createdAt,
-            OffsetDateTime updatedAt) {}
+            OffsetDateTime updatedAt) {
+        public KnowledgeResponse(
+                UUID id, String title, String docType, String content, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
+            this(id, title, docType, content, 0, createdAt, updatedAt);
+        }
+    }
+
+    public record KnowledgeUploadRequest(String filename, String contentBase64, String docType) {}
+
+    public record KnowledgeReindexResponse(int documentsReindexed, String message) {}
 
     public record RecommendationResponse(
             UUID id,
@@ -206,4 +233,65 @@ public final class AiDtos {
             boolean canApprove,
             String stepsSnapshotJson,
             List<WorkflowApprovalActionResponse> actions) {}
+
+    public record AutomationRequest(
+            String name,
+            String description,
+            String triggerType,
+            String cronExpression,
+            String eventType,
+            String signalType,
+            String actionType,
+            String actionConfigJson,
+            Boolean dryRun) {}
+
+    public record AutomationResponse(
+            UUID id,
+            String name,
+            String description,
+            String triggerType,
+            String cronExpression,
+            String eventType,
+            String signalType,
+            String actionType,
+            String actionConfigJson,
+            boolean dryRun,
+            String status,
+            OffsetDateTime lastRunAt,
+            OffsetDateTime nextRunAt,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt) {}
+
+    public record AutomationRunResponse(
+            UUID id,
+            UUID automationId,
+            String triggerSource,
+            String status,
+            boolean dryRun,
+            int signalCount,
+            int actionCount,
+            String summary,
+            String errorMessage,
+            OffsetDateTime startedAt,
+            OffsetDateTime finishedAt) {}
+
+    public record BudgetStatusResponse(
+            UUID organizationId,
+            int dailyTokenLimit,
+            int tokensUsedToday,
+            boolean hardStop,
+            boolean exhausted,
+            java.time.LocalDate usageDate) {}
+
+    public record DocumentDraftConfirmRequest(String documentType, Map<String, Object> draftFields) {}
+
+    public record DocumentDraftConfirmResponse(
+            boolean created, String message, String documentType, UUID draftDocumentId) {}
+
+    public record CommerceSimilarProductResponse(
+            UUID productIndexId, UUID storeId, UUID productId, String name, String sku, Double score) {}
+
+    public record CommerceSupportRequest(String message, UUID orderId) {}
+
+    public record CommerceSupportResponse(String answer, List<String> toolsUsed) {}
 }

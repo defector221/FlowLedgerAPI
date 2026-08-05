@@ -55,5 +55,34 @@ Default agent when omitted: **ASK**. Legacy codes (`FINANCE`, `GST`, …) alias 
 | PUT | `/workflow/drafts/{id}` | AI_WORKFLOW / AI_ADMIN | update |
 | POST | `/workflow/drafts/{id}/activate` | AI_WORKFLOW / AI_ADMIN | stores ACTIVE config only |
 | POST | `/workflow/drafts/{id}/deactivate` | AI_WORKFLOW / AI_ADMIN | → DRAFT |
-| POST | `/workflow/document-extract` | AI_CHAT | stub / not configured |
+| POST | `/workflow/document-extract` | AI_CHAT | OCR / heuristic extract → draft fields |
+| POST | `/workflow/document-confirm` | AI_CHAT / AI_ADMIN | Accept reviewed draft (no ERP auto-post) |
 | POST | `/workflow/voice-transcribe` | AI_CHAT | Whisper STT `{ contentType, audioBase64 }` |
+
+## Knowledge (v2.1)
+
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/knowledge` | AI_ADMIN / AI_KNOWLEDGE |
+| PUT | `/knowledge/{id}` | AI_ADMIN / AI_KNOWLEDGE |
+| DELETE | `/knowledge/{id}` | AI_ADMIN / AI_KNOWLEDGE |
+| POST | `/knowledge/upload` | AI_ADMIN / AI_KNOWLEDGE |
+| POST | `/knowledge/reindex` | AI_ADMIN / AI_KNOWLEDGE |
+| GET | `/knowledge?q=` | AI_CHAT / AI_ADMIN / AI_KNOWLEDGE |
+
+## Automations (v2.2)
+
+| Method | Path | Auth |
+|--------|------|------|
+| GET/POST | `/automations` | AI_AUTOMATION / AI_ADMIN |
+| PUT | `/automations/{id}` | AI_AUTOMATION / AI_ADMIN |
+| POST | `/automations/{id}/activate\|pause\|run` | AI_AUTOMATION / AI_ADMIN |
+| DELETE | `/automations/{id}` | AI_AUTOMATION / AI_ADMIN |
+| GET | `/automations/runs` | AI_AUTOMATION / AI_ADMIN |
+
+## Chat extras (v2.1)
+
+| Method | Path | Notes |
+|--------|------|-------|
+| POST | `/chat/stream` | SSE tokens + final `done` payload with citations |
+| GET | `/budget` | Daily token budget status |

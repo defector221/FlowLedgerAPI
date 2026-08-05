@@ -76,6 +76,12 @@ class AiChatServiceTest {
     @Mock
     AiAgentRunRepository agentRuns;
 
+    @Mock
+    com.flowledger.ai.budget.AiBudgetService budgets;
+
+    @Mock
+    com.flowledger.ai.tools.LangChain4jToolBridge toolBridge;
+
     private ChatOrchestrationService service;
     private final UUID orgId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
@@ -101,7 +107,9 @@ class AiChatServiceTest {
                 audit,
                 knowledgeDocuments,
                 embeddingPipeline,
-                agentRuns);
+                agentRuns,
+                budgets,
+                toolBridge);
     }
 
     @AfterEach
@@ -139,8 +147,9 @@ class AiChatServiceTest {
         when(memory.getOrCreate(any(), eq(userId), anyString(), anyString())).thenReturn(conversation);
         when(memory.append(any(), eq("user"), anyString(), any(), any(), any(), any()))
                 .thenReturn(new AiMessage());
-        when(rag.retrieveContext(anyString(), anyInt())).thenReturn("");
+        when(rag.retrieveWithCitations(anyString(), anyInt())).thenReturn(RagService.RetrievalResult.empty());
         when(tools.invokeAllowed(any(), anyString())).thenReturn("dashboard ok");
+        when(toolBridge.describeTools(any())).thenReturn("");
         when(prompts.render(eq("agent-ask"), any())).thenReturn("system prompt");
         when(memory.historyAsChat(any(), anyInt()))
                 .thenReturn(List.of(new AIProvider.ChatMessage("user", "summary please")));

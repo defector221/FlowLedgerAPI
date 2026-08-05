@@ -130,6 +130,14 @@ public class AiWorkflowController {
         return documentAi.extract(request);
     }
 
+    @PostMapping("/document-confirm")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('AI_ADMIN') or hasRole('ORGANIZATION_ADMIN')")
+    public AiDtos.DocumentDraftConfirmResponse documentConfirm(
+            @AuthenticationPrincipal UserPrincipal principal, @RequestBody AiDtos.DocumentDraftConfirmRequest request) {
+        ensureTenant(principal);
+        return documentAi.confirmDraft(request);
+    }
+
     @PostMapping("/voice-transcribe")
     @PreAuthorize("hasAuthority('AI_CHAT') or hasRole('ORGANIZATION_ADMIN')")
     public AiDtos.VoiceAiResponse voiceTranscribe(

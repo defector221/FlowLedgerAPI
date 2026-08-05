@@ -18,6 +18,7 @@ public class AiProperties {
     private boolean voiceEnabled = false;
     private boolean multiAgentEnabled = true;
     private boolean workflowBuilderEnabled = true;
+    private long automationPollMs = 60_000;
     private OpenAi openai = new OpenAi();
 
     @Getter

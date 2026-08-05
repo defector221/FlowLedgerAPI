@@ -30,13 +30,15 @@ public class AiAutoConfiguration {
     }
 
     @Bean
-    ClaudeProvider claudeProvider() {
-        return new ClaudeProvider();
+    ClaudeProvider claudeProvider(
+            AiProperties properties, ObjectMapper objectMapper, RestClient.Builder restClientBuilder) {
+        return new ClaudeProvider(properties, objectMapper, restClientBuilder);
     }
 
     @Bean
-    GeminiProvider geminiProvider() {
-        return new GeminiProvider();
+    GeminiProvider geminiProvider(
+            AiProperties properties, ObjectMapper objectMapper, RestClient.Builder restClientBuilder) {
+        return new GeminiProvider(properties, objectMapper, restClientBuilder);
     }
 
     @Bean
@@ -45,8 +47,9 @@ public class AiAutoConfiguration {
     }
 
     @Bean
-    OllamaProvider ollamaProvider() {
-        return new OllamaProvider();
+    OllamaProvider ollamaProvider(
+            AiProperties properties, ObjectMapper objectMapper, RestClient.Builder restClientBuilder) {
+        return new OllamaProvider(properties, objectMapper, restClientBuilder);
     }
 
     @Bean

@@ -7,11 +7,15 @@ import com.flowledger.common.security.UserPrincipal;
 import com.flowledger.common.tenant.TenantContext;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -31,7 +35,7 @@ public class AiKnowledgeController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAuthority('AI_ADMIN') or hasRole('ORGANIZATION_ADMIN')")
+    @PreAuthorize("hasAuthority('AI_ADMIN') or hasAuthority('AI_KNOWLEDGE') or hasRole('ORGANIZATION_ADMIN')")
     public AiDtos.KnowledgeResponse create(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody AiDtos.KnowledgeCreateRequest request) {
@@ -39,8 +43,43 @@ public class AiKnowledgeController {
         return knowledgeService.create(request);
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('AI_ADMIN') or hasAuthority('AI_KNOWLEDGE') or hasRole('ORGANIZATION_ADMIN')")
+    public AiDtos.KnowledgeResponse update(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id,
+            @RequestBody AiDtos.KnowledgeUpdateRequest request) {
+        ensureTenant(principal);
+        return knowledgeService.update(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('AI_ADMIN') or hasAuthority('AI_KNOWLEDGE') or hasRole('ORGANIZATION_ADMIN')")
+    public void delete(@AuthenticationPrincipal UserPrincipal principal, @PathVariable UUID id) {
+        ensureTenant(principal);
+        knowledgeService.delete(id);
+    }
+
+    @PostMapping("/upload")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('AI_ADMIN') or hasAuthority('AI_KNOWLEDGE') or hasRole('ORGANIZATION_ADMIN')")
+    public AiDtos.KnowledgeResponse upload(
+            @AuthenticationPrincipal UserPrincipal principal, @RequestBody AiDtos.KnowledgeUploadRequest request) {
+        ensureTenant(principal);
+        return knowledgeService.upload(request);
+    }
+
+    @PostMapping("/reindex")
+    @PreAuthorize("hasAuthority('AI_ADMIN') or hasAuthority('AI_KNOWLEDGE') or hasRole('ORGANIZATION_ADMIN')")
+    public AiDtos.KnowledgeReindexResponse reindex(@AuthenticationPrincipal UserPrincipal principal) {
+        ensureTenant(principal);
+        return knowledgeService.reindex();
+    }
+
     @GetMapping
-    @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('AI_ADMIN') or hasRole('ORGANIZATION_ADMIN')")
+    @PreAuthorize(
+            "hasAuthority('AI_CHAT') or hasAuthority('AI_ADMIN') or hasAuthority('AI_KNOWLEDGE') or hasRole('ORGANIZATION_ADMIN')")
     public AiDtos.KnowledgeSearchResponse search(
             @AuthenticationPrincipal UserPrincipal principal, @RequestParam(required = false) String q) {
         ensureTenant(principal);

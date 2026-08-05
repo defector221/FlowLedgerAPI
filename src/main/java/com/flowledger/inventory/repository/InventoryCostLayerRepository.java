@@ -32,4 +32,14 @@ public interface InventoryCostLayerRepository extends JpaRepository<InventoryCos
             """)
     List<InventoryCostLayer> findOpenLayers(
             @Param("org") UUID org, @Param("product") UUID product, @Param("warehouse") UUID warehouse);
+
+    @Query(
+            """
+            select distinct l.productId from InventoryCostLayer l
+            where l.organizationId = :org
+              and l.warehouseId = :warehouse
+              and l.qtyRemaining > 0
+            """)
+    List<UUID> findProductIdsWithStock(
+            @Param("org") UUID org, @Param("warehouse") UUID warehouse);
 }

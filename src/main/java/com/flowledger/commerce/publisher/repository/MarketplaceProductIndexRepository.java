@@ -13,6 +13,8 @@ public interface MarketplaceProductIndexRepository extends JpaRepository<Marketp
 
     List<MarketplaceProductIndex> findByStoreId(UUID storeId);
 
+    List<MarketplaceProductIndex> findByStoreIdAndPublishedTrue(UUID storeId);
+
     Optional<MarketplaceProductIndex> findFirstByBarcodeAndPublishedTrue(String barcode);
 
     Optional<MarketplaceProductIndex> findFirstByStoreIdAndBarcodeAndPublishedTrue(UUID storeId, String barcode);

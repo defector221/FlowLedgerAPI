@@ -5,6 +5,7 @@ import com.flowledger.ai.agent.AiAgent;
 import com.flowledger.ai.agent.AiAgentType;
 import com.flowledger.ai.agent.MultiAgentCollaborator;
 import com.flowledger.ai.audit.AiAuditService;
+import com.flowledger.ai.budget.AiBudgetService;
 import com.flowledger.ai.config.AiProperties;
 import com.flowledger.ai.config.ConditionalOnAiEnabled;
 import com.flowledger.ai.dto.AiDtos;
@@ -22,6 +23,7 @@ import com.flowledger.ai.rag.RagService;
 import com.flowledger.ai.repository.AiAgentRunRepository;
 import com.flowledger.ai.repository.AiKnowledgeDocumentRepository;
 import com.flowledger.ai.tools.AiToolRegistry;
+import com.flowledger.ai.tools.LangChain4jToolBridge;
 import com.flowledger.common.tenant.TenantContext;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +31,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +58,8 @@ public class ChatOrchestrationService {
     private final AiKnowledgeDocumentRepository knowledgeDocuments;
     private final EmbeddingPipeline embeddingPipeline;
     private final AiAgentRunRepository agentRuns;
+    private final AiBudgetService budgets;
+    private final LangChain4jToolBridge toolBridge;
 
     public ChatOrchestrationService(
             AiProperties properties,
@@ -68,7 +73,9 @@ public class ChatOrchestrationService {
             AiAuditService audit,
             AiKnowledgeDocumentRepository knowledgeDocuments,
             EmbeddingPipeline embeddingPipeline,
-            AiAgentRunRepository agentRuns) {
+            AiAgentRunRepository agentRuns,
+            AiBudgetService budgets,
+            LangChain4jToolBridge toolBridge) {
         this.properties = properties;
         this.agentSelector = agentSelector;
         this.collaborator = collaborator;
@@ -81,6 +88,8 @@ public class ChatOrchestrationService {
         this.knowledgeDocuments = knowledgeDocuments;
         this.embeddingPipeline = embeddingPipeline;
         this.agentRuns = agentRuns;
+        this.budgets = budgets;
+        this.toolBridge = toolBridge;
     }
 
     @Transactional
@@ -91,6 +100,7 @@ public class ChatOrchestrationService {
         if (request == null || request.message() == null || request.message().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message is required");
         }
+        budgets.assertWithinBudget();
 
         UUID org = TenantContext.getOrganizationId();
         UUID userId = TenantContext.userId()
@@ -107,7 +117,9 @@ public class ChatOrchestrationService {
         memory.append(conversation, "user", request.message(), null, null, null, null);
 
         boolean useRag = request.useRag() == null ? properties.isRagEnabled() : request.useRag();
-        String ragContext = useRag ? rag.retrieveContext(request.message(), 3) : "";
+        RagService.RetrievalResult retrieval =
+                useRag ? rag.retrieveWithCitations(request.message(), 3) : RagService.RetrievalResult.empty();
+        String ragContext = retrieval.context();
         String toolContext = gatherToolContext(agent.allowedTools(), request.message());
 
         MultiAgentCollaborator.ConsultResult consult = collaborator.consult(agent.type(), request.message());
@@ -170,6 +182,7 @@ public class ChatOrchestrationService {
 
         int tokens = (result.promptTokens() == null ? 0 : result.promptTokens())
                 + (result.completionTokens() == null ? 0 : result.completionTokens());
+        budgets.recordUsage(Math.max(tokens, 1));
         audit.record(
                 "CHAT", request.message(), result.content(), result.model(), tokens, (int) result.latencyMs(), null);
 
@@ -190,7 +203,8 @@ public class ChatOrchestrationService {
                 result.content(),
                 result.model(),
                 result.latencyMs(),
-                List.copyOf(consult.consultedAgents()));
+                List.copyOf(consult.consultedAgents()),
+                List.copyOf(retrieval.citations()));
     }
 
     /** Forced Global Ask Agent entry for FAB clients. */
@@ -202,6 +216,21 @@ public class ChatOrchestrationService {
                 message,
                 AiAgentType.ASK.name(),
                 request == null ? null : request.useRag()));
+    }
+
+    /**
+     * Runs chat then streams content tokens to the consumer (SSE-friendly). Final payload is also
+     * returned for non-stream clients that still need metadata/citations.
+     */
+    @Transactional
+    public AiDtos.ChatResponse chatStreaming(AiDtos.ChatRequest request, Consumer<String> tokenSink) {
+        AiDtos.ChatResponse response = chat(request);
+        String content = response.content() == null ? "" : response.content();
+        int size = 48;
+        for (int i = 0; i < content.length(); i += size) {
+            tokenSink.accept(content.substring(i, Math.min(content.length(), i + size)));
+        }
+        return response;
     }
 
     private void recordRun(
@@ -236,10 +265,12 @@ public class ChatOrchestrationService {
             if (allowed.contains("dashboard")) {
                 toRun = Set.of("dashboard");
             } else {
-                return "";
+                return toolBridge.describeTools(allowed);
             }
         }
-        return "Tool data:\n" + tools.invokeAllowed(toRun, message);
+        String data = "Tool data:\n" + tools.invokeAllowed(toRun, message);
+        String catalog = toolBridge.describeTools(toRun);
+        return catalog.isBlank() ? data : catalog + "\n" + data;
     }
 
     private Set<String> selectToolsForMessage(Set<String> allowed, String message) {

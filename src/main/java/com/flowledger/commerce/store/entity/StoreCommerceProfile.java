@@ -11,10 +11,14 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "store_commerce_profiles")
@@ -61,6 +65,10 @@ public class StoreCommerceProfile extends AuditedEntity {
 
     @Column(name = "discovery_radius")
     private BigDecimal discoveryRadius;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "allowed_category_ids", nullable = false, columnDefinition = "jsonb")
+    private List<UUID> allowedCategoryIds = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

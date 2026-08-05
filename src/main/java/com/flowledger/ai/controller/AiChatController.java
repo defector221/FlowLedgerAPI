@@ -1,6 +1,7 @@
 package com.flowledger.ai.controller;
 
 import com.flowledger.ai.agent.AgentCatalogService;
+import com.flowledger.ai.budget.AiBudgetService;
 import com.flowledger.ai.chat.ChatOrchestrationService;
 import com.flowledger.ai.config.ConditionalOnAiEnabled;
 import com.flowledger.ai.dto.AiDtos;
@@ -11,9 +12,11 @@ import com.flowledger.ai.workflow.VoiceAiService;
 import com.flowledger.common.security.UserPrincipal;
 import com.flowledger.common.tenant.TenantContext;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -33,15 +37,19 @@ public class AiChatController {
     private final AgentCatalogService agents;
     private final VoiceAiService voiceAi;
 
+    private final AiBudgetService budgets;
+
     public AiChatController(
             ChatOrchestrationService chat,
             ConversationMemoryService memory,
             AgentCatalogService agents,
-            VoiceAiService voiceAi) {
+            VoiceAiService voiceAi,
+            AiBudgetService budgets) {
         this.chat = chat;
         this.memory = memory;
         this.agents = agents;
         this.voiceAi = voiceAi;
+        this.budgets = budgets;
     }
 
     @GetMapping("/agents")
@@ -65,6 +73,35 @@ public class AiChatController {
             @AuthenticationPrincipal UserPrincipal principal, @Valid @RequestBody AiDtos.ChatRequest request) {
         ensureTenant(principal);
         return chat.ask(request);
+    }
+
+    @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasRole('ORGANIZATION_ADMIN')")
+    public SseEmitter chatStream(
+            @AuthenticationPrincipal UserPrincipal principal, @Valid @RequestBody AiDtos.ChatRequest request) {
+        ensureTenant(principal);
+        SseEmitter emitter = new SseEmitter(120_000L);
+        try {
+            AiDtos.ChatResponse response = chat.chatStreaming(request, token -> {
+                try {
+                    emitter.send(SseEmitter.event().name("token").data(token));
+                } catch (IOException e) {
+                    emitter.completeWithError(e);
+                }
+            });
+            emitter.send(SseEmitter.event().name("done").data(response));
+            emitter.complete();
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
+        return emitter;
+    }
+
+    @GetMapping("/budget")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('AI_ADMIN') or hasRole('ORGANIZATION_ADMIN')")
+    public AiDtos.BudgetStatusResponse budget(@AuthenticationPrincipal UserPrincipal principal) {
+        ensureTenant(principal);
+        return budgets.status();
     }
 
     @PostMapping("/voice-chat")

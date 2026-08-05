@@ -1,5 +1,6 @@
 package com.flowledger.ai.event;
 
+import com.flowledger.ai.automation.AutomationService;
 import com.flowledger.ai.config.ConditionalOnAiEnabled;
 import com.flowledger.ai.recommendation.RecommendationGenerator;
 import com.flowledger.common.tenant.TenantContext;
@@ -26,16 +27,19 @@ public class AiSearchEventBridge {
     private final AiLifecycleEventPublisher lifecycleEvents;
     private final SearchEntityDocumentLoader documentLoader;
     private final AiEntityCleanupService cleanupService;
+    private final AutomationService automations;
 
     public AiSearchEventBridge(
             RecommendationGenerator recommendationGenerator,
             AiLifecycleEventPublisher lifecycleEvents,
             SearchEntityDocumentLoader documentLoader,
-            AiEntityCleanupService cleanupService) {
+            AiEntityCleanupService cleanupService,
+            AutomationService automations) {
         this.recommendationGenerator = recommendationGenerator;
         this.lifecycleEvents = lifecycleEvents;
         this.documentLoader = documentLoader;
         this.cleanupService = cleanupService;
+        this.automations = automations;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -57,20 +61,24 @@ public class AiSearchEventBridge {
                 case PRODUCT -> {
                     int n = recommendationGenerator.onProductChanged(event.entityId());
                     lifecycleEvents.recommendationSeed(event.organizationId(), type.name(), event.entityId());
+                    automations.handleEvent(event.organizationId(), "PRODUCT_UPSERT");
                     log.debug("AI inventory heuristics created={} for product={}", n, event.entityId());
                 }
                 case CUSTOMER -> {
                     int n = recommendationGenerator.onCustomerChanged(event.entityId());
                     lifecycleEvents.recommendationSeed(event.organizationId(), type.name(), event.entityId());
+                    automations.handleEvent(event.organizationId(), "CUSTOMER_UPSERT");
                     log.debug("AI credit heuristics created={} for customer={}", n, event.entityId());
                 }
-                case SALES_INVOICE, PURCHASE_INVOICE, SUPPLIER, SHIPMENT ->
+                case SALES_INVOICE, PURCHASE_INVOICE, SUPPLIER, SHIPMENT -> {
                     lifecycleEvents.publish(
                             event.organizationId(),
                             AiLifecycleEvent.RECOMMENDATION_SEED,
                             type.name(),
                             event.entityId(),
                             java.util.Map.of("source", "search-upsert"));
+                    automations.handleEvent(event.organizationId(), type.name() + "_UPSERT");
+                }
                 default -> {
                     // no-op
                 }

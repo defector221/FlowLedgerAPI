@@ -28,11 +28,14 @@ Dedupes open (`NEW`/`OPEN`) rows per type + related entity.
 - Side effects: `RecommendationGenerator` + `AiLifecycleEventPublisher`
 - Prefer **no ERP method edits**; bridge reuses existing search upserts
 
-## Forecasts (Phase 7)
+## Forecasts (Phase 7 / v2.1)
 
-Moving-average / position stubs from invoice counts and stock overview. Persisted to `ai_forecast_runs`. Gated by `analytics-enabled`.
+Exponential smoothing over invoice totals (SALES/DEMAND) with MAPE persistence on `ai_forecast_runs`. Cashflow and inventory remain advisory proxies. Gated by `analytics-enabled`.
 
-## Autonomous stubs (Phase 8)
+## Autonomous + Document AI (Phase 8 / v2.2)
 
-`suggest-from-text` returns draft field JSON (`suggestedDocumentType`, amount, GSTIN regex).  
-Document/voice endpoints return “not configured” unless flags are on — still never post documents.
+`/workflow/document-extract` uses OpenAI vision when keyed, else heuristics. `/workflow/document-confirm` accepts reviewed fields for human-gated ERP create (never silent post).
+
+## Automations (v2.2)
+
+`ai_automations` + cron scheduler + EVENT hooks from `AiSearchEventBridge` (PRODUCT_UPSERT, CUSTOMER_UPSERT, …). Actions are advisory: recommendations / notify / workflow draft. Dry-run supported.

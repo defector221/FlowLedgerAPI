@@ -33,6 +33,9 @@ class AiSearchEventBridgeTest {
     @Mock
     AiEntityCleanupService cleanupService;
 
+    @Mock
+    com.flowledger.ai.automation.AutomationService automations;
+
     @InjectMocks
     AiSearchEventBridge bridge;
 

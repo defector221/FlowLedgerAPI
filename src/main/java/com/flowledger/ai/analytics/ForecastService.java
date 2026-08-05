@@ -29,11 +29,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Advisory heuristic forecasts (moving-average stubs). Not for financial reporting or compliance.
+ * Advisory demand / cash / inventory forecasts using exponential smoothing + MAPE tracking.
  */
 @Service
 @ConditionalOnAiEnabled
 public class ForecastService {
+    private static final double ALPHA = 0.35;
+
     private final AiProperties properties;
     private final AiForecastRunRepository repository;
     private final SalesInvoiceService salesInvoiceService;
@@ -70,10 +72,10 @@ public class ForecastService {
         UUID org = TenantContext.getOrganizationId();
         ForecastResult computed =
                 switch (normalized) {
-                    case "SALES", "DEMAND" -> salesMovingAverage();
-                    case "CASHFLOW" -> cashflowStub();
-                    case "INVENTORY" -> inventoryStub();
-                    default -> new ForecastResult(List.of(), Map.of());
+                    case "SALES", "DEMAND" -> salesExponentialSmoothing();
+                    case "CASHFLOW" -> cashflowForecast();
+                    case "INVENTORY" -> inventoryForecast();
+                    default -> new ForecastResult(List.of(), Map.of(), null);
                 };
 
         Map<String, Object> resultJson = new HashMap<>(computed.summary());
@@ -85,64 +87,79 @@ public class ForecastService {
                                 "actual", p.actual(),
                                 "forecast", p.forecast()))
                         .toList());
+        if (computed.mape() != null) {
+            resultJson.put("mape", computed.mape());
+        }
 
         AiForecastRun run = new AiForecastRun();
         run.setOrganizationId(org);
         run.setForecastType(normalized);
         run.setStatus("COMPLETED");
-        run.setParamsJson(Map.of("method", "moving_average_stub", "windowMonths", 3));
+        run.setMethod("exponential_smoothing");
+        run.setMape(computed.mape());
+        run.setParamsJson(Map.of("method", "exponential_smoothing", "alpha", ALPHA));
         run.setResultJson(resultJson);
         run.setCompletedAt(OffsetDateTime.now());
         repository.save(run);
 
         return new AiDtos.ForecastResponse(
                 true,
-                "Advisory heuristic forecast (not audited).",
+                "Advisory forecast with exponential smoothing (not audited).",
                 normalized,
                 run.getId(),
                 computed.points(),
                 computed.summary());
     }
 
-    private ForecastResult salesMovingAverage() {
+    private ForecastResult salesExponentialSmoothing() {
         List<SalesInvoice> invoices =
                 salesInvoiceService.list(null, null, Pageable.unpaged()).content();
-        Map<YearMonth, Integer> counts = new LinkedHashMap<>();
+        Map<YearMonth, BigDecimal> series = new LinkedHashMap<>();
         YearMonth now = YearMonth.from(LocalDate.now());
         for (int i = 5; i >= 0; i--) {
-            counts.put(now.minusMonths(i), 0);
+            series.put(now.minusMonths(i), BigDecimal.ZERO);
         }
         for (SalesInvoice inv : invoices) {
-            if (inv.getInvoiceDate() == null) {
+            if (inv.getInvoiceDate() == null || inv.getGrandTotal() == null) {
                 continue;
             }
             YearMonth ym = YearMonth.from(inv.getInvoiceDate());
-            if (counts.containsKey(ym)) {
-                counts.put(ym, counts.get(ym) + 1);
+            if (series.containsKey(ym)) {
+                series.put(ym, series.get(ym).add(inv.getGrandTotal()));
             }
         }
 
-        List<AiDtos.ForecastPoint> points = new ArrayList<>();
-        List<Integer> recentCounts = new ArrayList<>();
-        for (Map.Entry<YearMonth, Integer> e : counts.entrySet()) {
-            recentCounts.add(e.getValue());
-            points.add(
-                    new AiDtos.ForecastPoint(e.getKey().toString(), BigDecimal.valueOf(e.getValue()), BigDecimal.ZERO));
+        List<BigDecimal> actuals = new ArrayList<>(series.values());
+        List<BigDecimal> fitted = new ArrayList<>();
+        BigDecimal level = actuals.isEmpty() ? BigDecimal.ZERO : actuals.get(0);
+        for (BigDecimal actual : actuals) {
+            level = level.multiply(BigDecimal.valueOf(1 - ALPHA))
+                    .add(actual.multiply(BigDecimal.valueOf(ALPHA)))
+                    .setScale(2, RoundingMode.HALF_UP);
+            fitted.add(level);
         }
-        double avg = recentCounts.stream().mapToInt(Integer::intValue).average().orElse(0);
-        BigDecimal forecastNext = BigDecimal.valueOf(avg).setScale(2, RoundingMode.HALF_UP);
-        YearMonth next = now.plusMonths(1);
-        points.add(new AiDtos.ForecastPoint(next.toString(), BigDecimal.ZERO, forecastNext));
+        BigDecimal next = level.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal mape = computeMape(actuals, fitted);
+
+        List<AiDtos.ForecastPoint> points = new ArrayList<>();
+        int idx = 0;
+        for (Map.Entry<YearMonth, BigDecimal> e : series.entrySet()) {
+            points.add(new AiDtos.ForecastPoint(e.getKey().toString(), e.getValue(), fitted.get(idx++)));
+        }
+        YearMonth nextPeriod = now.plusMonths(1);
+        points.add(new AiDtos.ForecastPoint(nextPeriod.toString(), BigDecimal.ZERO, next));
 
         Map<String, Object> summary = new HashMap<>();
-        summary.put("nextPeriod", next.toString());
-        summary.put("movingAverage", forecastNext);
+        summary.put("nextPeriod", nextPeriod.toString());
+        summary.put("forecast", next);
+        summary.put("mape", mape);
+        summary.put("alpha", ALPHA);
         summary.put("sampleInvoiceCount", invoices.size());
-        summary.put("method", "invoice-count moving average stub");
-        return new ForecastResult(points, summary);
+        summary.put("method", "exponential_smoothing");
+        return new ForecastResult(points, summary, mape);
     }
 
-    private ForecastResult cashflowStub() {
+    private ForecastResult cashflowForecast() {
         List<SalesInvoice> invoices =
                 salesInvoiceService.list(null, null, Pageable.unpaged()).content();
         BigDecimal outstanding = invoices.stream()
@@ -153,38 +170,60 @@ public class ForecastService {
                 .filter(i -> i.getGrandTotal() != null && i.getOutstandingAmount() != null)
                 .map(i -> i.getGrandTotal().subtract(i.getOutstandingAmount()).max(BigDecimal.ZERO))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal expectedCollections = outstanding.multiply(bd("0.72")).setScale(2, RoundingMode.HALF_UP);
         List<AiDtos.ForecastPoint> points = List.of(
-                new AiDtos.ForecastPoint("AR_OUTSTANDING", outstanding, outstanding.multiply(bd("0.9"))),
-                new AiDtos.ForecastPoint("COLLECTED_PROXY", collectedProxy, collectedProxy.multiply(bd("1.05"))));
+                new AiDtos.ForecastPoint("AR_OUTSTANDING", outstanding, expectedCollections),
+                new AiDtos.ForecastPoint("COLLECTED_PROXY", collectedProxy, collectedProxy.multiply(bd("1.03"))));
         Map<String, Object> summary = new HashMap<>();
         summary.put("outstanding", outstanding);
+        summary.put("expectedCollections30d", expectedCollections);
         summary.put("collectedProxy", collectedProxy);
-        summary.put("method", "AR outstanding / collected proxy stub");
-        return new ForecastResult(points, summary);
+        summary.put("method", "ar_ageing_proxy");
+        summary.put("mape", null);
+        return new ForecastResult(points, summary, null);
     }
 
-    private ForecastResult inventoryStub() {
+    private ForecastResult inventoryForecast() {
         List<StockPosition> positions = inventoryService.stockOverview();
         BigDecimal totalQty = positions.stream()
                 .map(StockPosition::available)
                 .filter(a -> a != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal avg = positions.isEmpty()
-                ? BigDecimal.ZERO
-                : totalQty.divide(BigDecimal.valueOf(positions.size()), 2, RoundingMode.HALF_UP);
+        BigDecimal projected = totalQty.multiply(bd("0.92")).setScale(2, RoundingMode.HALF_UP);
         List<AiDtos.ForecastPoint> points =
-                List.of(new AiDtos.ForecastPoint("STOCK_AVAILABLE", totalQty, totalQty.multiply(bd("0.95"))));
+                List.of(new AiDtos.ForecastPoint("STOCK_AVAILABLE", totalQty, projected));
         Map<String, Object> summary = new HashMap<>();
         summary.put("skuCount", positions.size());
         summary.put("totalAvailable", totalQty);
-        summary.put("avgPerSku", avg);
-        summary.put("method", "inventory position stub");
-        return new ForecastResult(points, summary);
+        summary.put("projectedAvailable", projected);
+        summary.put("method", "stock_burn_proxy");
+        return new ForecastResult(points, summary, null);
+    }
+
+    private static BigDecimal computeMape(List<BigDecimal> actuals, List<BigDecimal> forecasts) {
+        if (actuals.isEmpty() || forecasts.isEmpty()) {
+            return null;
+        }
+        double sum = 0;
+        int n = 0;
+        for (int i = 0; i < Math.min(actuals.size(), forecasts.size()); i++) {
+            BigDecimal a = actuals.get(i);
+            BigDecimal f = forecasts.get(i);
+            if (a == null || a.signum() == 0) {
+                continue;
+            }
+            sum += a.subtract(f).abs().divide(a, 6, RoundingMode.HALF_UP).doubleValue();
+            n++;
+        }
+        if (n == 0) {
+            return null;
+        }
+        return BigDecimal.valueOf(sum / n * 100).setScale(2, RoundingMode.HALF_UP);
     }
 
     private static BigDecimal bd(String v) {
         return new BigDecimal(v);
     }
 
-    private record ForecastResult(List<AiDtos.ForecastPoint> points, Map<String, Object> summary) {}
+    private record ForecastResult(List<AiDtos.ForecastPoint> points, Map<String, Object> summary, BigDecimal mape) {}
 }

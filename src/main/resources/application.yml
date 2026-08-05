@@ -163,6 +163,7 @@ flowledger:
     voice-enabled: ${FLOWLEDGER_AI_VOICE_ENABLED:true}
     multi-agent-enabled: ${FLOWLEDGER_AI_MULTI_AGENT_ENABLED:true}
     workflow-builder-enabled: ${FLOWLEDGER_AI_WORKFLOW_ENABLED:true}
+    automation-poll-ms: ${FLOWLEDGER_AI_AUTOMATION_POLL_MS:60000}
     openai:
       api-key: ${OPENAI_API_KEY:}
       base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
