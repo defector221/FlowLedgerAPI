@@ -59,7 +59,7 @@ flowledger:
     access-token-expiry-minutes: 30
     refresh-token-expiry-days: 14
   cors:
-    allowed-origins: http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000,https://flowledger.valiantxgroup.com,https://apiflowledger.valiantxgroup.com
+    allowed-origins: ${FLOWLEDGER_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000,https://flowledger.valiantxgroup.com,https://apiflowledger.valiantxgroup.com,https://one.sankhya.cloud}
   storage:
     local:
       base-path: ${FLOWLEDGER_LOCAL_STORAGE_PATH:${user.home}/.flowledger/storage}

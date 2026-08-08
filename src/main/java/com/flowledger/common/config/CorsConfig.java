@@ -24,7 +24,9 @@ public class CorsConfig {
                 "http://127.0.0.1:*",
                 "https://*.valiantxgroup.com",
                 "https://flowledger.valiantxgroup.com",
-                "https://apiflowledger.valiantxgroup.com"));
+                "https://apiflowledger.valiantxgroup.com",
+                "https://one.sankhya.cloud",
+                "https://*.sankhya.cloud"));
         for (String origin : allowed) {
             if (!config.getAllowedOriginPatterns().contains(origin)) {
                 config.addAllowedOriginPattern(origin);
