@@ -25,16 +25,19 @@ public class PlatformAuthController {
     private final PasswordEncoder encoder;
     private final PlatformJwtService jwt;
     private final PlatformUserDetailsService userDetails;
+    private final com.flowledger.iam.config.IamProperties iamProperties;
 
     public PlatformAuthController(
             PlatformUserRepository users,
             PasswordEncoder encoder,
             PlatformJwtService jwt,
-            PlatformUserDetailsService userDetails) {
+            PlatformUserDetailsService userDetails,
+            com.flowledger.iam.config.IamProperties iamProperties) {
         this.users = users;
         this.encoder = encoder;
         this.jwt = jwt;
         this.userDetails = userDetails;
+        this.iamProperties = iamProperties;
     }
 
     public record LoginRequest(@NotBlank @Email String email, @NotBlank String password) {}
@@ -43,6 +46,10 @@ public class PlatformAuthController {
 
     @PostMapping("/login")
     public ApiResponse<Map<String, Object>> login(@RequestBody LoginRequest request) {
+        if (iamProperties.isEnabled()) {
+            throw new ResponseStatusException(
+                    HttpStatus.GONE, "Password authentication is disabled. Use Sankhya IAM SSO (/api/v1/ops/auth/iam).");
+        }
         PlatformUser user = users.findByEmailIgnoreCase(request.email().trim())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
         if (!user.isActive() || !encoder.matches(request.password(), user.getPasswordHash())) {
@@ -56,6 +63,10 @@ public class PlatformAuthController {
 
     @PostMapping("/refresh")
     public ApiResponse<Map<String, Object>> refresh(@RequestBody RefreshRequest request) {
+        if (iamProperties.isEnabled()) {
+            throw new ResponseStatusException(
+                    HttpStatus.GONE, "Use /api/v1/ops/auth/iam/refresh while IAM SSO is enabled");
+        }
         if (!jwt.isValidPlatformRefresh(request.refreshToken())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token");
         }

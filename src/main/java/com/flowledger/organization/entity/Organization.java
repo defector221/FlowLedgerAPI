@@ -69,4 +69,8 @@ public class Organization extends AuditableEntity {
 
     @Column(nullable = false, length = 32)
     private String editionCode = "PROFESSIONAL";
+
+    /** Sankhya IAM organization id (source of truth when IAM SSO is enabled). */
+    @Column(name = "iam_organization_id")
+    private java.util.UUID iamOrganizationId;
 }

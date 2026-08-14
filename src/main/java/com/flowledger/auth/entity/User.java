@@ -38,6 +38,10 @@ public class User extends AuditableEntity {
     private String invitationToken;
     private Instant invitationExpiry;
 
+    /** Sankhya IAM user id (source of truth for identity when IAM SSO is enabled). */
+    @Column(name = "iam_user_id")
+    private UUID iamUserId;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",

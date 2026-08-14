@@ -6,6 +6,7 @@ import com.flowledger.auth.entity.*;
 import com.flowledger.auth.repository.*;
 import com.flowledger.common.exception.*;
 import com.flowledger.common.security.*;
+import com.flowledger.iam.config.IamProperties;
 import com.flowledger.notification.NotificationChannel;
 import com.flowledger.notification.NotificationRecipient;
 import com.flowledger.notification.NotificationRequest;
@@ -19,9 +20,11 @@ import java.time.*;
 import java.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @Slf4j
@@ -39,6 +42,7 @@ public class AuthService {
     private final NotificationService notifications;
     private final ChartOfAccountsBootstrapService accountingBootstrap;
     private final EditionService editionService;
+    private final IamProperties iamProperties;
 
     @Value("${flowledger.app.frontend-url}")
     private String frontendUrl;
@@ -56,7 +60,8 @@ public class AuthService {
             SubscriptionService subscriptions,
             NotificationService notifications,
             ChartOfAccountsBootstrapService accountingBootstrap,
-            EditionService editionService) {
+            EditionService editionService,
+            IamProperties iamProperties) {
         this.users = users;
         this.roles = roles;
         this.refreshTokens = refreshTokens;
@@ -70,6 +75,7 @@ public class AuthService {
         this.notifications = notifications;
         this.accountingBootstrap = accountingBootstrap;
         this.editionService = editionService;
+        this.iamProperties = iamProperties;
     }
 
     @Transactional
@@ -148,6 +154,11 @@ public class AuthService {
 
     @Transactional
     public LoginResponse switchOrganization(UUID userId, SwitchOrganizationRequest request) {
+        if (iamProperties != null && iamProperties.isEnabled()) {
+            throw new ResponseStatusException(
+                    HttpStatus.GONE,
+                    "Use /api/v1/auth/iam/organizations/{id}/switch");
+        }
         User user =
                 users.findByIdAndActiveTrue(userId).orElseThrow(() -> new UnauthorizedException("User unavailable"));
         membershipService.requireActiveMembership(userId, request.organizationId());

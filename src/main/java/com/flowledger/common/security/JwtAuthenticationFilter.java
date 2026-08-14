@@ -2,6 +2,7 @@ package com.flowledger.common.security;
 
 import com.flowledger.auth.service.CustomUserDetailsService;
 import com.flowledger.common.tenant.TenantContext;
+import com.flowledger.iam.config.IamProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,14 +22,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwt;
     private final CustomUserDetailsService users;
+    private final IamProperties iamProperties;
 
-    public JwtAuthenticationFilter(JwtService jwt, CustomUserDetailsService users) {
+    public JwtAuthenticationFilter(JwtService jwt, CustomUserDetailsService users, IamProperties iamProperties) {
         this.jwt = jwt;
         this.users = users;
+        this.iamProperties = iamProperties;
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
+        // Legacy HS256 plane is retained only when IAM SSO is disabled.
+        if (iamProperties.isEnabled()) {
+            return true;
+        }
         String path = request.getRequestURI();
         if (path != null && path.startsWith("/api/v1/ops/")) {
             return true;
@@ -65,7 +72,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
                 if (!jwt.isValid(token, "access")) {
-                    // Expired / malformed / wrong type — must be 401 so the UI can refresh or log out
                     if (isPublicAuthPath(request)) {
                         chain.doFilter(request, response);
                         return;

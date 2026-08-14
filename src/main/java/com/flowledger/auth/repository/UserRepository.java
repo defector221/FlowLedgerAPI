@@ -20,4 +20,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByIdAndOrganizationId(UUID id, UUID organizationId);
 
     Optional<User> findByInvitationToken(String invitationToken);
+
+    Optional<User> findByIamUserId(UUID iamUserId);
 }

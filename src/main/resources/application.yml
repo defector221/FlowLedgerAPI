@@ -54,6 +54,35 @@ flowledger:
   finance:
     # When false, document services fall back to AccountingPostingService (rollback path).
     voucher-engine-enabled: ${FLOWLEDGER_VOUCHER_ENGINE_ENABLED:true}
+  iam:
+    # Keycloak is the only token issuer. HS256 is legacy rollback only when enabled=false.
+    enabled: ${FLOWLEDGER_IAM_ENABLED:true}
+    base-url: ${FLOWLEDGER_IAM_BASE_URL:https://iam.sankhya.cloud}
+    product-code: ${FLOWLEDGER_IAM_PRODUCT_CODE:flowledger}
+    client-id: ${FLOWLEDGER_IAM_CLIENT_ID:flowledger-bff}
+    client-secret: ${FLOWLEDGER_IAM_CLIENT_SECRET:2WvXBifKMmkwBmkbUeKDIXBTXiVh8ptw}
+    redirect-uri: ${FLOWLEDGER_IAM_REDIRECT_URI:https://apiflowledger.valiantxgroup.com/api/v1/auth/iam/callback}
+    frontend-success-url: ${FLOWLEDGER_IAM_FRONTEND_SUCCESS_URL:https://flowledger.valiantxgroup.com/auth/iam/complete}
+    post-logout-redirect-uri: ${FLOWLEDGER_IAM_POST_LOGOUT_REDIRECT_URI:https://flowledger.valiantxgroup.com/login}
+    audience: ${FLOWLEDGER_IAM_AUDIENCE:flowledger-bff}
+    # Bootstrap hint for IAM resolve/login-url only — not durable tenant identity (use iam_organization_id).
+    org-slug: ${FLOWLEDGER_IAM_ORG_SLUG:demo}
+    # Demo org id from IAM V5 seed — required for provision when JWT lacks organizationId claim.
+    organization-id: ${FLOWLEDGER_IAM_ORGANIZATION_ID:00000000-0000-0000-0000-000000000001}
+    self-service-signup-enabled: ${FLOWLEDGER_IAM_SELF_SERVICE_SIGNUP:false}
+    thin-token-mode: ${FLOWLEDGER_IAM_THIN_TOKEN_MODE:true}
+    jwks-cache-ttl-seconds: ${FLOWLEDGER_IAM_JWKS_CACHE_TTL_SECONDS:300}
+    permission-cache-ttl-seconds: ${FLOWLEDGER_IAM_PERMISSION_CACHE_TTL_SECONDS:300}
+    cookie-secure: ${FLOWLEDGER_IAM_COOKIE_SECURE:true}
+    fallback-direct-keycloak: ${FLOWLEDGER_IAM_FALLBACK_DIRECT_KEYCLOAK:true}
+    trusted-issuers:
+      - ${FLOWLEDGER_IAM_TRUSTED_ISSUER:https://keycloak.sankhya.cloud/realms/sankhya}
+    ops:
+      client-id: ${FLOWLEDGER_IAM_OPS_CLIENT_ID:flowledger-ops-bff}
+      client-secret: ${FLOWLEDGER_IAM_OPS_CLIENT_SECRET:}
+      redirect-uri: ${FLOWLEDGER_IAM_OPS_REDIRECT_URI:https://apiflowledger.valiantxgroup.com/api/v1/ops/auth/iam/callback}
+      frontend-success-url: ${FLOWLEDGER_IAM_OPS_FRONTEND_SUCCESS_URL:http://localhost:5174/auth/iam/complete}
+      post-logout-redirect-uri: ${FLOWLEDGER_IAM_OPS_POST_LOGOUT_REDIRECT_URI:http://localhost:5174/login}
   jwt:
     secret: ${JWT_SECRET:FlowLedgerDevSecretKeyMustBeAtLeast256BitsLongForHS256Security!!}
     access-token-expiry-minutes: 30

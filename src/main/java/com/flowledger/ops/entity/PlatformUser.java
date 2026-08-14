@@ -43,6 +43,10 @@ public class PlatformUser {
     @Column(name = "last_login_at")
     private OffsetDateTime lastLoginAt;
 
+    /** Sankhya IAM user id for Platform Ops SSO shells. */
+    @Column(name = "iam_user_id")
+    private UUID iamUserId;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             schema = "platform",

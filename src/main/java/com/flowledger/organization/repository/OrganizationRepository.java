@@ -23,4 +23,6 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
                OR LOWER(COALESCE(o.email, '')) LIKE LOWER(CONCAT('%', :q, '%')))
             """)
     Page<Organization> search(@Param("q") String q, Pageable pageable);
+
+    Optional<Organization> findByIamOrganizationId(UUID iamOrganizationId);
 }

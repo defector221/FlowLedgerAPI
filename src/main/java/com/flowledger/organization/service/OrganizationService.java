@@ -111,21 +111,16 @@ public class OrganizationService {
         return mapper.toResponse(saved);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public OrganizationSettingsResponse settings() {
         UUID orgId = SecurityUtils.currentOrganizationId();
-        OrganizationSettings settings = settingsRepo
-                .findByOrganizationId(orgId)
-                .orElseThrow(() -> new ResourceNotFoundException("Organization settings not found"));
-        return mapper.toResponse(settings);
+        return mapper.toResponse(getOrCreateSettings(orgId));
     }
 
     @Transactional
     public OrganizationSettingsResponse updateSettings(UpdateOrganizationSettingsRequest request) {
         UUID orgId = SecurityUtils.currentOrganizationId();
-        OrganizationSettings settings = settingsRepo
-                .findByOrganizationId(orgId)
-                .orElseThrow(() -> new ResourceNotFoundException("Organization settings not found"));
+        OrganizationSettings settings = getOrCreateSettings(orgId);
         if (request.inventoryDeductionEvent() != null) {
             settings.setInventoryDeductionEvent(request.inventoryDeductionEvent());
         }
@@ -194,6 +189,14 @@ public class OrganizationService {
         if (value == null || value.isBlank()) {
             errors.put(field, message);
         }
+    }
+
+    private OrganizationSettings getOrCreateSettings(UUID organizationId) {
+        return settingsRepo.findByOrganizationId(organizationId).orElseGet(() -> {
+            OrganizationSettings created = new OrganizationSettings();
+            created.setOrganizationId(organizationId);
+            return settingsRepo.save(created);
+        });
     }
 
     private Organization get(UUID id) {

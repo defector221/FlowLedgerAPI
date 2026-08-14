@@ -53,14 +53,14 @@ public class AiChatController {
     }
 
     @GetMapping("/agents")
-    @PreAuthorize("hasAuthority('AI_CHAT') or hasRole('ORGANIZATION_ADMIN')")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('flowledger.ai.chat') or hasRole('ORGANIZATION_ADMIN')")
     public List<AiDtos.AgentInfo> listAgents(@AuthenticationPrincipal UserPrincipal principal) {
         ensureTenant(principal);
         return agents.list();
     }
 
     @PostMapping("/chat")
-    @PreAuthorize("hasAuthority('AI_CHAT') or hasRole('ORGANIZATION_ADMIN')")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('flowledger.ai.chat') or hasRole('ORGANIZATION_ADMIN')")
     public AiDtos.ChatResponse chat(
             @AuthenticationPrincipal UserPrincipal principal, @Valid @RequestBody AiDtos.ChatRequest request) {
         ensureTenant(principal);
@@ -68,7 +68,7 @@ public class AiChatController {
     }
 
     @PostMapping("/ask")
-    @PreAuthorize("hasAuthority('AI_CHAT') or hasRole('ORGANIZATION_ADMIN')")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('flowledger.ai.chat') or hasRole('ORGANIZATION_ADMIN')")
     public AiDtos.ChatResponse ask(
             @AuthenticationPrincipal UserPrincipal principal, @Valid @RequestBody AiDtos.ChatRequest request) {
         ensureTenant(principal);
@@ -76,7 +76,7 @@ public class AiChatController {
     }
 
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PreAuthorize("hasAuthority('AI_CHAT') or hasRole('ORGANIZATION_ADMIN')")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('flowledger.ai.chat') or hasRole('ORGANIZATION_ADMIN')")
     public SseEmitter chatStream(
             @AuthenticationPrincipal UserPrincipal principal, @Valid @RequestBody AiDtos.ChatRequest request) {
         ensureTenant(principal);
@@ -98,14 +98,14 @@ public class AiChatController {
     }
 
     @GetMapping("/budget")
-    @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('AI_ADMIN') or hasRole('ORGANIZATION_ADMIN')")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('flowledger.ai.chat') or hasAuthority('AI_ADMIN') or hasRole('ORGANIZATION_ADMIN')")
     public AiDtos.BudgetStatusResponse budget(@AuthenticationPrincipal UserPrincipal principal) {
         ensureTenant(principal);
         return budgets.status();
     }
 
     @PostMapping("/voice-chat")
-    @PreAuthorize("hasAuthority('AI_CHAT') or hasRole('ORGANIZATION_ADMIN')")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('flowledger.ai.chat') or hasRole('ORGANIZATION_ADMIN')")
     public AiDtos.ChatResponse voiceChat(
             @AuthenticationPrincipal UserPrincipal principal, @RequestBody AiDtos.VoiceChatRequest request) {
         ensureTenant(principal);
@@ -126,7 +126,7 @@ public class AiChatController {
     }
 
     @GetMapping("/conversations")
-    @PreAuthorize("hasAuthority('AI_CHAT') or hasRole('ORGANIZATION_ADMIN')")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('flowledger.ai.chat') or hasRole('ORGANIZATION_ADMIN')")
     public List<AiDtos.ConversationResponse> conversations(@AuthenticationPrincipal UserPrincipal principal) {
         ensureTenant(principal);
         return memory.listForUser(principal.getId()).stream()
@@ -135,7 +135,7 @@ public class AiChatController {
     }
 
     @GetMapping("/conversations/{id}/messages")
-    @PreAuthorize("hasAuthority('AI_CHAT') or hasRole('ORGANIZATION_ADMIN')")
+    @PreAuthorize("hasAuthority('AI_CHAT') or hasAuthority('flowledger.ai.chat') or hasRole('ORGANIZATION_ADMIN')")
     public List<AiDtos.MessageResponse> messages(
             @AuthenticationPrincipal UserPrincipal principal, @PathVariable UUID id) {
         ensureTenant(principal);

@@ -1,5 +1,6 @@
 package com.flowledger.ops.security;
 
+import com.flowledger.iam.config.IamProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,8 +16,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Authenticates platform JWTs on /api/v1/ops/**. Skips auth paths. Does not touch tenant SecurityContext for other
- * routes.
+ * Authenticates platform JWTs on /api/v1/ops/**. Skips auth paths. Disabled when IAM SSO is enabled
+ * (see PlatformIamJwtAuthenticationFilter).
  */
 @Slf4j
 @Component
@@ -24,14 +25,20 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class PlatformJwtAuthenticationFilter extends OncePerRequestFilter {
     private final PlatformJwtService jwt;
     private final PlatformUserDetailsService users;
+    private final IamProperties iamProperties;
 
-    public PlatformJwtAuthenticationFilter(PlatformJwtService jwt, PlatformUserDetailsService users) {
+    public PlatformJwtAuthenticationFilter(
+            PlatformJwtService jwt, PlatformUserDetailsService users, IamProperties iamProperties) {
         this.jwt = jwt;
         this.users = users;
+        this.iamProperties = iamProperties;
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
+        if (iamProperties.isEnabled()) {
+            return true;
+        }
         String path = request.getRequestURI();
         return path == null || !path.startsWith("/api/v1/ops/");
     }

@@ -30,7 +30,9 @@ public class SecurityConfig {
             HttpSecurity h,
             JwtAuthenticationFilter tenantJwt,
             PlatformJwtAuthenticationFilter platformJwt,
-            CommerceJwtAuthenticationFilter commerceJwt)
+            CommerceJwtAuthenticationFilter commerceJwt,
+            com.flowledger.iam.security.IamJwtAuthenticationFilter iamJwt,
+            com.flowledger.iam.security.PlatformIamJwtAuthenticationFilter platformIamJwt)
             throws Exception {
         return h.csrf(c -> c.disable())
                 .cors(c -> {})
@@ -71,6 +73,8 @@ public class SecurityConfig {
                         .authenticated()
                         .anyRequest()
                         .authenticated())
+                .addFilterBefore(platformIamJwt, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(iamJwt, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(platformJwt, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(commerceJwt, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(tenantJwt, UsernamePasswordAuthenticationFilter.class)
